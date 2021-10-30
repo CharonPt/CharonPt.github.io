@@ -186,7 +186,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-10-30 11:12:15" itemprop="dateModified" datetime="2021-10-30T11:12:15+08:00">2021-10-30</time>
+                <time title="修改时间：2021-10-30 11:17:35" itemprop="dateModified" datetime="2021-10-30T11:17:35+08:00">2021-10-30</time>
               </span>
 
           
@@ -210,7 +210,7 @@
 <li>libc的基地址 + 函数libc中的偏移 = 函数真实地址</li>
 <li>控制程序返回，再次触发栈溢出，执行system(“/bin/sh”)</li>
 </ul>
-<h4 id="一道简单的例题"><a href="#一道简单的例题" class="headerlink" title="一道简单的例题"></a>一道简单的例题</h4>
+<h4 id="一道简单的例题"><a href="#一道简单的例题" class="headerlink" title="一道简单的例题"></a>一道简单的例题</h4><img src="/2021/10/29/ret2libc/pwnn.jpg" class>
 
 <p>如上图，存在栈溢出漏洞和一个输出函数‘puts’，显然当触发栈溢出时puts函数已经被执行，所以这里可以选择泄漏puts函数的地址。</p>
 <p>检查程序保护：可以看到PIE和Canary都没开启</p>
