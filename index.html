@@ -180,7 +180,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2021-11-08 19:37:28 / 修改时间：21:14:29" itemprop="dateCreated datePublished" datetime="2021-11-08T19:37:28+08:00">2021-11-08</time>
+              <time title="创建时间：2021-11-08 19:37:28 / 修改时间：21:29:56" itemprop="dateCreated datePublished" datetime="2021-11-08T19:37:28+08:00">2021-11-08</time>
             </span>
 
           
@@ -194,9 +194,13 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="劫持-stack-chk-fail函数实现Canary绕过"><a href="#劫持-stack-chk-fail函数实现Canary绕过" class="headerlink" title="劫持__stack_chk_fail函数实现Canary绕过"></a>劫持__stack_chk_fail函数实现Canary绕过</h2><p>原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，既然存在延迟绑定机制，那就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当于没有跳转。</p>
+          <h2 id="劫持-stack-chk-fail函数实现Canary绕过"><a href="#劫持-stack-chk-fail函数实现Canary绕过" class="headerlink" title="劫持__stack_chk_fail函数实现Canary绕过"></a>劫持__stack_chk_fail函数实现Canary绕过</h2><p>原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当于没有跳转。</p>
 <p>值得注意的是，Canary的检查的时间点是在函数返回的时候进行的，所以只有当函数即将返回时Canary才会起到作用。</p>
-<h4 id="一道例题"><a href="#一道例题" class="headerlink" title="一道例题"></a>一道例题</h4><p>main函数如下</p>
+<h4 id="一道例题"><a href="#一道例题" class="headerlink" title="一道例题"></a>一道例题</h4><p>先检查程序保护</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/checksec.jpg" class>
+
+<p>可以看到程序开启了Canary保护，但是RELRO保护只开了部分，说明got表此时可写（这句话好像不一定对，学到后面再来确认）。</p>
+<p>main函数如下</p>
 <img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/main.jpg" class>
 
 <p>接下来分析每个函数的作用，跟进到sub_4007C7()函数中</p>
