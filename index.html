@@ -292,10 +292,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2021-12-17 20:22:47 / 修改时间：20:54:03" itemprop="dateCreated datePublished" datetime="2021-12-17T20:22:47+08:00">2021-12-17</time>
+              <time title="创建时间：2021-12-17 20:22:47" itemprop="dateCreated datePublished" datetime="2021-12-17T20:22:47+08:00">2021-12-17</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-12-19 19:50:59" itemprop="dateModified" datetime="2021-12-19T19:50:59+08:00">2021-12-19</time>
+              </span>
 
           
 
@@ -311,7 +317,7 @@
           <p>这篇文章主要用来收集做题时关于shellcode的问题</p>
 <h4 id="mrctf2020-shellcode-revenge"><a href="#mrctf2020-shellcode-revenge" class="headerlink" title="mrctf2020_shellcode_revenge"></a>mrctf2020_shellcode_revenge</h4><p>该题利用 alpha3 来生成可见字符shellcode来绕过限制，详细见：<a target="_blank" rel="noopener" href="http://taqini.space/2020/03/31/alpha-shellcode-gen/#alpha3">纯字符shellcode生成指南 | TaQini</a></p>
 <p>程序保护如下，栈段是可执行的</p>
-<img src="/2021/12/17/shellcode/msr_11FC.jpg" class>
+<img src="/2021/12/17/shellcode/msr_checksec.jpg" class>
 
 <p>该题的main函数无法反汇编，所以就着汇编审</p>
 <img src="/2021/12/17/shellcode/msr_main.jpg" class>
