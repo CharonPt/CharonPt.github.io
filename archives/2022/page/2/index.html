@@ -20,21 +20,15 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="格式化字符串在bss段的处理（没写完）当格式化字符串不在栈上，而是在堆上或者 .bss 段上的时候，我们便无法直接往栈上写入我们想要读写的地址。但是我们也可以通过修改栈上的指针为我们想要读写的地址，进而在栈上得到我们想要读写的地址来完成类似的利用手法。 我们知道格式化字符串参数 %n 会把其对应的参数作为指针解析，并往该指针所指向的地址写入已经打印出的字节数大小。同时由于函数调用的过程，只要我们此">
-<meta property="og:type" content="article">
-<meta property="og:title" content="格式化字符串-3">
-<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/index.html">
+  <meta property="og:type" content="website">
+<meta property="og:title" content="CharonPt的Blog">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/archives/2022/page/2/index.html">
 <meta property="og:site_name" content="CharonPt的Blog">
-<meta property="og:description" content="格式化字符串在bss段的处理（没写完）当格式化字符串不在栈上，而是在堆上或者 .bss 段上的时候，我们便无法直接往栈上写入我们想要读写的地址。但是我们也可以通过修改栈上的指针为我们想要读写的地址，进而在栈上得到我们想要读写的地址来完成类似的利用手法。 我们知道格式化字符串参数 %n 会把其对应的参数作为指针解析，并往该指针所指向的地址写入已经打印出的字节数大小。同时由于函数调用的过程，只要我们此">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2021-11-22T11:15:49.000Z">
-<meta property="article:modified_time" content="2022-02-03T20:08:05.976Z">
 <meta property="article:author" content="John Doe">
-<meta property="article:tag" content="pwn">
-<meta property="article:tag" content="格式化字符串">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/">
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/archives/2022/page/2/">
 
 
 <script id="page-configurations">
@@ -42,12 +36,12 @@
   CONFIG.page = {
     sidebar: "",
     isHome : false,
-    isPost : true,
+    isPost : false,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>格式化字符串-3 | CharonPt的Blog</title>
+  <title>归档 | CharonPt的Blog</title>
   
 
 
@@ -155,92 +149,55 @@
         <div class="content-wrap">
           
 
-          <div class="content post posts-expand">
+          <div class="content archive">
             
 
-    
   
   
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          格式化字符串-3
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-22 19:15:49" itemprop="dateCreated datePublished" datetime="2021-11-22T19:15:49+08:00">2021-11-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-02-04 04:08:05" itemprop="dateModified" datetime="2022-02-04T04:08:05+08:00">2022-02-04</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
+  
+  <div class="post-block">
+    <div class="posts-collapse">
+      <div class="collection-title">
+        
+        <span class="collection-header">还行! 目前共计 33 篇日志。 继续努力。</span>
+      </div>
 
       
-        <h2 id="格式化字符串在bss段的处理（没写完）"><a href="#格式化字符串在bss段的处理（没写完）" class="headerlink" title="格式化字符串在bss段的处理（没写完）"></a>格式化字符串在bss段的处理（没写完）</h2><p>当格式化字符串不在栈上，而是在堆上或者 .bss 段上的时候，我们便无法直接往栈上写入我们想要读写的地址。但是我们也可以通过修改栈上的指针为我们想要读写的地址，进而在栈上得到我们想要读写的地址来完成类似的利用手法。</p>
-<p>我们知道格式化字符串参数 %n 会把其对应的参数作为指针解析，并往该指针所指向的地址写入已经打印出的字节数大小。同时由于函数调用的过程，只要我们此时所在的函数是作为被调用函数（存在其父函数），那么该函数的栈帧中就会保存有其父函数的 rbp 地址，同理这个 rbp 地址中同样保存了一个栈地址，这样我们就得到了一个天然的存在于栈上的链式指针结构，我们就可以利用这个结构来让我们想要读写的地址出现在栈上。</p>
-
+    <div class="collection-year">
+      <span class="collection-header">2022</span>
     </div>
 
-    
-    
-    
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
 
-      <footer class="post-footer">
-          <div class="post-tags">
-              <a href="/tags/pwn/" rel="tag"># pwn</a>
-              <a href="/tags/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/" rel="tag"># 格式化字符串</a>
-          </div>
+      <div class="post-meta">
+        <time itemprop="dateCreated"
+              datetime="2022-01-14T16:49:09+08:00"
+              content="2022-01-14">
+          01-14
+        </time>
+      </div>
 
-        
+      <div class="post-title">
+          <a class="post-title-link" href="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/" itemprop="url">
+            <span itemprop="name">强网杯2019-拟态STKOF</span>
+          </a>
+      </div>
 
-
-        
-    <div class="post-nav">
-      <div class="post-nav-item">
-    <a href="/2021/11/21/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-2/" rel="prev" title="格式化字符串-2">
-      <i class="fa fa-chevron-left"></i> 格式化字符串-2
-    </a></div>
-      <div class="post-nav-item">
-    <a href="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/" rel="next" title="fini_array劫持">
-      fini_array劫持 <i class="fa fa-chevron-right"></i>
-    </a></div>
-    </div>
-      </footer>
-    
+    </header>
   </article>
+
+
+    </div>
+  </div>
   
   
   
+
+  
+  <nav class="pagination">
+    <a class="extend prev" rel="prev" href="/archives/2022/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/archives/2022/">1</a><span class="page-number current">2</span>
+  </nav>
 
 
 
@@ -292,7 +249,6 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%9C%A8bss%E6%AE%B5%E7%9A%84%E5%A4%84%E7%90%86%EF%BC%88%E6%B2%A1%E5%86%99%E5%AE%8C%EF%BC%89"><span class="nav-number">1.</span> <span class="nav-text">格式化字符串在bss段的处理（没写完）</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
