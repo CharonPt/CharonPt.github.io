@@ -41,7 +41,8 @@
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fast-bins.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/small-bins.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins.jpg">
+<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-1.jpg">
+<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-2.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-1.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-2.png">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-1.jpg">
@@ -52,7 +53,7 @@
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-2.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/house_of_force-1.jpg">
 <meta property="article:published_time" content="2022-03-19T08:48:28.000Z">
-<meta property="article:modified_time" content="2022-04-08T06:22:43.621Z">
+<meta property="article:modified_time" content="2022-04-15T14:33:42.181Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="堆">
@@ -217,7 +218,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-04-08 14:22:43" itemprop="dateModified" datetime="2022-04-08T14:22:43+08:00">2022-04-08</time>
+                <time title="修改时间：2022-04-15 22:33:42" itemprop="dateModified" datetime="2022-04-15T22:33:42+08:00">2022-04-15</time>
               </span>
 
           
@@ -316,8 +317,10 @@
 <li><p><code>bk</code>（backward）指针在bin中指向上一个（非物理相邻）free chunk</p>
 </li>
 <li><p><code>fd_nextsize</code>在large bin中指向前一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<p>（指向比自己小的链表中最大的链表的链头）</p>
 <img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fd_nextsize.jpg" class></li>
 <li><p><code>bk_nextsize</code>在large bin中指向后一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<p>（指向比自己大的链表中最小的链表的链头）</p>
 <img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bk_nextsize.jpg" class>
 
 <ul>
@@ -331,9 +334,10 @@
 <p>有一点要注意的是这个被free掉的chunk中的所有数据在合并前后都不会被抹除，只是被作为合并后的chunk的数据区了。</p>
 <h5 id="物理链表"><a href="#物理链表" class="headerlink" title="物理链表"></a>物理链表</h5><p>因为<code>prev size</code>的存在，每个chunk都知道上一个chunk的大小，这样每个chunk就知道上一个chunk的起始地址，以此类推，这样每个内存分配区就知道了自己的分配空间和分配位置</p>
 <h5 id="逻辑链表"><a href="#逻辑链表" class="headerlink" title="逻辑链表"></a>逻辑链表</h5><p>有些chunk中存在<code>fd</code>、<code>bk</code>这样的指针，利用这些指针就可以构成一个逻辑链表</p>
-<h4 id="top-chunk"><a href="#top-chunk" class="headerlink" title="top chunk"></a>top chunk</h4><p>堆管理器通过系统调用向系统申请的内存中，未分配给用户的（即堆管理器留下来的）形成Top chunk，可以理解为堆管理器的库存。</p>
+<h4 id="top-chunk"><a href="#top-chunk" class="headerlink" title="top chunk"></a>top chunk</h4><p>程序第一次进行 malloc 的时候，heap 会被分为两块，一块给用户，剩下的那块就是 top chunk。其实，所谓的 top chunk 就是处于当前堆的物理地址最高的 chunk。这个 chunk 不属于任何一个 bin，它的作用在于当所有的 bin 都无法满足用户请求的大小时，如果其大小不小于指定的大小，就进行分配，并将剩下的部分作为新的 top chunk。否则，就对 heap 进行扩展后再进行分配。在 main arena 中通过 sbrk 扩展 heap，而在 thread arena 中通过 mmap 分配新的 heap。</p>
 <img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/top-chunk.jpg" class>
 
+<p>需要注意的是，top chunk 的 prev_inuse 比特位始终为 1，否则其前面的 chunk 就会被合并到 top chunk 中。</p>
 <h3 id="bin"><a href="#bin" class="headerlink" title="bin"></a>bin</h3><p>管理arena中空闲的chunk结构，<strong>以数组的形式存在</strong>，数组元素为相应大小的chunk链表的链表头，存在于arena的malloc_state中。</p>
 <ul>
 <li>unsorted bin</li>
@@ -355,9 +359,15 @@
 <h4 id="unsorted-bin"><a href="#unsorted-bin" class="headerlink" title="unsorted bin"></a>unsorted bin</h4><ul>
 <li><p>bins[1]（malloc_state中的bins数组索引为1的元素属于<code>unsorted bin</code>）</p>
 </li>
-<li><p>管理刚刚释放且不能进入<code>fast bins</code>（小于<code>fast bins</code>的最小大小或者大于<code>fast bins</code>的最大大小）的还未分类的chunk</p>
-</li>
 <li><p>可以视为free chunk回归其所属bin之前的缓冲区</p>
+</li>
+<li><p>unsorted bin 中的空闲 chunk 处于乱序状态，主要有两个来源</p>
+<ul>
+<li>当一个较大的 chunk 被分割成两半后，如果剩下的部分大于 MINSIZE，就会被放到 unsorted bin 中。</li>
+<li>释放一个不属于 fast bin 的 chunk，并且该 chunk 不和 top chunk 紧邻时，该 chunk 会被首先放到 unsorted bin 中。</li>
+</ul>
+</li>
+<li><p>此外，Unsorted Bin 在使用的过程中，采用的遍历顺序是 FIFO 。</p>
 </li>
 </ul>
 <p>结构如下：</p>
@@ -371,6 +381,7 @@
 <li>LIFO（last in first out）</li>
 <li>管理 16、24、32、40、48、56、64 Byte的free chunk（32位下，64位就乘2）</li>
 <li>其中 chunk 的 in use 位（size字段的P位）总为1</li>
+<li>默认情况下（<strong>32 位系统为例</strong>）， fastbin 中默认支持最大的 chunk 的数据空间大小为 64 字节。但是其可以支持的 chunk 的数据空间最大为 80 字节。除此之外， fastbin 最多可以支持的 bin 的个数为 10 个，从数据空间为 8 字节开始一直到 80 字节（注意这里说的是数据空间大小，也即除去 prev_size 和 size 字段部分的大小）</li>
 </ul>
 <p>结构如下：</p>
 <img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fast-bins.jpg" class>
@@ -397,11 +408,28 @@
 <li>管理大于 504 Bytes 的 free chunks（32位下）</li>
 </ul>
 <p>结构如下：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins.jpg" class>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-1.jpg" class>
 
-<p>因为large bins中每个bin所管理的chunk大小都是不固定的（只是一个范围内），所以large bins要用到两个额外的控制字段（fd_nextsize、bk_nextsize）去记录每个chunk相邻（上一个和下一个）的chunk的大小是多少。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-2.jpg" class>
+
+<p>large bins跟其它bins的主要区别在于其每个bin中所管理的chunk的大小都是不固定的（如上图，一个large bin中管理了多个双向链表，同时任意两个链表之间保存的chunk大小都不一样，但是每个链表里保存的chunk大小都相同），也就是说一个large bin会维护一个大小范围内的chunk链表。</p>
+<p>同时large bin使用<code>fd_nextsize</code>和<code>bk_nextsize</code>指针来连接大小不同的链表，而每个链表中的chunk用fd和bk指针相互连接。<code>fd_nextsize</code>和<code>bk_nextsize</code>只在每个链表的链表头起作用。</p>
+<p>large bin使用FIFO分配策略，将先进入的chunk设置为链头，后面插入chunk在链头的后面，取出时取出链头的下一个chunk。</p>
+<p>此外，上述这些 bin 的排布都会遵循一个原则：<strong>任意两个物理相邻的空闲 chunk 不能在一起</strong>。(需要注意的是，并不是所有的 chunk 被释放后就立即被放到 bin 中。ptmalloc 为了提高分配的速度，会把一些小的 chunk <strong>先</strong>放到 fast bins 的容器内。<strong>而且，fastbin 容器中的 chunk 的使用标记总是被置位的，所以不满足上面的原则。</strong>)</p>
 <h4 id="tcache"><a href="#tcache" class="headerlink" title="tcache"></a>tcache</h4><p>tcache可以理解为super fast bin，其工作模式跟fast bin类似，同样是单向链表。在chunk存放到fast bins之前，所有的chunk都会优先存在到tcache中，tcache也会存放一些特定范围的bins。</p>
 <p>在2.26和2.27的libc中，tcache没有double free检查，往后的版本新加了tcache的安全检查。</p>
+<h4 id="last-reminder"><a href="#last-reminder" class="headerlink" title="last_reminder"></a>last_reminder</h4><p>刚分配的chunk被分割后剩下的部分</p>
+<h3 id="另一些注意的问题"><a href="#另一些注意的问题" class="headerlink" title="另一些注意的问题"></a>另一些注意的问题</h3><p>从<a target="_blank" rel="noopener" href="https://ctf-wiki.org/pwn/linux/user-mode/heap/ptmalloc2/heap-structure/">堆相关数据结构 - CTF Wiki</a>]</p>
+<blockquote>
+<p><strong>最小的 chunk 大小</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest possible chunk */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MIN_CHUNK_SIZE (offsetof(struct malloc_chunk, fd_nextsize))</span></span><br></pre></td></tr></table></figure>
+
+<p>这里，offsetof 函数计算出 fd_nextsize 在 malloc_chunk 中的偏移，说明最小的 chunk 至少要包含 bk 指针。</p>
+<p><strong>最小申请的堆内存大小</strong></p>
+<p>用户最小申请的内存大小必须是 2 * SIZE_SZ 的最小整数倍。</p>
+<p><strong>注：就目前而看 MIN_CHUNK_SIZE 和 MINSIZE 大小是一致的，个人认为之所以要添加两个宏是为了方便以后修改 malloc_chunk 时方便一些。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest size we can malloc is an aligned minimal chunk */</span></span><br><span class="line"><span class="comment">//MALLOC_ALIGN_MASK = 2 * SIZE_SZ -1</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MINSIZE                                                                \</span></span><br><span class="line"><span class="meta">    (unsigned long) (((MIN_CHUNK_SIZE + MALLOC_ALIGN_MASK) &amp;                   \</span></span><br><span class="line"><span class="meta">                      ~MALLOC_ALIGN_MASK))</span></span><br></pre></td></tr></table></figure>
+</blockquote>
 <h2 id="How2heap"><a href="#How2heap" class="headerlink" title="How2heap"></a>How2heap</h2><p>这里记一下从how2heap中学习所得</p>
 <h4 id="first-fit"><a href="#first-fit" class="headerlink" title="first-fit"></a>first-fit</h4><p>glibc使用第一契合算法来选择free chunk，就是如果程序在遍历bins链表的时候，如果找到一个free chunk足够大（也就是不小于用户需求），那么就会直接选择这个chunk来使用以此节省时间，而不是去遍历完所有的bin来寻找一个大小刚刚合适的chunk。</p>
 <p>如果遍历完bins链表都没有能满足用户需求大小的chunk，则在Top chunk中划分一块给用户。</p>
@@ -481,7 +509,10 @@
     <a href="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/" rel="prev" title="2021强网杯-shellcode">
       <i class="fa fa-chevron-left"></i> 2021强网杯-shellcode
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2022/04/14/pwnable-tw-calc/" rel="next" title="pwnable.tw-calc">
+      pwnable.tw-calc <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -540,7 +571,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86"><span class="nav-number">1.</span> <span class="nav-text">堆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">2.</span> <span class="nav-text">堆管理器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84"><span class="nav-number">3.</span> <span class="nav-text">堆管理器是如何工作的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#arena"><span class="nav-number">3.1.</span> <span class="nav-text">arena</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#chunk"><span class="nav-number">3.2.</span> <span class="nav-text">chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#malloced-chunk"><span class="nav-number">3.2.1.</span> <span class="nav-text">malloced chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#prev-size%E7%9A%84%E8%A6%86%E7%94%A8%E9%97%AE%E9%A2%98"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">prev size的覆用问题</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#free-chunk"><span class="nav-number">3.2.2.</span> <span class="nav-text">free chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.1.</span> <span class="nav-text">物理链表</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%80%BB%E8%BE%91%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.2.</span> <span class="nav-text">逻辑链表</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#top-chunk"><span class="nav-number">3.2.3.</span> <span class="nav-text">top chunk</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bin"><span class="nav-number">3.3.</span> <span class="nav-text">bin</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#bin%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%80%9D%E6%83%B3"><span class="nav-number">3.3.0.1.</span> <span class="nav-text">bin的实现思想</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin"><span class="nav-number">3.3.1.</span> <span class="nav-text">unsorted bin</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#fast-bins"><span class="nav-number">3.3.2.</span> <span class="nav-text">fast bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#small-bins"><span class="nav-number">3.3.3.</span> <span class="nav-text">small bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#large-bins"><span class="nav-number">3.3.4.</span> <span class="nav-text">large bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#tcache"><span class="nav-number">3.3.5.</span> <span class="nav-text">tcache</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How2heap"><span class="nav-number">4.</span> <span class="nav-text">How2heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#first-fit"><span class="nav-number">4.0.1.</span> <span class="nav-text">first-fit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#use-after-free%EF%BC%88%E9%87%8A%E6%94%BE%E9%87%8D%E5%88%A9%E7%94%A8%EF%BC%89"><span class="nav-number">4.0.2.</span> <span class="nav-text">use-after-free（释放重利用）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Double-free"><span class="nav-number">4.0.3.</span> <span class="nav-text">Double-free</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin-attack"><span class="nav-number">4.0.4.</span> <span class="nav-text">unsorted-bin-attack</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-force"><span class="nav-number">4.0.5.</span> <span class="nav-text">house_of_force</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86"><span class="nav-number">1.</span> <span class="nav-text">堆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">2.</span> <span class="nav-text">堆管理器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84"><span class="nav-number">3.</span> <span class="nav-text">堆管理器是如何工作的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#arena"><span class="nav-number">3.1.</span> <span class="nav-text">arena</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#chunk"><span class="nav-number">3.2.</span> <span class="nav-text">chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#malloced-chunk"><span class="nav-number">3.2.1.</span> <span class="nav-text">malloced chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#prev-size%E7%9A%84%E8%A6%86%E7%94%A8%E9%97%AE%E9%A2%98"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">prev size的覆用问题</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#free-chunk"><span class="nav-number">3.2.2.</span> <span class="nav-text">free chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.1.</span> <span class="nav-text">物理链表</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%80%BB%E8%BE%91%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.2.</span> <span class="nav-text">逻辑链表</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#top-chunk"><span class="nav-number">3.2.3.</span> <span class="nav-text">top chunk</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bin"><span class="nav-number">3.3.</span> <span class="nav-text">bin</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#bin%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%80%9D%E6%83%B3"><span class="nav-number">3.3.0.1.</span> <span class="nav-text">bin的实现思想</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin"><span class="nav-number">3.3.1.</span> <span class="nav-text">unsorted bin</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#fast-bins"><span class="nav-number">3.3.2.</span> <span class="nav-text">fast bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#small-bins"><span class="nav-number">3.3.3.</span> <span class="nav-text">small bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#large-bins"><span class="nav-number">3.3.4.</span> <span class="nav-text">large bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#tcache"><span class="nav-number">3.3.5.</span> <span class="nav-text">tcache</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#last-reminder"><span class="nav-number">3.3.6.</span> <span class="nav-text">last_reminder</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%A6%E4%B8%80%E4%BA%9B%E6%B3%A8%E6%84%8F%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">3.4.</span> <span class="nav-text">另一些注意的问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How2heap"><span class="nav-number">4.</span> <span class="nav-text">How2heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#first-fit"><span class="nav-number">4.0.1.</span> <span class="nav-text">first-fit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#use-after-free%EF%BC%88%E9%87%8A%E6%94%BE%E9%87%8D%E5%88%A9%E7%94%A8%EF%BC%89"><span class="nav-number">4.0.2.</span> <span class="nav-text">use-after-free（释放重利用）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Double-free"><span class="nav-number">4.0.3.</span> <span class="nav-text">Double-free</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin-attack"><span class="nav-number">4.0.4.</span> <span class="nav-text">unsorted-bin-attack</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-force"><span class="nav-number">4.0.5.</span> <span class="nav-text">house_of_force</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -554,14 +585,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">37</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-count">25</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
