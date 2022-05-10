@@ -20,15 +20,15 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="知识点 prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。 例如我们malloc(0x18)，实际上得到的chunk大小为0x2">
+  <meta name="description" content="利用条件 程序中存在基于堆的漏洞  该漏洞可以控制 chunk hearder 中的数据   效果使得块重叠之后能利用大chunk修改其包含的小chunk的内容 如果某个chunk中存在字符串指针，函数指针等等，就可以考虑这种利用方式 同时假如被重叠的堆块是free chunk的话，就可以修改其fd&#x2F;bk指针 原理在 ptmalloc 中 获取下一chunk（高地址chunk）地址的操作：当前块指">
 <meta property="og:type" content="article">
 <meta property="og:title" content="extend_overlopping">
 <meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/extend-overlopping/index.html">
 <meta property="og:site_name" content="CharonPt的Blog">
-<meta property="og:description" content="知识点 prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。 例如我们malloc(0x18)，实际上得到的chunk大小为0x2">
+<meta property="og:description" content="利用条件 程序中存在基于堆的漏洞  该漏洞可以控制 chunk hearder 中的数据   效果使得块重叠之后能利用大chunk修改其包含的小chunk的内容 如果某个chunk中存在字符串指针，函数指针等等，就可以考虑这种利用方式 同时假如被重叠的堆块是free chunk的话，就可以修改其fd&#x2F;bk指针 原理在 ptmalloc 中 获取下一chunk（高地址chunk）地址的操作：当前块指">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2022-05-06T17:17:02.000Z">
-<meta property="article:modified_time" content="2022-05-06T19:04:25.035Z">
+<meta property="article:modified_time" content="2022-05-09T17:50:13.425Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="堆">
@@ -185,10 +185,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2022-05-07 01:17:02 / 修改时间：03:04:25" itemprop="dateCreated datePublished" datetime="2022-05-07T01:17:02+08:00">2022-05-07</time>
+              <time title="创建时间：2022-05-07 01:17:02" itemprop="dateCreated datePublished" datetime="2022-05-07T01:17:02+08:00">2022-05-07</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-10 01:50:13" itemprop="dateModified" datetime="2022-05-10T01:50:13+08:00">2022-05-10</time>
+              </span>
 
           
 
@@ -201,7 +207,36 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><ol>
+        <h3 id="利用条件"><a href="#利用条件" class="headerlink" title="利用条件"></a>利用条件</h3><ol>
+<li><p>程序中存在基于堆的漏洞</p>
+</li>
+<li><p>该漏洞可以控制 chunk hearder 中的数据</p>
+</li>
+</ol>
+<h3 id="效果"><a href="#效果" class="headerlink" title="效果"></a>效果</h3><p>使得块重叠之后能利用大chunk修改其包含的小chunk的内容</p>
+<p>如果某个chunk中存在字符串指针，函数指针等等，就可以考虑这种利用方式</p>
+<p>同时假如被重叠的堆块是free chunk的话，就可以修改其fd/bk指针</p>
+<h3 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h3><p>在 ptmalloc 中</p>
+<p>获取下一chunk（高地址chunk）地址的操作：当前块指针加上size</p>
+<p>获取上一chunk（低地址chunk）地址的操作：当前块指针减去prev size</p>
+<p>查看当前chunk是否inuse：去查看下一chunk的inuse位</p>
+<p>总结：ptmalloc基于chunk header中的数据来判断chunk的使用情况以及前后块的定位</p>
+<h3 id="对-inuse-的-fastbin-进行-extend"><a href="#对-inuse-的-fastbin-进行-extend" class="headerlink" title="对 inuse 的 fastbin 进行 extend"></a>对 inuse 的 fastbin 进行 extend</h3><p>实现方法：</p>
+<p>更改低地址chunk的size位，使该chunk的大小足以覆盖想要修改的数据，free掉该chunk之后再malloc回来，就在原本的位置上得到了一个大chunk</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">size_t</span>* ptr1 = <span class="built_in">malloc</span>(<span class="number">0x20</span>);	<span class="comment">//chunk1</span></span><br><span class="line">    <span class="keyword">size_t</span>* ptr2 = <span class="built_in">malloc</span>(<span class="number">0x30</span>);	<span class="comment">//chunk2</span></span><br><span class="line">    *(ptr1 - <span class="number">1</span>) = <span class="number">0x71</span>;		<span class="comment">//修改chunk1的size位</span></span><br><span class="line">    <span class="built_in">free</span>(ptr1);</span><br><span class="line">    <span class="keyword">size_t</span>* ptr3 = <span class="built_in">malloc</span>(<span class="number">0x60</span>);	<span class="comment">//ptr3 == ptr1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="对-inuse-的-smallbin-进行-extend"><a href="#对-inuse-的-smallbin-进行-extend" class="headerlink" title="对 inuse 的 smallbin 进行 extend"></a>对 inuse 的 smallbin 进行 extend</h3><p>其实这个跟上面的一样，只是当我们修改的size大于fastbin范围的时候有一点需要注意，就是我们free掉的这个大chunk不能紧贴top chunk，否则就会直接跟其合并。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">size_t</span>* ptr1 = <span class="built_in">malloc</span>(<span class="number">0x80</span>);	<span class="comment">//chunk1</span></span><br><span class="line">    <span class="keyword">size_t</span>* ptr2 = <span class="built_in">malloc</span>(<span class="number">0x30</span>);	<span class="comment">//chunk2</span></span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x10</span>);	<span class="comment">//垫一个chunk防止chunk1与top chunk合并</span></span><br><span class="line">    *(ptr1 - <span class="number">1</span>) = <span class="number">0xd1</span>;		<span class="comment">//修改chunk1的size位(0x90+0x40)</span></span><br><span class="line">    <span class="built_in">free</span>(ptr1);</span><br><span class="line">    <span class="keyword">size_t</span>* ptr3 = <span class="built_in">malloc</span>(<span class="number">0xc0</span>);	<span class="comment">//ptr3 == ptr1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="对-free-的-smallbin-进行-extend"><a href="#对-free-的-smallbin-进行-extend" class="headerlink" title="对 free 的 smallbin 进行 extend"></a>对 free 的 smallbin 进行 extend</h3><p>这个跟上面的也一样，只是其是在chunk1被正常free掉之后再去修改其size位，这样修改就不需要垫一个chunk，因为是free掉之后再改的size</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">size_t</span>* ptr1 = <span class="built_in">malloc</span>(<span class="number">0x80</span>);	<span class="comment">//chunk1</span></span><br><span class="line">    <span class="keyword">size_t</span>* ptr2 = <span class="built_in">malloc</span>(<span class="number">0x30</span>);	<span class="comment">//chunk2</span></span><br><span class="line">    <span class="built_in">free</span>(ptr1);</span><br><span class="line">    *(ptr1 - <span class="number">1</span>) = <span class="number">0xd1</span>;		<span class="comment">//修改free状态下的chunk1的size</span></span><br><span class="line">    <span class="keyword">size_t</span>* ptr3 = <span class="built_in">malloc</span>(<span class="number">0xc0</span>);	<span class="comment">//ptr3 == ptr1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="通过-extend-前向-overlapping"><a href="#通过-extend-前向-overlapping" class="headerlink" title="通过 extend 前向 overlapping"></a>通过 extend 前向 overlapping</h3><p>前面展示的都是后向合并（向高地址的chunk合并）</p>
+<p>其实也可以通过修改当前chunk的prev size跟inuse位实现前向合并（向低地址的chunk合并），但是要满足unlink的条件</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">	<span class="keyword">size_t</span>* ptr1 = <span class="built_in">malloc</span>(<span class="number">0x80</span>);	<span class="comment">//chunk1</span></span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x20</span>);	<span class="comment">//中间包含的小块</span></span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x20</span>);</span><br><span class="line">    <span class="keyword">size_t</span>* ptr2 = <span class="built_in">malloc</span>(<span class="number">0x80</span>);	<span class="comment">//chunk2</span></span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x10</span>);	<span class="comment">//垫一块</span></span><br><span class="line">    <span class="built_in">free</span>(ptr1);</span><br><span class="line">    *(ptr2 - <span class="number">1</span>) = <span class="number">0x90</span>;		<span class="comment">//修改chunk2的size</span></span><br><span class="line">    *(ptr2 - <span class="number">2</span>) = <span class="number">0xf0</span>;		<span class="comment">//修改chunk2的prev size</span></span><br><span class="line">    <span class="built_in">free</span>(ptr2);		<span class="comment">//触发unlink实现前向合并</span></span><br><span class="line">    <span class="keyword">size_t</span>* ptr3 = <span class="built_in">malloc</span>(<span class="number">0x170</span>);	<span class="comment">//ptr3 == ptr1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中把chunk1 free掉是为了让其进入unsorted bin，从而使其fd跟bk指针的值能过unlink的检测，否则会报错。</p>
+<h3 id="例题1"><a href="#例题1" class="headerlink" title="例题1"></a>例题1</h3><h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><ol>
 <li><p>prev size的复用问题：学基础知识的时候知道有这么个概念，到这里才比较理解。其实很简单，例如我们malloc一个0xn8（除了0x8，因为64位chunk最小对齐到0x20）的chunk，实际上我们只会得到一个数据段大小为0xn0的chunk，剩下的八个字节就用与其相邻的那个chunk的prev size位来存储。</p>
 <p>例如我们<code>malloc(0x18)</code>，实际上得到的chunk大小为0x20，如下图，不够的八个字节用了top chunk的prev size来补</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x1192020</span><br><span class="line">0x1192020:	0x0000000000000000	0x0000000000000021</span><br><span class="line">0x1192030:	0x6161616161616161	0x6161616161616161</span><br><span class="line">0x1192040:	0x6161616161616161	0x0000000000020fc1</span><br></pre></td></tr></table></figure>
@@ -211,7 +246,7 @@
 <li><p>通过extend_overlopping利用fast bin来实现任意地址读写，具体在例题中说明。</p>
 </li>
 </ol>
-<h3 id="例题"><a href="#例题" class="headerlink" title="例题"></a>例题</h3><p>（libc-2.23下复现）</p>
+<p>（libc-2.23下复现）</p>
 <p>首先是常规菜单</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;          Heap Creator          &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 1. Create a Heap               &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 2. Edit a Heap                 &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 3. Show a Heap                 &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 4. Delete a Heap               &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot; 5. Exit                        &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;--------------------------------&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">printf</span>(<span class="string">&quot;Your choice :&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -341,7 +376,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">1.</span> <span class="nav-text">知识点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BE%8B%E9%A2%98"><span class="nav-number">2.</span> <span class="nav-text">例题</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%80%9A%E8%BF%87extend-overlopping%E5%88%A9%E7%94%A8fast-bin%E6%9D%A5%E5%AE%9E%E7%8E%B0%E4%BB%BB%E6%84%8F%E5%9C%B0%E5%9D%80%E8%AF%BB%E5%86%99%E7%9A%84%E8%AF%A6%E8%A7%A3"><span class="nav-number">2.1.</span> <span class="nav-text">通过extend_overlopping利用fast bin来实现任意地址读写的详解</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6"><span class="nav-number">1.</span> <span class="nav-text">利用条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%88%E6%9E%9C"><span class="nav-number">2.</span> <span class="nav-text">效果</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9-inuse-%E7%9A%84-fastbin-%E8%BF%9B%E8%A1%8C-extend"><span class="nav-number">4.</span> <span class="nav-text">对 inuse 的 fastbin 进行 extend</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9-inuse-%E7%9A%84-smallbin-%E8%BF%9B%E8%A1%8C-extend"><span class="nav-number">5.</span> <span class="nav-text">对 inuse 的 smallbin 进行 extend</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9-free-%E7%9A%84-smallbin-%E8%BF%9B%E8%A1%8C-extend"><span class="nav-number">6.</span> <span class="nav-text">对 free 的 smallbin 进行 extend</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BF%87-extend-%E5%89%8D%E5%90%91-overlapping"><span class="nav-number">7.</span> <span class="nav-text">通过 extend 前向 overlapping</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BE%8B%E9%A2%981"><span class="nav-number">8.</span> <span class="nav-text">例题1</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">8.1.</span> <span class="nav-text">知识点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%80%9A%E8%BF%87extend-overlopping%E5%88%A9%E7%94%A8fast-bin%E6%9D%A5%E5%AE%9E%E7%8E%B0%E4%BB%BB%E6%84%8F%E5%9C%B0%E5%9D%80%E8%AF%BB%E5%86%99%E7%9A%84%E8%AF%A6%E8%A7%A3"><span class="nav-number">8.2.</span> <span class="nav-text">通过extend_overlopping利用fast bin来实现任意地址读写的详解</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -355,7 +390,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-count">45</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

