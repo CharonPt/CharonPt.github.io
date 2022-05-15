@@ -20,19 +20,19 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="前言学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西 主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码 fastbin_dup_consolidate1234567891011121314#include &lt;stdio.h&gt;#include">
+  <meta name="description" content="前言学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西 主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码 关于fast bin的保护 double free：一个chunk进入fast bin时，其实是插入这个bin链表的头部，main_arena会设置">
 <meta property="og:type" content="article">
 <meta property="og:title" content="堆利用-fastbin">
 <meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/index.html">
 <meta property="og:site_name" content="CharonPt的Blog">
-<meta property="og:description" content="前言学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西 主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码 fastbin_dup_consolidate1234567891011121314#include &lt;stdio.h&gt;#include">
+<meta property="og:description" content="前言学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西 主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码 关于fast bin的保护 double free：一个chunk进入fast bin时，其实是插入这个bin链表的头部，main_arena会设置">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://github.com/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-1.jpg">
 <meta property="og:image" content="https://github.com/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-2.png">
 <meta property="og:image" content="https://github.com/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-3.jpg">
 <meta property="og:image" content="https://github.com/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-4.jpg">
 <meta property="article:published_time" content="2022-05-03T09:47:14.000Z">
-<meta property="article:modified_time" content="2022-05-03T10:49:15.377Z">
+<meta property="article:modified_time" content="2022-05-10T18:02:25.223Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="堆">
@@ -190,10 +190,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2022-05-03 17:47:14 / 修改时间：18:49:15" itemprop="dateCreated datePublished" datetime="2022-05-03T17:47:14+08:00">2022-05-03</time>
+              <time title="创建时间：2022-05-03 17:47:14" itemprop="dateCreated datePublished" datetime="2022-05-03T17:47:14+08:00">2022-05-03</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-11 02:02:25" itemprop="dateModified" datetime="2022-05-11T02:02:25+08:00">2022-05-11</time>
+              </span>
 
           
 
@@ -208,6 +214,12 @@
       
         <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西</p>
 <p>主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码</p>
+<h3 id="关于fast-bin的保护"><a href="#关于fast-bin的保护" class="headerlink" title="关于fast bin的保护"></a>关于fast bin的保护</h3><ol>
+<li>double free：一个chunk进入fast bin时，其实是插入这个bin链表的头部，main_arena会设置一个指针直接指向这个块，同时一个chunk准备进入该bin链表时，会<strong>检查main_arena直接指向的块</strong>跟这个准备进入的块是否相同，相同则抛出double free异常。也就是说其只检查bin的链表头，不检查整个链表</li>
+<li>从fast bin中取出一个chunk时，会检查该chunk的size位是否跟这个bin链表对应的size相符，不相符则抛出异常。这个size的p位会被fast bin忽略（也就是说无所谓），但是在IS_MMAPPED跟NON_MAIN_ARENA这两种情况下会发生异常。</li>
+</ol>
+<h4 id="House-Of-Spirit"><a href="#House-Of-Spirit" class="headerlink" title="House Of Spirit"></a>House Of Spirit</h4><p>实验流程：让一个指针指向一个假块，将其free掉再malloc出来，实现任意地址分配。</p>
+<p>需要注意的点：① 假块的size位必须属于fast bin范围内。②假块的下一个块的size位必须被设置成一个合理的值（合理即可）。③ 假块的地址要对其。④ 假块的ISMMAP（用来判断这个chunk是否是MMAP的那一位）不能为1，因为MMAPED的块被free掉时会单独处理。</p>
 <h4 id="fastbin-dup-consolidate"><a href="#fastbin-dup-consolidate" class="headerlink" title="fastbin_dup_consolidate"></a>fastbin_dup_consolidate</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">void</span> *p1 = <span class="built_in">malloc</span>(<span class="number">0x40</span>);</span><br><span class="line">    <span class="keyword">void</span> *p2 = <span class="built_in">malloc</span>(<span class="number">0x40</span>); <span class="comment">//防止第一个chunk被合并到top chunk</span></span><br><span class="line">    <span class="built_in">free</span>(p1);</span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x400</span>); <span class="comment">//触发malloc_consolidate()</span></span><br><span class="line">    <span class="built_in">free</span>(p1);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;now we malloc 1 = %p\n&quot;</span>,<span class="built_in">malloc</span>(<span class="number">0x40</span>));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;malloc 2 = %p&quot;</span>,<span class="built_in">malloc</span>(<span class="number">0x40</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <p>malloc_consolidate()函数主要有两个功能：</p>
@@ -312,7 +324,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#fastbin-dup-consolidate"><span class="nav-number">1.1.</span> <span class="nav-text">fastbin_dup_consolidate</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8Efast-bin%E7%9A%84%E4%BF%9D%E6%8A%A4"><span class="nav-number">2.</span> <span class="nav-text">关于fast bin的保护</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#House-Of-Spirit"><span class="nav-number">2.1.</span> <span class="nav-text">House Of Spirit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#fastbin-dup-consolidate"><span class="nav-number">2.2.</span> <span class="nav-text">fastbin_dup_consolidate</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -326,14 +338,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-count">47</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-count">30</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

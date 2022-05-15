@@ -37,7 +37,7 @@
 <meta property="og:image" content="https://github.com/2022/04/17/how2heap/unsorted-bin-attack-2.jpg">
 <meta property="og:image" content="https://github.com/2022/04/17/how2heap/house_of_force-1.jpg">
 <meta property="article:published_time" content="2022-04-17T06:09:41.000Z">
-<meta property="article:modified_time" content="2022-05-04T10:01:51.664Z">
+<meta property="article:modified_time" content="2022-05-11T17:17:23.366Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta property="article:tag" content="堆">
@@ -203,7 +203,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-05-04 18:01:51" itemprop="dateModified" datetime="2022-05-04T18:01:51+08:00">2022-05-04</time>
+                <time title="修改时间：2022-05-12 01:17:23" itemprop="dateModified" datetime="2022-05-12T01:17:23+08:00">2022-05-12</time>
               </span>
 
           
@@ -274,12 +274,25 @@
 
 <p>例如想修改栈上的一个值，我们第一次先malloc一个很大的空间，大到把栈的一部分也作为这块chunk的一部分，这块malloc的空间就会从top chunk当前的起始位置一直往内存的高地址划分，直到达到我们指定的大小，然后我们第二次再malloc一块chunk，那么这块chunk就会直接在栈上，此时我们就实现了往栈上写数据。</p>
 <p>而且如果我们malloc一个负数，那么就会在此时top chunk低地址处得到一块chunk（这是因为malloc的参数是无符号类型整数，所以我们传进一个负数的话会被解释成无符号类型整数，从而发生整数溢出，最后会得到从此时top chunk起始地址往低地址的一块对应大小的chunk），我们就可以用这种方式去修改程序段的某个地址的值。</p>
-<h4 id="house-of-spirit"><a href="#house-of-spirit" class="headerlink" title="house_of_spirit"></a>house_of_spirit</h4><p>该攻击实现的是任意地址分配chunk。</p>
-<p>主要有三个要求：① 伪造的假块需要一个字长对齐。② 目标地址-1字长处需要设置fast bin范围内的size。③ 需要设置目标地址chunk的下一个chunk的size，但是这个size只需要合理即可，不一定要是fast bin范围内的</p>
-<p>首先覆写一个指针指向一个我们伪造的fastbin假块，然后完成相应size的设置（该chunk的size，下一个chunk的size）之后直接free掉这个指针就完成了任意地址分配。</p>
-<p>…..</p>
-<h4 id="house-of-einherjar-libc-2-23"><a href="#house-of-einherjar-libc-2-23" class="headerlink" title="house_of_einherjar(libc-2.23)"></a>house_of_einherjar(libc-2.23)</h4><p>条件：off-by-one、泄漏heap地址</p>
+<h4 id="house-of-einherjar-libc-2-23"><a href="#house-of-einherjar-libc-2-23" class="headerlink" title="house_of_einherjar(libc-2.23)"></a>house_of_einherjar(libc-2.23)</h4><p>（还没搞懂）</p>
+<p>条件：off-by-one、泄漏heap地址</p>
 <p>该攻击实现的是任意地址分配chunk</p>
+<h4 id="house-of-orange"><a href="#house-of-orange" class="headerlink" title="house_of_orange"></a>house_of_orange</h4><p>（还没搞懂）</p>
+<p>很好的博客：<a target="_blank" rel="noopener" href="https://blog.csdn.net/happylzs2008/article/details/103879620">借助gdb调试glibc代码学习House of Orange_happylzs2008的博客-CSDN博客</a></p>
+<p>使用场景：程序中没有包含free函数或者其他释放堆块的函数时，利用该漏洞获得free的效果</p>
+<p>条件：</p>
+<ol>
+<li>能够修改top chunk的size位</li>
+<li>伪造top chunk的size必须对齐到内存页（0x1000个字节），意思就是top chunk的起始地址加上top chunk的size必须是0x1000的倍数</li>
+<li>伪造的这个size必须大于最小chunk的大小，同时小于之后要申请的内存</li>
+<li>inuse位必须为1</li>
+</ol>
+<p>原理：</p>
+<ol>
+<li><p>当现有的top chunk都不足以满足malloc的分配需求时，系统会执行sysmalloc来向系统申请更多空间，在该函数中，其会根据我们申请的大小决定用mmap分配还是brk分配。我们需要让堆以brk的形式拓展，因为用mmap进行拓展时不会将原本的top chunk free掉，这个过程中首先会在原来的top chunk的上方拓展一块空间作为新的top chunk，然后会把原来的top chunk free掉，这样旧top chunk就进入了unsorted bin中。</p>
+</li>
+<li></li>
+</ol>
 
     </div>
 
@@ -365,7 +378,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#How2heap"><span class="nav-number">1.</span> <span class="nav-text">How2heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#first-fit"><span class="nav-number">1.0.1.</span> <span class="nav-text">first-fit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#use-after-free%EF%BC%88%E9%87%8A%E6%94%BE%E9%87%8D%E5%88%A9%E7%94%A8%EF%BC%89"><span class="nav-number">1.0.2.</span> <span class="nav-text">use-after-free（释放重利用）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Double-free"><span class="nav-number">1.0.3.</span> <span class="nav-text">Double-free</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin-attack"><span class="nav-number">1.0.4.</span> <span class="nav-text">unsorted-bin-attack</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-force"><span class="nav-number">1.0.5.</span> <span class="nav-text">house_of_force</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-spirit"><span class="nav-number">1.0.6.</span> <span class="nav-text">house_of_spirit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-einherjar-libc-2-23"><span class="nav-number">1.0.7.</span> <span class="nav-text">house_of_einherjar(libc-2.23)</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#How2heap"><span class="nav-number">1.</span> <span class="nav-text">How2heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#first-fit"><span class="nav-number">1.0.1.</span> <span class="nav-text">first-fit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#use-after-free%EF%BC%88%E9%87%8A%E6%94%BE%E9%87%8D%E5%88%A9%E7%94%A8%EF%BC%89"><span class="nav-number">1.0.2.</span> <span class="nav-text">use-after-free（释放重利用）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Double-free"><span class="nav-number">1.0.3.</span> <span class="nav-text">Double-free</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#unsorted-bin-attack"><span class="nav-number">1.0.4.</span> <span class="nav-text">unsorted-bin-attack</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-force"><span class="nav-number">1.0.5.</span> <span class="nav-text">house_of_force</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-einherjar-libc-2-23"><span class="nav-number">1.0.6.</span> <span class="nav-text">house_of_einherjar(libc-2.23)</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-orange"><span class="nav-number">1.0.7.</span> <span class="nav-text">house_of_orange</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -379,14 +392,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-count">47</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-count">30</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
