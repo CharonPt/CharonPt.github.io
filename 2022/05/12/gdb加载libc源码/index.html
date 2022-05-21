@@ -28,7 +28,7 @@
 <meta property="og:description" content="搭建Glibc源码调试环境方法也是从别人的博客嫖的，为了防止搞丢所以这里简单记一下 能跟源码是真的舒服，堆利用在讲原理时往往甩一堆源码过来，然后里面一些变量指的是什么也不说清楚，导致稍微复杂点的源码就很难审懂（也许是我的问题） 在gdb里能加载源码之后直接跟到想看的位置再稍微跟一下就能比较简单地搞懂一些代码实现了什么功能，以及怎样实现的…… 1.下载并解压glibc源码123sudo apt-ge">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2022-05-12T13:52:28.000Z">
-<meta property="article:modified_time" content="2022-05-12T14:01:10.864Z">
+<meta property="article:modified_time" content="2022-05-20T09:26:34.645Z">
 <meta property="article:author" content="John Doe">
 <meta property="article:tag" content="pwn">
 <meta name="twitter:card" content="summary">
@@ -183,10 +183,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2022-05-12 21:52:28 / 修改时间：22:01:10" itemprop="dateCreated datePublished" datetime="2022-05-12T21:52:28+08:00">2022-05-12</time>
+              <time title="创建时间：2022-05-12 21:52:28" itemprop="dateCreated datePublished" datetime="2022-05-12T21:52:28+08:00">2022-05-12</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-20 17:26:34" itemprop="dateModified" datetime="2022-05-20T17:26:34+08:00">2022-05-20</time>
+              </span>
 
           
 
@@ -210,6 +216,13 @@
 <p>在首行加入以下内容</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">directory /usr/src/glibc/glibc-2.23/malloc:/usr/src/glibc/glibc-2.23/elf</span><br></pre></td></tr></table></figure>
 
+<h3 id="调别的版本的源码"><a href="#调别的版本的源码" class="headerlink" title="调别的版本的源码"></a>调别的版本的源码</h3><h4 id="1-选择-glibc-版本下载、解压"><a href="#1-选择-glibc-版本下载、解压" class="headerlink" title="1.选择 glibc 版本下载、解压"></a>1.选择 glibc 版本下载、解压</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">wget https://ftp.gnu.org/gnu/glibc/glibc-2.29.tar.gz</span><br><span class="line">tar xvf glibc-2.23.tar.gz</span><br></pre></td></tr></table></figure>
+
+<h4 id="2-将解压得到的文件夹放到-usr-src-glibc下"><a href="#2-将解压得到的文件夹放到-usr-src-glibc下" class="headerlink" title="2.将解压得到的文件夹放到/usr/src/glibc下"></a>2.将解压得到的文件夹放到/usr/src/glibc下</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo mv glibc-2.29 /usr/src/glibc</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-更改GDB配置"><a href="#3-更改GDB配置" class="headerlink" title="3.更改GDB配置"></a>3.更改GDB配置</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo vim ~/.gdbinit</span><br><span class="line">directory /usr/src/glibc/glibc-2.29/malloc:/usr/src/glibc/glibc-2.29/elf</span><br></pre></td></tr></table></figure>
+
+<p>这样gdb就会读指定版本的源码了，但是要注意调试的elf要patchelf成对应版本的</p>
 
     </div>
 
@@ -231,7 +244,10 @@
     <a href="/2022/05/12/large-bin/" rel="prev" title="large-bin">
       <i class="fa fa-chevron-left"></i> large-bin
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2022/05/16/tcache/" rel="next" title="tcache">
+      tcache <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -290,7 +306,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%90%AD%E5%BB%BAGlibc%E6%BA%90%E7%A0%81%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83"><span class="nav-number">1.</span> <span class="nav-text">搭建Glibc源码调试环境</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E4%B8%8B%E8%BD%BD%E5%B9%B6%E8%A7%A3%E5%8E%8Bglibc%E6%BA%90%E7%A0%81"><span class="nav-number">1.1.</span> <span class="nav-text">1.下载并解压glibc源码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E9%85%8D%E7%BD%AEGDB"><span class="nav-number">1.2.</span> <span class="nav-text">2.配置GDB</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%90%AD%E5%BB%BAGlibc%E6%BA%90%E7%A0%81%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83"><span class="nav-number">1.</span> <span class="nav-text">搭建Glibc源码调试环境</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E4%B8%8B%E8%BD%BD%E5%B9%B6%E8%A7%A3%E5%8E%8Bglibc%E6%BA%90%E7%A0%81"><span class="nav-number">1.1.</span> <span class="nav-text">1.下载并解压glibc源码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E9%85%8D%E7%BD%AEGDB"><span class="nav-number">1.2.</span> <span class="nav-text">2.配置GDB</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B0%83%E5%88%AB%E7%9A%84%E7%89%88%E6%9C%AC%E7%9A%84%E6%BA%90%E7%A0%81"><span class="nav-number">2.</span> <span class="nav-text">调别的版本的源码</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E9%80%89%E6%8B%A9-glibc-%E7%89%88%E6%9C%AC%E4%B8%8B%E8%BD%BD%E3%80%81%E8%A7%A3%E5%8E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">1.选择 glibc 版本下载、解压</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E5%B0%86%E8%A7%A3%E5%8E%8B%E5%BE%97%E5%88%B0%E7%9A%84%E6%96%87%E4%BB%B6%E5%A4%B9%E6%94%BE%E5%88%B0-usr-src-glibc%E4%B8%8B"><span class="nav-number">2.2.</span> <span class="nav-text">2.将解压得到的文件夹放到&#x2F;usr&#x2F;src&#x2F;glibc下</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E6%9B%B4%E6%94%B9GDB%E9%85%8D%E7%BD%AE"><span class="nav-number">2.3.</span> <span class="nav-text">3.更改GDB配置</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -304,14 +320,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">47</span>
+          <span class="site-state-item-count">49</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">30</span>
+        <span class="site-state-item-count">32</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

