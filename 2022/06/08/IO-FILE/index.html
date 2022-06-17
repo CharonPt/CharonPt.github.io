@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="IO_FILE劫持vtable简单点说就是在一些函数的调用链中存在“通过vtable指针到一个结构体中找到对应函数指针来调用函数”的这一过程，同时vtable本身也是个指针，所以这里就有两种思路：①直接修改vtable指向的结构体中的函数指针。②修改vtable指针，使其指向一片我们可控的区域，再在里面布置函数指针。 但是从glibc-2.23开始，位于libc数据段的vtable指向的结构体不可">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IO_FILE">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/IO-FILE/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="IO_FILE劫持vtable简单点说就是在一些函数的调用链中存在“通过vtable指针到一个结构体中找到对应函数指针来调用函数”的这一过程，同时vtable本身也是个指针，所以这里就有两种思路：①直接修改vtable指向的结构体中的函数指针。②修改vtable指针，使其指向一片我们可控的区域，再在里面布置函数指针。 但是从glibc-2.23开始，位于libc数据段的vtable指向的结构体不可">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-06-08T05:56:12.000Z">
+<meta property="article:modified_time" content="2022-06-17T09:16:33.649Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="IO_FILE">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/IO-FILE/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>IO_FILE | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/IO-FILE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          IO_FILE
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-06-08 13:56:12" itemprop="dateCreated datePublished" datetime="2022-06-08T13:56:12+08:00">2022-06-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-06-17 17:16:33" itemprop="dateModified" datetime="2022-06-17T17:16:33+08:00">2022-06-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="IO-FILE"><a href="#IO-FILE" class="headerlink" title="IO_FILE"></a>IO_FILE</h3><h3 id="劫持vtable"><a href="#劫持vtable" class="headerlink" title="劫持vtable"></a>劫持vtable</h3><p>简单点说就是在一些函数的调用链中存在“通过vtable指针到一个结构体中找到对应函数指针来调用函数”的这一过程，同时vtable本身也是个指针，所以这里就有两种思路：①直接修改vtable指向的结构体中的函数指针。②修改vtable指针，使其指向一片我们可控的区域，再在里面布置函数指针。</p>
+<p>但是从glibc-2.23开始，位于libc数据段的vtable指向的结构体不可写，所以要用第二种方法</p>
+<p>要使用第二种方法的话需要知道函数最后会调用vtable中的哪个函数，这样才能对应地去修改</p>
+<p>当然不是所有函数都会用到<code>_IO_FILE</code>结构，所以具体还得自己掌握</p>
+<h4 id="例如"><a href="#例如" class="headerlink" title="例如"></a>例如</h4><p>以exit函数为例</p>
+<blockquote>
+<p>程序调用 <code>exit</code> 后，会遍历 <code>_IO_list_all</code> ，调用 <code>_IO_2_1_stdout_</code> 下的 <code>vtable</code> 中 <code>_setbuf</code> 函数。</p>
+</blockquote>
+<p>那么我们就知道<code>exit</code>函数会去调用<code>vtable</code>中的<code>_setbuf</code>，然后去查看<code>_setbuf</code>在<code>vtable</code>中的偏移</p>
+<p>首先找到对应的流</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ p &amp;_IO_2_1_stdout_</span><br><span class="line">$1 = (struct _IO_FILE_plus *) 0x7fc602899620 &lt;_IO_2_1_stdout_&gt;</span><br></pre></td></tr></table></figure>
+
+<p>在libc-2.23版本下，vtable位于_IO_FILE + 0x94/0xd8（32位/64位），由于版本的不同所以可以选择在IDA中搜索vtable符号来找到对应的偏移</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/gx 0x7fc602899620+0xd8</span><br><span class="line">0x7fc6028996f8 &lt;_IO_2_1_stdout_+216&gt;:	0x00007fc6028976e0</span><br><span class="line"></span><br><span class="line">gdb-peda$ x/32gx 0x00007fc6028976e0</span><br><span class="line">0x7fc6028976e0 &lt;_IO_file_jumps&gt;:	0x0000000000000000	0x0000000000000000</span><br><span class="line">0x7fc6028976f0 &lt;_IO_file_jumps+16&gt;:	0x00007fc60254d9d0	0x00007fc60254e740</span><br><span class="line">0x7fc602897700 &lt;_IO_file_jumps+32&gt;:	0x00007fc60254e4b0	0x00007fc60254f610</span><br><span class="line">0x7fc602897710 &lt;_IO_file_jumps+48&gt;:	0x00007fc602550990	0x00007fc60254d1f0</span><br><span class="line">0x7fc602897720 &lt;_IO_file_jumps+64&gt;:	0x00007fc60254ced0	0x00007fc60254c4d0</span><br><span class="line">0x7fc602897730 &lt;_IO_file_jumps+80&gt;:	0x00007fc60254fa10	0x00007fc60254c440</span><br><span class="line">0x7fc602897740 &lt;_IO_file_jumps+96&gt;:	0x00007fc60254c380	0x00007fc602541190</span><br><span class="line">0x7fc602897750 &lt;_IO_file_jumps+112&gt;:	0x00007fc60254d1b0	0x00007fc60254cb80</span><br><span class="line">0x7fc602897760 &lt;_IO_file_jumps+128&gt;:	0x00007fc60254c980	0x00007fc60254c350</span><br><span class="line">0x7fc602897770 &lt;_IO_file_jumps+144&gt;:	0x00007fc60254cb70	0x00007fc602550b00</span><br><span class="line">0x7fc602897780 &lt;_IO_file_jumps+160&gt;:	0x00007fc602550b10	0x0000000000000000</span><br><span class="line"></span><br><span class="line">gdb-peda$ p _IO_file_jumps</span><br><span class="line">$2 = &#123;</span><br><span class="line">  __dummy = 0x0, </span><br><span class="line">  __dummy2 = 0x0, </span><br><span class="line">  __finish = 0x7fc60254d9d0 &lt;_IO_new_file_finish&gt;, </span><br><span class="line">  __overflow = 0x7fc60254e740 &lt;_IO_new_file_overflow&gt;, </span><br><span class="line">  __underflow = 0x7fc60254e4b0 &lt;_IO_new_file_underflow&gt;, </span><br><span class="line">  __uflow = 0x7fc60254f610 &lt;__GI__IO_default_uflow&gt;, </span><br><span class="line">  __pbackfail = 0x7fc602550990 &lt;__GI__IO_default_pbackfail&gt;, </span><br><span class="line">  __xsputn = 0x7fc60254d1f0 &lt;_IO_new_file_xsputn&gt;, </span><br><span class="line">  __xsgetn = 0x7fc60254ced0 &lt;__GI__IO_file_xsgetn&gt;, </span><br><span class="line">  __seekoff = 0x7fc60254c4d0 &lt;_IO_new_file_seekoff&gt;, </span><br><span class="line">  __seekpos = 0x7fc60254fa10 &lt;_IO_default_seekpos&gt;, </span><br><span class="line">  __setbuf = 0x7fc60254c440 &lt;_IO_new_file_setbuf&gt;, </span><br><span class="line">  __sync = 0x7fc60254c380 &lt;_IO_new_file_sync&gt;, </span><br><span class="line">  __doallocate = 0x7fc602541190 &lt;__GI__IO_file_doallocate&gt;, </span><br><span class="line">  __read = 0x7fc60254d1b0 &lt;__GI__IO_file_read&gt;, </span><br><span class="line">  __write = 0x7fc60254cb80 &lt;_IO_new_file_write&gt;, </span><br><span class="line">  __seek = 0x7fc60254c980 &lt;__GI__IO_file_seek&gt;, </span><br><span class="line">  __close = 0x7fc60254c350 &lt;__GI__IO_file_close&gt;, </span><br><span class="line">  __stat = 0x7fc60254cb70 &lt;__GI__IO_file_stat&gt;, </span><br><span class="line">  __showmanyc = 0x7fc602550b00 &lt;_IO_default_showmanyc&gt;, </span><br><span class="line">  __imbue = 0x7fc602550b10 &lt;_IO_default_imbue&gt;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到<code>_setbuf</code>对应的偏移是0x58，那么只需要在伪造的vtable+0x58的这个位置布置函数指针即可。</p>
+<p>puts函数会调用<code>_IO_2_1_stdout_</code>的<code>vtable</code>中的<code>__xsputn</code>，但由于puts函数在程序中经常被调用，所以如果先改虚表再布置指针的话就会出现错误，这时就可以选择先在一个地址上布置函数指针，然后再改<code>_IO_2_1_stdout_</code>的虚表指针，这样就没有问题。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/IO-FILE/" rel="tag"># IO_FILE</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/06/03/%E5%87%BA%E9%A2%98%E8%AE%B0%E5%BD%95/" rel="prev" title="出题记录">
+      <i class="fa fa-chevron-left"></i> 出题记录
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/06/08/house-of-force/" rel="next" title="house_of_force">
+      house_of_force <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#IO-FILE"><span class="nav-number">1.</span> <span class="nav-text">IO_FILE</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8A%AB%E6%8C%81vtable"><span class="nav-number">2.</span> <span class="nav-text">劫持vtable</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BE%8B%E5%A6%82"><span class="nav-number">2.1.</span> <span class="nav-text">例如</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">54</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">36</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

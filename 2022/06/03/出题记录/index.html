@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="保护全开的编译命令1gcc -z now -pie -fPIE binary.c  这条命令开启了pie跟FULL RELRO，因为NX跟canary默认是开的，所以这样就行了 去除符号表直接用strip就可以，要注意题目不要patch过 strip 题目名 如果要加沙箱的话比较详细的文章：Seccomp从0到1 一般来说能用seccomp或者prctl函数来加沙箱，但是用seccomp的话会留下">
+<meta property="og:type" content="article">
+<meta property="og:title" content="出题记录">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/03/%E5%87%BA%E9%A2%98%E8%AE%B0%E5%BD%95/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="保护全开的编译命令1gcc -z now -pie -fPIE binary.c  这条命令开启了pie跟FULL RELRO，因为NX跟canary默认是开的，所以这样就行了 去除符号表直接用strip就可以，要注意题目不要patch过 strip 题目名 如果要加沙箱的话比较详细的文章：Seccomp从0到1 一般来说能用seccomp或者prctl函数来加沙箱，但是用seccomp的话会留下">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-06-03T10:07:46.000Z">
+<meta property="article:modified_time" content="2022-06-15T09:04:28.766Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn出题">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/03/%E5%87%BA%E9%A2%98%E8%AE%B0%E5%BD%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>出题记录 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/03/%E5%87%BA%E9%A2%98%E8%AE%B0%E5%BD%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          出题记录
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-06-03 18:07:46" itemprop="dateCreated datePublished" datetime="2022-06-03T18:07:46+08:00">2022-06-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-06-15 17:04:28" itemprop="dateModified" datetime="2022-06-15T17:04:28+08:00">2022-06-15</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="保护全开的编译命令"><a href="#保护全开的编译命令" class="headerlink" title="保护全开的编译命令"></a>保护全开的编译命令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc -z now -pie -fPIE binary.c</span><br></pre></td></tr></table></figure>
+
+<p>这条命令开启了pie跟FULL RELRO，因为NX跟canary默认是开的，所以这样就行了</p>
+<h3 id="去除符号表"><a href="#去除符号表" class="headerlink" title="去除符号表"></a>去除符号表</h3><p>直接用strip就可以，要注意题目不要patch过</p>
+<p><code>strip 题目名</code></p>
+<h3 id="如果要加沙箱的话"><a href="#如果要加沙箱的话" class="headerlink" title="如果要加沙箱的话"></a>如果要加沙箱的话</h3><p>比较详细的文章：<a target="_blank" rel="noopener" href="http://cn-sec.com/archives/78105.html">Seccomp从0到1</a></p>
+<p>一般来说能用seccomp或者prctl函数来加沙箱，但是用seccomp的话会留下堆的使用痕迹，所以在堆题中一般只用prctl</p>
+<p>下面这块的效果是禁用execve，如果这样就够了的话直接复制就行</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/prctl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;linux/filter.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;seccomp.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;linux/seccomp.h&gt;</span></span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sock_filter</span> <span class="title">filter</span>[] =</span> &#123;</span><br><span class="line">	BPF_STMT(BPF_LD+BPF_W+BPF_ABS,<span class="number">4</span>),</span><br><span class="line">    BPF_JUMP(BPF_JMP+BPF_JEQ,<span class="number">0xc000003e</span>,<span class="number">0</span>,<span class="number">2</span>),</span><br><span class="line">    BPF_STMT(BPF_LD+BPF_W+BPF_ABS,<span class="number">0</span>),</span><br><span class="line">    BPF_JUMP(BPF_JMP+BPF_JEQ,<span class="number">59</span>,<span class="number">0</span>,<span class="number">1</span>),</span><br><span class="line">    BPF_STMT(BPF_RET+BPF_K,SECCOMP_RET_KILL),</span><br><span class="line">    BPF_STMT(BPF_RET+BPF_K,SECCOMP_RET_ALLOW),</span><br><span class="line">    &#125;;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sock_fprog</span> <span class="title">prog</span> =</span> &#123;</span><br><span class="line">    .len = (<span class="keyword">unsigned</span> <span class="keyword">short</span>)(<span class="keyword">sizeof</span>(filter)/<span class="keyword">sizeof</span>(filter[<span class="number">0</span>])),</span><br><span class="line">    .filter = filter,</span><br><span class="line">    &#125;;</span><br><span class="line">    prctl(PR_SET_NO_NEW_PRIVS,<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    prctl(PR_SET_SECCOMP,SECCOMP_MODE_FILTER,&amp;prog);</span><br></pre></td></tr></table></figure>
+
+<p>效果</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"> line  CODE  JT   JF      K</span><br><span class="line">=================================</span><br><span class="line"> 0000: 0x20 0x00 0x00 0x00000004  A = arch</span><br><span class="line"> 0001: 0x15 0x00 0x02 0xc000003e  if (A != ARCH_X86_64) goto 0004</span><br><span class="line"> 0002: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0003: 0x15 0x00 0x01 0x0000003b  if (A != execve) goto 0005</span><br><span class="line"> 0004: 0x06 0x00 0x00 0x00000000  return KILL</span><br><span class="line"> 0005: 0x06 0x00 0x00 0x7fff0000  return ALLOW</span><br></pre></td></tr></table></figure>
+
+<h3 id="Docker部分"><a href="#Docker部分" class="headerlink" title="Docker部分"></a>Docker部分</h3><p>创建一个文件夹用来存放相关文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">├── bin</span><br><span class="line">│   ├── flag.txt</span><br><span class="line">│   └── pwn</span><br><span class="line">├── build.sh</span><br><span class="line">├── ctf.xinetd</span><br><span class="line">├── Dockerfile</span><br><span class="line">├── run.sh</span><br><span class="line">└── start.sh</span><br></pre></td></tr></table></figure>
+
+<p>目前还不会自己写Dockerfile，所以用的是学长给的Dockerfile</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">FROM ubuntu:21.04</span><br><span class="line">ARG DEBIAN_FRONTEND=noninteractive</span><br><span class="line">RUN sed -i &#x27;s/archive.ubuntu.com/mirrors.aliyun.com/g&#x27; /etc/apt/sources.list &amp;&amp; sed -i &#x27;s/security.ubuntu.com/mirrors.aliyun.com/g&#x27; /etc/apt/sources.list &amp;&amp; apt update &amp;&amp; apt-get install -y lib32z1 xinetd &amp;&amp; apt-get install -y openssh-server &amp;&amp; apt-get install -y openssh-client &amp;&amp; apt-get install -y net-tools &amp;&amp; rm -rf /var/lib/apt/lists/ &amp;&amp; rm -rf /root/.cache &amp;&amp; apt-get autoclean &amp;&amp; rm -rf /tmp/* /var/lib/apt/* /var/cache/* /var/log/*</span><br><span class="line"></span><br><span class="line">RUN useradd -m ctf</span><br><span class="line"></span><br><span class="line">WORKDIR /home/ctf</span><br><span class="line"></span><br><span class="line">RUN cp -R /lib* /home/ctf &amp;&amp; \</span><br><span class="line">    cp -R /usr/lib* /home/ctf</span><br><span class="line"></span><br><span class="line">RUN mkdir /home/ctf/dev &amp;&amp; \</span><br><span class="line">    mknod /home/ctf/dev/null c 1 3 &amp;&amp; \</span><br><span class="line">    mknod /home/ctf/dev/zero c 1 5 &amp;&amp; \</span><br><span class="line">    mknod /home/ctf/dev/random c 1 8 &amp;&amp; \</span><br><span class="line">    mknod /home/ctf/dev/urandom c 1 9 &amp;&amp; \</span><br><span class="line">    chmod 666 /home/ctf/dev/*</span><br><span class="line"></span><br><span class="line">RUN mkdir /home/ctf/bin &amp;&amp; \</span><br><span class="line">    mkdir /home/ctf/pwn &amp;&amp; \</span><br><span class="line">    mkdir /home/ctf/etc &amp;&amp; \</span><br><span class="line">    cp /bin/sh /home/ctf/bin &amp;&amp; \</span><br><span class="line">    cp /bin/ls /home/ctf/bin &amp;&amp; \</span><br><span class="line">    cp /bin/cat /home/ctf/bin &amp;&amp; \</span><br><span class="line">    cp /usr/bin/whoami /home/ctf/bin/  &amp;&amp;\</span><br><span class="line">    cp /etc/passwd /home/ctf/etc/</span><br><span class="line"></span><br><span class="line">COPY ./ctf.xinetd /etc/xinetd.d/ctf</span><br><span class="line">COPY ./start.sh /start.sh</span><br><span class="line">RUN echo &quot;Blocked by ctf_xinetd&quot; &gt; /etc/banner_fail</span><br><span class="line"></span><br><span class="line">RUN chmod +x /start.sh</span><br><span class="line"></span><br><span class="line">COPY ./bin/flag.txt /home/ctf/</span><br><span class="line">COPY ./bin/pwn /home/ctf/pwn/</span><br><span class="line"></span><br><span class="line">RUN chown -R root:ctf /home/ctf &amp;&amp; \</span><br><span class="line">    chmod -R 750 /home/ctf/pwn/ &amp;&amp; \</span><br><span class="line">    chmod 770 /home/ctf/pwn/pwn &amp;&amp; \</span><br><span class="line">    chmod 740 /home/ctf/flag.txt &amp;&amp; \</span><br><span class="line">    echo &quot;ctf:123456&quot; | chpasswd</span><br><span class="line"></span><br><span class="line">CMD [&quot;/start.sh&quot;]</span><br><span class="line"></span><br><span class="line">EXPOSE 8888</span><br></pre></td></tr></table></figure>
+
+<p>将第一句<code>FROM ubuntu:21.04</code>中的ubuntu版本改成自己需要的就行，第一个<code>RUN</code>中进行了换源以及一些所需工具的安装，有时候要是报错的话可能是那个版本的ubuntu的问题，比如20.10这个版本好像就比较难找到能用的源</p>
+<p>最后一行<code>EXPOSE 8888</code>将题目挂到了docker的8888端口</p>
+<p>start.sh中的内容如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/sh</span><br><span class="line"># Add your startup script</span><br><span class="line">service ssh start</span><br><span class="line"># DO NOT DELETE</span><br><span class="line">/etc/init.d/xinetd start;</span><br><span class="line">sleep infinity;</span><br></pre></td></tr></table></figure>
+
+<p>然后<code>ctf.xinetd</code>的内容如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">service ctf</span><br><span class="line">&#123;</span><br><span class="line">    disable = no</span><br><span class="line">    socket_type = stream</span><br><span class="line">    protocol    = tcp</span><br><span class="line">    wait        = no</span><br><span class="line">    user        = root</span><br><span class="line">    type        = UNLISTED</span><br><span class="line">    port        = 8888</span><br><span class="line">    bind        = 0.0.0.0</span><br><span class="line">    server      = /usr/sbin/chroot</span><br><span class="line">    # replace helloworld to your program</span><br><span class="line">    server_args = --userspec=1000:1000 /home/ctf ./pwn/pwn</span><br><span class="line">    banner_fail = /etc/banner_fail</span><br><span class="line">    # safety options</span><br><span class="line">    per_source	= 10 # the maximum instances of this service per source IP address</span><br><span class="line">    rlimit_cpu	= 20 # the maximum number of CPU seconds that the service may use</span><br><span class="line">    #rlimit_as  = 1024M # the Address Space resource limit for the service</span><br><span class="line">    #access_times = 2:00-9:00 12:00-24:00</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在Dockerfile相同目录下用这个命令生成一个镜像</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker build -t $NAME .</span><br></pre></td></tr></table></figure>
+
+<p>然后用这个命令生成一个容器</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run --cap-add LINUX_IMMUTABLE -it -d -p &quot;0.0.0.0:3359:8888&quot; $NAME</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>-p &quot;0.0.0.0:3359:8888&quot;</code>的作用是端口映射，表示将docker的8888端口映射到本机3359端口中，这样就能用本机的ip:3359访问到docker的8888端口了，也就是题目</p>
+<p>有时发现用127.0.0.1可以访问题目，但是用公网ip无法访问的话可能是服务器的安全组策略配置问题，也就是你的服务器开放了哪些端口。</p>
+<p>文件夹里的<code>build.sh</code>和<code>run.sh</code>其实也就是上面两条命令</p>
+<p>因为在提交题目时还需要提交镜像文件，所以要把生成的镜像打包一下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker save -o $NAME.tar $NAME</span><br></pre></td></tr></table></figure>
+
+<p>顺带一提，用镜像tar压缩包生成镜像的命令</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker load -i $NAME.tar</span><br></pre></td></tr></table></figure>
+
+
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn%E5%87%BA%E9%A2%98/" rel="tag"># pwn出题</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/31/glibc-2-32/" rel="prev" title="glibc-2.32">
+      <i class="fa fa-chevron-left"></i> glibc-2.32
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/06/08/IO-FILE/" rel="next" title="IO_FILE">
+      IO_FILE <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%9D%E6%8A%A4%E5%85%A8%E5%BC%80%E7%9A%84%E7%BC%96%E8%AF%91%E5%91%BD%E4%BB%A4"><span class="nav-number">1.</span> <span class="nav-text">保护全开的编译命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%BB%E9%99%A4%E7%AC%A6%E5%8F%B7%E8%A1%A8"><span class="nav-number">2.</span> <span class="nav-text">去除符号表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E8%A6%81%E5%8A%A0%E6%B2%99%E7%AE%B1%E7%9A%84%E8%AF%9D"><span class="nav-number">3.</span> <span class="nav-text">如果要加沙箱的话</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Docker%E9%83%A8%E5%88%86"><span class="nav-number">4.</span> <span class="nav-text">Docker部分</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">54</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">36</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

