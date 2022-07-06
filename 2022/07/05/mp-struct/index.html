@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="知识点严格来说这一部分应该归到tcache的知识点中 似乎在网上不怎么找得到关于这个知识点的文章，所以只能自己看源码来分析一下 mp_在malloc.c源码中，mp_是一个由malloc_par结构体声明的结构体变量 12345678910111213141516static struct malloc_par mp_ &#x3D;&amp;#123;  .top_pad &#x3D; DEFAULT_TOP_PAD,  .">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mp_struct">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/07/05/mp-struct/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="知识点严格来说这一部分应该归到tcache的知识点中 似乎在网上不怎么找得到关于这个知识点的文章，所以只能自己看源码来分析一下 mp_在malloc.c源码中，mp_是一个由malloc_par结构体声明的结构体变量 12345678910111213141516static struct malloc_par mp_ &#x3D;&amp;#123;  .top_pad &#x3D; DEFAULT_TOP_PAD,  .">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-07-05T11:25:50.000Z">
+<meta property="article:modified_time" content="2022-07-06T11:43:19.559Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="mp_">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/07/05/mp-struct/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mp_struct | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/07/05/mp-struct/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mp_struct
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-07-05 19:25:50" itemprop="dateCreated datePublished" datetime="2022-07-05T19:25:50+08:00">2022-07-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-06 19:43:19" itemprop="dateModified" datetime="2022-07-06T19:43:19+08:00">2022-07-06</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h2><p>严格来说这一部分应该归到tcache的知识点中</p>
+<p>似乎在网上不怎么找得到关于这个知识点的文章，所以只能自己看源码来分析一下</p>
+<h3 id="mp"><a href="#mp" class="headerlink" title="mp_"></a>mp_</h3><p>在malloc.c源码中，<code>mp_</code>是一个由<code>malloc_par</code>结构体声明的结构体变量</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">malloc_par</span> <span class="title">mp_</span> =</span></span><br><span class="line">&#123;</span><br><span class="line">  .top_pad = DEFAULT_TOP_PAD,</span><br><span class="line">  .n_mmaps_max = DEFAULT_MMAP_MAX,</span><br><span class="line">  .mmap_threshold = DEFAULT_MMAP_THRESHOLD,</span><br><span class="line">  .trim_threshold = DEFAULT_TRIM_THRESHOLD,</span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))</span></span><br><span class="line">  .arena_test = NARENAS_FROM_NCORES (<span class="number">1</span>)</span><br><span class="line"><span class="meta">#<span class="meta-keyword">if</span> USE_TCACHE</span></span><br><span class="line">  ,</span><br><span class="line">  .tcache_count = TCACHE_FILL_COUNT,</span><br><span class="line">  .tcache_bins = TCACHE_MAX_BINS,</span><br><span class="line">  .tcache_max_bytes = tidx2usize (TCACHE_MAX_BINS<span class="number">-1</span>),</span><br><span class="line">  .tcache_unsorted_limit = <span class="number">0</span> <span class="comment">/* No limit.  */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>而结构体<code>malloc_par</code>的声明如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">malloc_par</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="comment">/* Tunable parameters */</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">long</span> trim_threshold;</span><br><span class="line">  INTERNAL_SIZE_T top_pad;</span><br><span class="line">  INTERNAL_SIZE_T mmap_threshold;</span><br><span class="line">  INTERNAL_SIZE_T arena_test;</span><br><span class="line">  INTERNAL_SIZE_T arena_max;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Memory map support */</span></span><br><span class="line">  <span class="keyword">int</span> n_mmaps;</span><br><span class="line">  <span class="keyword">int</span> n_mmaps_max;</span><br><span class="line">  <span class="keyword">int</span> max_n_mmaps;</span><br><span class="line">  <span class="comment">/* the mmap_threshold is dynamic, until the user sets</span></span><br><span class="line"><span class="comment">     it manually, at which point we need to disable any</span></span><br><span class="line"><span class="comment">     dynamic behavior. */</span></span><br><span class="line">  <span class="keyword">int</span> no_dyn_threshold;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Statistics */</span></span><br><span class="line">  INTERNAL_SIZE_T mmapped_mem;</span><br><span class="line">  INTERNAL_SIZE_T max_mmapped_mem;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* First address handed out by MORECORE/sbrk.  */</span></span><br><span class="line">  <span class="keyword">char</span> *sbrk_base;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">if</span> USE_TCACHE</span></span><br><span class="line">  <span class="comment">/* Maximum number of buckets to use.  */</span></span><br><span class="line">  <span class="keyword">size_t</span> tcache_bins;</span><br><span class="line">  <span class="keyword">size_t</span> tcache_max_bytes;</span><br><span class="line">  <span class="comment">/* Maximum number of chunks in each bucket.  */</span></span><br><span class="line">  <span class="keyword">size_t</span> tcache_count;</span><br><span class="line">  <span class="comment">/* Maximum number of chunks to remove from the unsorted list, which</span></span><br><span class="line"><span class="comment">     aren&#x27;t used to prefill the cache.  */</span></span><br><span class="line">  <span class="keyword">size_t</span> tcache_unsorted_limit;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>tcache_bins</code>这一项记录的是tcache bin的总数量，正常情况下有64个tcache bin。其在<code>mp_</code>中的偏移为0x80</p>
+<h3 id="计算tc-idx"><a href="#计算tc-idx" class="headerlink" title="计算tc_idx"></a>计算tc_idx</h3><p>大概梳理一下malloc的流程，在有tcache的版本下，程序首先会根据传入的参数大小（bytes）计算出实际需要的chunk大小（tbytes），然后根据这个大小计算出对应的tcache bin下标（tc_idx）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">size_t</span> tc_idx = csize2tidx (tbytes);</span><br></pre></td></tr></table></figure>
+
+<p>因为在攻击中我们需要知道这个tc_idx和tbytes的对应关系，所以要了解一下具体是怎么算出来的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">/* When &quot;x&quot; is from chunksize().  */</span><br><span class="line"># define csize2tidx(x) (((x) - MINSIZE + MALLOC_ALIGNMENT - 1) / MALLOC_ALIGNMENT)</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>MINSIZE</code>一般在32位下是0x10字节，64位下是0x20字节，<code>MALLOC_ALIGNMENT</code>在32位下是8个字节，64位下是16个字节。</p>
+<p>那么这样代入我们就能算出特定大小的chunk所对应的<code>tc_idx</code>了</p>
+<h3 id="相关结构"><a href="#相关结构" class="headerlink" title="相关结构"></a>相关结构</h3><p>然后程序根据以下三点来判断是否从tcache中取块：① 下标在tcache bin范围里。② tcache指针有值。③ 下标对应的bin中有chunk</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (tc_idx &lt; mp_.tcache_bins</span><br><span class="line">    &amp;&amp; tcache</span><br><span class="line">    &amp;&amp; tcache-&gt;counts[tc_idx] &gt; <span class="number">0</span>)</span><br><span class="line">  &#123;</span><br><span class="line">    victim = tcache_get (tc_idx);</span><br><span class="line">    <span class="keyword">return</span> TAG_NEW_USABLE (victim);</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后<code>tcache_get</code>函数是这样的</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> __always_inline <span class="keyword">void</span> *</span></span><br><span class="line"><span class="function"><span class="title">tcache_get</span> <span class="params">(<span class="keyword">size_t</span> tc_idx)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  tcache_entry *e = tcache-&gt;entries[tc_idx];</span><br><span class="line">  <span class="keyword">if</span> (__glibc_unlikely (!aligned_OK (e)))</span><br><span class="line">    malloc_printerr (<span class="string">&quot;malloc(): unaligned tcache chunk detected&quot;</span>);</span><br><span class="line">  tcache-&gt;entries[tc_idx] = REVEAL_PTR (e-&gt;next);</span><br><span class="line">  --(tcache-&gt;counts[tc_idx]);</span><br><span class="line">  e-&gt;key = <span class="literal">NULL</span>;</span><br><span class="line">  <span class="keyword">return</span> (<span class="keyword">void</span> *) e;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个函数很简单，根据下标从<code>tcache-&gt;entries</code>中取chunk地址给<code>e</code>，更新<code>tcache-&gt;counts[tc_idx]</code>，然后<code>tcache-&gt;counts[tc_idx]</code>减一。</p>
+<p>这里的tcache是个结构体指针，其指向对应线程所维护的那个<code>tcache_perthread_struct</code>结构体</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> __thread tcache_perthread_struct *tcache = <span class="literal">NULL</span>;</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>tcache_perthread_struct</code>是整个tcache的管理结构，其中记录了每条tcache bin链表中chunk的数量以及每条tcache bin链表头部的地址，这个结构体的总大小为<code>1 * 64 + 8 * 64 = 0x240</code>个字节，而每个 thread 都会用一个chunk来存放这个管理结构，所以其总大小为<code>0x250</code></p>
+<p>对于主线程来说，其位于<code>heap</code>段开头。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* There is one of these for each thread, which contains the</span></span><br><span class="line"><span class="comment">   per-thread cache (hence &quot;tcache_perthread_struct&quot;).  Keeping</span></span><br><span class="line"><span class="comment">   overall size low is mildly important.  Note that COUNTS and ENTRIES</span></span><br><span class="line"><span class="comment">   are redundant (we could have just counted the linked list each</span></span><br><span class="line"><span class="comment">   time), this is for performance reasons.  */</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">tcache_perthread_struct</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="keyword">char</span> counts[TCACHE_MAX_BINS];</span><br><span class="line">  tcache_entry *entries[TCACHE_MAX_BINS];</span><br><span class="line">&#125; tcache_perthread_struct;</span><br><span class="line"></span><br><span class="line"><span class="meta"># <span class="meta-keyword">define</span> TCACHE_MAX_BINS		64</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>值得注意的是，从glibc-2.30开始，<code>tcache_perthread_struct</code>中的<code>counts</code>变成了<code>uint16_t</code>类型的，也就是说一个<code>counts</code>占两个字节，<code>tcache_perthread_struct</code>chunk的总大小变成0x290</strong></p>
+<h2 id="利用"><a href="#利用" class="headerlink" title="利用"></a>利用</h2><p>在了解完上面的点之后其实可以发现，由于<code>tc_idx</code>是直接跟<code>tbytes</code>挂钩的，所以当<code>tbytes</code>大于正常的tcache bin chunk时，<code>tc_idx</code>就不会是正常的tcache bin下标，但是由于其存在对下标合法性的检查（如下），所以正常情况下当<code>tc_idx</code>不在tcache bin范围中时，程序就不会从tcache中取chunk。其实也可以理解为“程序是通过计算出来的下标是否属于tcache bin以及<code>tcache-&gt;counts[tc_idx]</code>是否大于0”来决定“是否从tcache bin中取chunk”。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">if (tc_idx &lt; mp_.tcache_bins</span><br><span class="line">    &amp;&amp; tcache</span><br><span class="line">    &amp;&amp; tcache-&gt;counts[tc_idx] &gt; 0)</span><br></pre></td></tr></table></figure>
+
+<p>所以如果我们修改<code>mp_.tcache_bins</code>为一个大值，那么程序就会认为一个大范围内的地址都属于tcache bin，而且由于主线程的<code>tcache_perthread_struct</code>结构就在heap段开头，所以<code>tcache_perthread_struct</code>之后的地址中的值都是可控的，这也就意味着我们可以直接往伪造的tcache bin上放任意地址，然后申请对应的大小，从这个伪造的tcache bin中将这个我们布置的地址给拿出来。只需要同时保证对应的<code>tcache-&gt;counts[tc_idx] &gt; 0</code>即可。</p>
+<h3 id="例子"><a href="#例子" class="headerlink" title="例子"></a>例子</h3><p>首先将<code>mp_</code>中<code>tcache_bins</code>的值改成一个大值（可以用unsorted bin attack、largebin_attack之类的），如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ p mp_</span><br><span class="line">$1 = &#123;</span><br><span class="line">  trim_threshold = 0x20000, </span><br><span class="line">  top_pad = 0x20000, </span><br><span class="line">  mmap_threshold = 0x20000, </span><br><span class="line">  arena_test = 0x8, </span><br><span class="line">  arena_max = 0x0, </span><br><span class="line">  n_mmaps = 0x0, </span><br><span class="line">  n_mmaps_max = 0x10000, </span><br><span class="line">  max_n_mmaps = 0x0, </span><br><span class="line">  no_dyn_threshold = 0x0, </span><br><span class="line">  mmapped_mem = 0x0, </span><br><span class="line">  max_mmapped_mem = 0x0, </span><br><span class="line">  sbrk_base = 0x555555759000 &quot;&quot;, </span><br><span class="line">  tcache_bins = 0x55555575afb0, </span><br><span class="line">  tcache_max_bytes = 0x408, </span><br><span class="line">  tcache_count = 0x7, </span><br><span class="line">  tcache_unsorted_limit = 0x0</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后我们在<code>tcache_perthread_struct</code>chunk的相邻chunk中布置一个<code>__free_hook</code></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ x/32gx 0x555555759290</span><br><span class="line">0x555555759290:	0x0000000000000000	0x0000000000000421</span><br><span class="line">0x5555557592a0:	0x00007ffff7fb9e20	0x0000000000000000</span><br><span class="line">0x5555557592b0:	0x0000000000000000	0x0000000000000000</span><br></pre></td></tr></table></figure>
+
+<p>那么此时假如我们<code>malloc(0x430)</code>，malloc的流程怎么走呢？</p>
+<p>首先计算出<code>tbytes = 0x440</code>，然后计算出<code>tc_idx = 0x42</code>，由于<code>0x42 &lt; 0x55555575afb0</code>，也就是满足<code>tc_idx &lt; mp_.tcache_bins</code>，然后计算<code>tcache-&gt;counts[tc_idx]</code>，也就是<code>heap_base + 0x10 + 2 * 0x42</code>，我们需要在这个地址中写一个值，让其至少大于0，满足counts的条件</p>
+<p>当以上两点都满足之后，tcache就会从对应的tcache bin中取chunk，<code>tcache-&gt;entries[tc_idx] = heap_base + 0x10 + 2 * 0x40 + 8 * 0x42 = heap_base + 0x2a0</code>，也就是说在<code>0x5555557592a0</code>处布置的<code>__free_hook</code>就被取出来了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/mp/" rel="tag"># mp_</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/05/2022%E9%B9%8F%E5%9F%8E%E6%9D%AF%E5%88%9D%E8%B5%9Bpwn/" rel="prev" title="2022鹏城杯初赛pwn">
+      <i class="fa fa-chevron-left"></i> 2022鹏城杯初赛pwn
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">1.</span> <span class="nav-text">知识点</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#mp"><span class="nav-number">1.1.</span> <span class="nav-text">mp_</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97tc-idx"><span class="nav-number">1.2.</span> <span class="nav-text">计算tc_idx</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E7%BB%93%E6%9E%84"><span class="nav-number">1.3.</span> <span class="nav-text">相关结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A9%E7%94%A8"><span class="nav-number">2.</span> <span class="nav-text">利用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BE%8B%E5%AD%90"><span class="nav-number">2.1.</span> <span class="nav-text">例子</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
