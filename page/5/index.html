@@ -155,6 +155,109 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/shellcode/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/shellcode/" class="post-title-link" itemprop="url">shellcode</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-12-17 20:22:47" itemprop="dateCreated datePublished" datetime="2021-12-17T20:22:47+08:00">2021-12-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-13 17:03:17" itemprop="dateModified" datetime="2022-03-13T17:03:17+08:00">2022-03-13</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/6645#toc-5">shellcode 的艺术 - 先知社区 (aliyun.com)</a></p>
+<p>这篇文章主要用来收集做题时关于shellcode的问题</p>
+<h4 id="mrctf2020-shellcode-revenge"><a href="#mrctf2020-shellcode-revenge" class="headerlink" title="mrctf2020_shellcode_revenge"></a>mrctf2020_shellcode_revenge</h4><p>该题利用 alpha3 来生成可见字符shellcode来绕过限制，详细见：<a target="_blank" rel="noopener" href="http://taqini.space/2020/03/31/alpha-shellcode-gen/#alpha3">纯字符shellcode生成指南 | TaQini</a></p>
+<p>程序保护如下，栈段是可执行的</p>
+<img src="/2021/12/17/shellcode/msr_checksec.jpg" class>
+
+<p>该题的main函数无法反汇编，所以就着汇编审</p>
+<img src="/2021/12/17/shellcode/msr_main.jpg" class>
+
+<p>可以看到开辟了 0x410 个字节的栈空间，然后往 buf 处输入最多 0x400 个字节，所以没有溢出。然后将 rax 的值与0进行比较，即将 read() 读取的字节数与0进行比较 ，如果大于0则跳转到 <code>loc_11AC</code>，否则跳转到 <code>locret_1254</code></p>
+<img src="/2021/12/17/shellcode/msr_11AC.jpg" class>
+
+<img src="/2021/12/17/shellcode/msr_1254.jpg" class>
+
+<p>可见<code>locret_1254</code> 用来结束程序，<code>loc_11AC</code> 处将0赋给 var_4 之后跳转到 <code>loc_123A</code> ,如下</p>
+<img src="/2021/12/17/shellcode/msr_123A.jpg" class>
+
+<p>可以看到此处将 var_4 和 var_8 进行比较，若 var_4 小于 var_8 则跳转到 <code>loc_11B8</code> 处，由前文我们知道 var_4 为0，var_8 一定大于0，所以这里会进行跳转。</p>
+<img src="/2021/12/17/shellcode/msr_11B8.jpg" class>
+
+<img src="/2021/12/17/shellcode/msr_11FC.jpg" class>
+
+<p>从 11B8-12AC 这一段汇编我们可以知道其是检查我们的输入是否在 <code>(60,74)||(2f,5a)</code>(大概）的范围里，如果不是则跳转到 1254 处结束程序，如果符合则跳转到 1236 处将 var_4 +1 以此进入一个循环，直到将我们的输入的每一位都检查完后会在 123A 处 <code>call rax</code> 也就是执行我们的输入，到这里我们的思路就很明确了，只要我们输入一段满足其输入限制的shellcode 就可以了。然后用 alpha3 生成即可</p>
+<h4 id="starctf-2019-babyshell"><a href="#starctf-2019-babyshell" class="headerlink" title="starctf_2019_babyshell"></a>starctf_2019_babyshell</h4><p>main() 函数如下</p>
+<img src="/2021/12/17/shellcode/sbs_main.jpg" class>
+
+<p>sub_400786() 函数如下</p>
+<img src="/2021/12/17/shellcode/sbs_400786.jpg" class>
+
+<p>可见在 main() 函数中我们可以直接往用 mmap 开辟出来的一段空间中写入一段内容，最后会直接执行这段内容，显然我们可以直接输入shellcode来getshell。但在执行前 sub_400786() 函数对我们的输入进行检查，即输入的每一位都必须是 unk_400978 中的字符，我们查看 unk_400978 中的内容</p>
+<img src="/2021/12/17/shellcode/sbs_400978.jpg" class>
+
+<p>显然我们想直接构造出符合条件的shellcode是比较困难的，但是如果可以让shellcode的前面加上 ‘\x00’ 开头的一段机器码，且这段机器码不会影响shellcode的执行，那么就可以pass掉整段检查过程。可用的机器码有 <code>\x00B\x22</code>、<code>\x00B\x00</code> 等</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">p=remote(<span class="string">&#x27;node3.buuoj.cn&#x27;</span>,<span class="number">26268</span>)</span><br><span class="line">context.arch = <span class="string">&quot;amd64&quot;</span></span><br><span class="line">p.recvuntil(<span class="string">&#x27;plz:&#x27;</span>)</span><br><span class="line">payload=<span class="string">b&#x27;\x00B\x00&#x27;</span>+asm(shellcraft.sh())</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<h4 id="2021强网杯-shellcode"><a href="#2021强网杯-shellcode" class="headerlink" title="2021强网杯-shellcode"></a>2021强网杯-shellcode</h4><p>在这里我们要先知道，程序是怎么知道要以64位模式运行还是以32位模式运行的；寄存器中有一个cs寄存器，cs = 0x23代表32位模式，cs = 0x33代表64位模式，而cs寄存器就是通过上面提到的<code>retfq</code>汇编指令来修改</p>
+<p>retfq有两步操作，<code>ret</code>以及<code>set cs</code>，所以执行retfq会跳转到rsp同时将cs设置为[rsp+0x8]，我们只需要事先在ret位置写入32位的shellcode就可以执行了，但是这里有一点需要注意的是，retfq跳转过去的时候程序已经切换成了32位模式，所以地址解析也是以32位的规则来的，所以原先的<code>rsp = 0x7ffe530d01b8</code>会被解析成<code>esp = 0x530d01b8</code></p>
+<p>因为call的是rbx，所以rbx中存储着shellcode执行的起始地址，将rbx pop 给rax，就可以用rax+偏移来得到push rdx;pop rdx;指令的地址，进而进行异或处理（其实不是很懂为什么不直接用rbx做基址）</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/Linux%E4%BF%9D%E6%8A%A4%E6%8A%80%E6%9C%AF/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1020,93 +1123,10 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/11/28/%E4%B8%80%E4%BA%9B%E7%AE%80%E5%8D%95%E7%9A%84%E7%BB%95%E8%BF%87/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/11/28/%E4%B8%80%E4%BA%9B%E7%AE%80%E5%8D%95%E7%9A%84%E7%BB%95%E8%BF%87/" class="post-title-link" itemprop="url">一些简单的绕过</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-11-28 21:36:14" itemprop="dateCreated datePublished" datetime="2021-11-28T21:36:14+08:00">2021-11-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-05-09 00:03:55" itemprop="dateModified" datetime="2022-05-09T00:03:55+08:00">2022-05-09</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="利用‘-x00’截断使strlen为0"><a href="#利用‘-x00’截断使strlen为0" class="headerlink" title="利用‘\x00’截断使strlen为0"></a>利用‘\x00’截断使strlen为0</h3><p>一道例题，main函数如下：</p>
-<img src="/2021/11/28/%E4%B8%80%E4%BA%9B%E7%AE%80%E5%8D%95%E7%9A%84%E7%BB%95%E8%BF%87/main.png" class>
-
-<p>可以看到程序先从 /dev/urandom 中读取了四个字节的随机数给buf，并将buf传给了func1，我们跟进到func1</p>
-<img src="/2021/11/28/%E4%B8%80%E4%BA%9B%E7%AE%80%E5%8D%95%E7%9A%84%E7%BB%95%E8%BF%87/func1.jpg" class>
-
-<p>可以看到程序先将 a1(传进来的buf) 传给了 s ，然后我们再进行一次输入，将输入和 a1 进行比较，如果相等则返回 buf[7]。</p>
-<p>我们注意到 strncmp() 中比较的字长是由 strlen(buf) 来决定的，而buf又可以由我们控制，且 strlen() 在碰到第一个结束字符后就停止计数，所以我们将 buf[] 的第一个字节设置成 ‘\x00’ 的话，就可以使strlen(buf) == 0，从而绕过 strncmp() 的比较。</p>
-<p>因为题目简单，这里只记录一下绕过方法。</p>
-<h3 id="有符号数与无符号数所产生的问题"><a href="#有符号数与无符号数所产生的问题" class="headerlink" title="有符号数与无符号数所产生的问题"></a>有符号数与无符号数所产生的问题</h3><p>这个问题算是很常见了，经常出现在有符号数与无符号数之间的比较以及转换中。</p>
-<p>比如传进read函数的第三个参数就会被解析成无符号类型整数，但是在题目中要求我们输入的size为有符号类型整数的时候，往往就能输入一个负数造成溢出……</p>
-<p>这一类问题很多而且不局限于这种情况，主要就是做题时最好留个心眼，判断一下题目中有没有这种问题。</p>
-<h4 id="ZCTF-2016-note3"><a href="#ZCTF-2016-note3" class="headerlink" title="ZCTF_2016_note3"></a>ZCTF_2016_note3</h4><p>这是一道比较常规的堆题，这题有一个堆溢出，发生在这里</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">size = sub_4009B9();	<span class="comment">//sub_4009B9()函数正常返回一个size</span></span><br><span class="line"><span class="keyword">if</span> ( size &lt; <span class="number">0</span> )</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Length error&quot;</span>);</span><br><span class="line"><span class="keyword">if</span> ( size &gt; <span class="number">0x400</span> )</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Content is too long&quot;</span>);</span><br><span class="line">chunk = <span class="built_in">malloc</span>(size);</span><br><span class="line"><span class="built_in">puts</span>(<span class="string">&quot;Input the note content:&quot;</span>);</span><br><span class="line">my_read(chunk, size, <span class="number">10</span>);</span><br><span class="line">*(&amp;ptr + i) = chunk;</span><br></pre></td></tr></table></figure>
-
-<p>题目中利用了my_read函数来向我们申请的chunk中输入内容，size是由我们控制的，my_read函数如下</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 __fastcall <span class="title">my_read</span><span class="params">(__int64 a1, __int64 len, <span class="keyword">char</span> a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">char</span> buf; <span class="comment">// [rsp+2Fh] [rbp-11h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 i; <span class="comment">// [rsp+30h] [rbp-10h]</span></span><br><span class="line">  <span class="keyword">ssize_t</span> v7; <span class="comment">// [rsp+38h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0LL</span>; len - <span class="number">1</span> &gt; i; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    v7 = read(<span class="number">0</span>, &amp;buf, <span class="number">1uLL</span>);</span><br><span class="line">    <span class="keyword">if</span> ( v7 &lt;= <span class="number">0</span> )</span><br><span class="line">      <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">    <span class="keyword">if</span> ( buf == a3 )</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    *(i + a1) = buf;</span><br><span class="line">  &#125;</span><br><span class="line">  *(a1 + i) = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">return</span> i;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这个函数的问题出在for循环的结束条件<code>len - 1 &gt; i</code>这里，对于一个正常的len来说当然没什么问题，但是如果我们传入的<code>len == 0</code>的话，那么<code>len - 1 == -1</code>，而我们要注意到，i是一个无符号类型整数，其在跟<code>len - 1</code>比较时就会将<code>len - 1</code>转换为无符号类型整数，也就相当于我们传入了一个最大的正整数，那么我们就可以往chunk中几乎无限的输入，从而造成了堆溢出。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1172,7 +1192,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">60</span>
+          <span class="site-state-item-count">61</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
