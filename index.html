@@ -648,7 +648,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2022/10/03/%E4%BB%8E%E5%BC%BA%E7%BD%91%E6%9D%AF-core%E5%85%A5%E9%97%A8linux-kernel/" class="post-title-link" itemprop="url">从强网杯-core入门linux-kernel(无保护内核栈溢出)</a>
+            <a href="/2022/10/03/%E4%BB%8E%E5%BC%BA%E7%BD%91%E6%9D%AF-core%E5%85%A5%E9%97%A8linux-kernel/" class="post-title-link" itemprop="url">从强网杯-core入门linux-kernel</a>
         </h2>
 
         <div class="post-meta">
@@ -665,7 +665,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-10-23 21:23:46" itemprop="dateModified" datetime="2022-10-23T21:23:46+08:00">2022-10-23</time>
+                <time title="修改时间：2023-03-27 22:14:51" itemprop="dateModified" datetime="2023-03-27T22:14:51+08:00">2023-03-27</time>
               </span>
 
           
@@ -679,7 +679,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="从强网杯-core入门linux-kernel"><a href="#从强网杯-core入门linux-kernel" class="headerlink" title="从强网杯-core入门linux kernel"></a>从强网杯-core入门linux kernel</h2><p>虽然这题不是那种最简单的入门题，但是对于已经比较熟悉用户态pwn的人来说这题的难度并不难，从这题能够学习到关于linux kernel pwn的很多相关知识</p>
+          <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>虽然这题不是那种最简单的入门题，但是对于已经比较熟悉用户态pwn的人来说这题的难度并不难，从这题能够学习到关于linux kernel pwn的很多相关知识</p>
 <p>题目最先给的是一个<code>.tar.gz</code>文件，解包之后如下：</p>
 <img src="/2022/10/03/%E4%BB%8E%E5%BC%BA%E7%BD%91%E6%9D%AF-core%E5%85%A5%E9%97%A8linux-kernel/core-1.jpg" class>
 
@@ -707,6 +707,9 @@
 <h3 id="About-调试"><a href="#About-调试" class="headerlink" title="About 调试"></a>About 调试</h3><h4 id="gdb"><a href="#gdb" class="headerlink" title="gdb"></a>gdb</h4><p>设置gdb远程调试时的位数：<code>set architecture i386:x86-64</code>，可以写在<code>~/.gdbinit</code>里</p>
 <p>gdb远程附加：<code>target remote:1234</code></p>
 <p>添加符号表：<code>add-symbol-file ./core.ko base_addr</code>，<code>base_addr</code>是驱动加载的基地址，可以在root权限启动内核时用<code>lsmod</code>命令查看到</p>
+<p>以上这些内容其实也可以写到一个sh里，方便很多</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/sh</span></span><br><span class="line"></span><br><span class="line">gdb -q \</span><br><span class="line">        -ex <span class="string">&quot;set architecture i386:x86-64&quot;</span> \</span><br><span class="line">        -ex <span class="string">&quot;file ../vmlinux&quot;</span> \</span><br><span class="line">        -ex <span class="string">&quot;add-symbol-file ./core.ko [base_addr]&quot;</span> \</span><br><span class="line">        -ex <span class="string">&quot;target remote :1234&quot;</span></span><br></pre></td></tr></table></figure>
+
 <h4 id="poc编译"><a href="#poc编译" class="headerlink" title="poc编译"></a>poc编译</h4><p>因为一般的内核镜像里是没有libc文件的，所以我们写好的c程序需要静态编译才能让内核去运行：<code>gcc ./poc.c -o poc -static -w</code>，如果里面用到的内联汇编是Intel的那还需要加个参数：<code>gcc poc.c -o poc -static -masm=intel</code></p>
 <p>编译好poc后将其打包进<code>.cpio</code>内即可</p>
 <h4 id="完整调试流程"><a href="#完整调试流程" class="headerlink" title="完整调试流程"></a>完整调试流程</h4><ol>
