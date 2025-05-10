@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="前言这次西湖3道pwn两道iot，pwn每题两三解、iot一道0解一道2解，感觉现在比赛的题目越来越难了，特别是大比赛 babywin一道Windows的pwn，也是我第一次接触，没有解出来，这里作复现学习和记录一下调试方法 调试在此之前是环境搭建，网上已经提到很多了，而且都是类似的 调试目前学的是clang师傅的，用socat+IDA+pwntools去调，就是感觉每次IDA attach时都要">
+<meta property="og:type" content="article">
+<meta property="og:title" content="西湖论剑2024">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="前言这次西湖3道pwn两道iot，pwn每题两三解、iot一道0解一道2解，感觉现在比赛的题目越来越难了，特别是大比赛 babywin一道Windows的pwn，也是我第一次接触，没有解出来，这里作复现学习和记录一下调试方法 调试在此之前是环境搭建，网上已经提到很多了，而且都是类似的 调试目前学的是clang师傅的，用socat+IDA+pwntools去调，就是感觉每次IDA attach时都要">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130170205287.png">
+<meta property="og:image" content="https://github.com/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130172122074.png">
+<meta property="og:image" content="https://github.com/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130172218898.png">
+<meta property="og:image" content="https://github.com/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130183521595.png">
+<meta property="article:published_time" content="2024-01-30T08:47:06.000Z">
+<meta property="article:modified_time" content="2025-05-10T05:43:29.429Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="winpwn">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130170205287.png">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>西湖论剑2024 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          西湖论剑2024
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-01-30 16:47:06" itemprop="dateCreated datePublished" datetime="2024-01-30T16:47:06+08:00">2024-01-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-05-10 13:43:29" itemprop="dateModified" datetime="2025-05-10T13:43:29+08:00">2025-05-10</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>这次西湖3道pwn两道iot，pwn每题两三解、iot一道0解一道2解，感觉现在比赛的题目越来越难了，特别是大比赛</p>
+<h1 id="babywin"><a href="#babywin" class="headerlink" title="babywin"></a>babywin</h1><p>一道Windows的pwn，也是我第一次接触，没有解出来，这里作复现学习和记录一下调试方法</p>
+<h3 id="调试"><a href="#调试" class="headerlink" title="调试"></a>调试</h3><p>在此之前是环境搭建，网上已经提到很多了，而且都是类似的</p>
+<p>调试目前学的是<a target="_blank" rel="noopener" href="https://xuanxuanblingbling.github.io/ctf/pwn/2020/07/09/winpwn/">clang师傅</a>的，用socat+IDA+pwntools去调，就是感觉每次IDA attach时都要搜索一下稍微有点麻烦</p>
+<ol>
+<li>先用socat架起来：<code>socat tcp-listen:8888,fork EXEC:EasyWinHeap.exe,pipes &amp;</code></li>
+<li>然后pwntools直接remote过去</li>
+<li>IDA里attach本地跑起来的题目进程：Debugger选<code>Local Windows debugger</code>，然后attach即可</li>
+</ol>
+<h2 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h2><p>Windows的保护相对于Linux要更多更复杂，github有个<a href="https://github.com/Wenzel/checksec.py">winchecksec</a>的项目，可以用它release的程序或者脚本，直接用程序就不用管脚本的依赖了，对题目程序执行结果如下</p>
+<img src="/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130170205287.png" class="" title="image-20240130170205287">
+
+<p>不知道为什么会尝试打开一些Linux的库文件，但是还是能看到程序的保护的</p>
+<p>Windows的ASLR跟Linux不太一样，开启与否是由文件本身决定的，也就是说这题是有程序地址和栈地址的（堆还是变化的），且NX关闭，能打shellcode。这题主要是开了Canary和SafeSEH</p>
+<h3 id="Canary"><a href="#Canary" class="headerlink" title="Canary"></a>Canary</h3><p>Windows的Canary跟Linux也有些不同，linux的Canary一般是在fs:0x28处，Windows的Canary保存在程序段</p>
+<img src="/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130172122074.png" class="" title="image-20240130172122074">
+
+<p>且会在main函数开始前初始化</p>
+<img src="/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130172218898.png" class="" title="image-20240130172218898">
+
+<h3 id="SEH"><a href="#SEH" class="headerlink" title="SEH"></a>SEH</h3><p>Windows对C/C++做的语法拓展，属于程序控制结构，用于处理异常事件（就像Linux用signal注册的异常处理函数）</p>
+<h4 id="相关结构体"><a href="#相关结构体" class="headerlink" title="相关结构体"></a>相关结构体</h4><h5 id="TIB"><a href="#TIB" class="headerlink" title="TIB"></a>TIB</h5><h3 id="比赛时遇到的问题"><a href="#比赛时遇到的问题" class="headerlink" title="比赛时遇到的问题"></a>比赛时遇到的问题</h3><p>在main函数开始之前其实还有一大段代码，其中存在这个函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">_DWORD *__cdecl <span class="title">sub_401AD0</span><span class="params">(<span class="keyword">int</span> a1, <span class="keyword">int</span> a2)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">void</span> *v4; <span class="comment">// esp</span></span><br><span class="line">  <span class="keyword">void</span> *v6; <span class="comment">// [esp-18h] [ebp-18h]</span></span><br><span class="line">  _DWORD v7[<span class="number">2</span>]; <span class="comment">// [esp-8h] [ebp-8h] BYREF</span></span><br><span class="line">  <span class="keyword">void</span> *retaddr; <span class="comment">// [esp+0h] [ebp+0h]</span></span><br><span class="line">  <span class="keyword">int</span> v9; <span class="comment">// [esp+4h] [ebp+4h]</span></span><br><span class="line"></span><br><span class="line">  v7[<span class="number">1</span>] = _except_handler4;</span><br><span class="line">  v7[<span class="number">0</span>] = NtCurrentTeb()-&gt;NtTib.ExceptionList;</span><br><span class="line">  v4 = alloca(a2);</span><br><span class="line">  v9 = <span class="number">-2</span>;</span><br><span class="line">  retaddr = v6;</span><br><span class="line">  <span class="keyword">return</span> v7;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>猜测是用来注册异常处理函数<code>_except_handler4</code>的，可以看到这个函数的逻辑明显跟canary的处理有关</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> __cdecl _except_handler4(_DWORD *a1, <span class="keyword">int</span> a2, <span class="keyword">int</span> a3, <span class="keyword">int</span> a4)</span><br><span class="line">&#123;</span><br><span class="line">  *a1 = _filter_x86_sse2_floating_point_exception_default(*a1);</span><br><span class="line">  <span class="keyword">return</span> except_handler4_common(&amp;__security_cookie, __security_check_cookie, a1, a2, a3, a4);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我将栈上的canary覆盖之后按逻辑会走一个异常处理，应该是走上面这个，但是实际上发现走的是另外的一个结束方法，是下面这个函数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> __cdecl __noreturn __report_gsfailure()</span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">int</span> v0; <span class="comment">// ebx</span></span><br><span class="line">  <span class="keyword">int</span> v1; <span class="comment">// edi</span></span><br><span class="line">  <span class="keyword">int</span> v2; <span class="comment">// esi</span></span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// edx</span></span><br><span class="line">  <span class="keyword">int</span> v4; <span class="comment">// ecx</span></span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v5; <span class="comment">// kr00_4</span></span><br><span class="line">  <span class="keyword">int</span> vars0; <span class="comment">// [esp+324h] [ebp+0h]</span></span><br><span class="line">  <span class="keyword">int</span> retaddr; <span class="comment">// [esp+328h] [ebp+4h]</span></span><br><span class="line">  <span class="keyword">char</span> v8; <span class="comment">// [esp+32Ch] [ebp+8h] BYREF</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> ( IsProcessorFeaturePresent(<span class="number">0x17</span>u) )</span><br><span class="line">    __fastfail(<span class="number">2u</span>);</span><br><span class="line">  dword_403120 = <span class="number">0</span>;</span><br><span class="line">  dword_40311C = v4;</span><br><span class="line">  dword_403118 = v3;</span><br><span class="line">  dword_403114 = v0;</span><br><span class="line">  dword_403110 = v2;</span><br><span class="line">  dword_40310C = v1;</span><br><span class="line">  word_403138 = __SS__;</span><br><span class="line">  word_40312C = __CS__;</span><br><span class="line">  word_403108 = __DS__;</span><br><span class="line">  word_403104 = __ES__;</span><br><span class="line">  word_403100 = __FS__;</span><br><span class="line">  word_4030FC = __GS__;</span><br><span class="line">  v5 = __readeflags();</span><br><span class="line">  dword_403130 = v5;</span><br><span class="line">  dword_403124 = vars0;</span><br><span class="line">  dword_403128 = retaddr;</span><br><span class="line">  dword_403134 = (<span class="keyword">int</span>)&amp;v8;</span><br><span class="line">  dword_403070 = <span class="number">65537</span>;</span><br><span class="line">  dword_40302C = retaddr;</span><br><span class="line">  dword_403020 = <span class="number">-1073740791</span>;</span><br><span class="line">  dword_403024 = <span class="number">1</span>;</span><br><span class="line">  dword_403030 = <span class="number">1</span>;</span><br><span class="line">  dword_403034 = <span class="number">2</span>;</span><br><span class="line">  __raise_securityfailure((struct _EXCEPTION_POINTERS *)&amp;ExceptionInfo);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>IsProcessorFeaturePresent()</code>函数是用来确定当前计算机是否支持指定的处理器功能，0x17对应<strong>PF_FASTFAIL_AVAILABLE</strong>，表示<code>_fastfail()</code>可用，从名字可以看出来意思就是当<code>_fastfail()</code>可用的时候就会走这条路径进行快速的结束，在这条路径中不会调用前面提到的<code>_except_handler4()</code>。既然<code>IsProcessorFeaturePresent()</code>的结果是跟当前计算机有关系的，那么合理的猜测是远程靶机可能不会走<code>_fastfail()</code>，于是手动改一下跳转，让程序继续往下走，到<code>__raise_securityfailure()</code>，从名字可以看出这个也是一个异常处理相关的函数，如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">BOOL __cdecl __raise_securityfailure(struct _EXCEPTION_POINTERS *ExceptionInfo)</span><br><span class="line">&#123;</span><br><span class="line">  HANDLE CurrentProcess; <span class="comment">// eax</span></span><br><span class="line"></span><br><span class="line">  SetUnhandledExceptionFilter(<span class="number">0</span>);</span><br><span class="line">  UnhandledExceptionFilter(ExceptionInfo);</span><br><span class="line">  CurrentProcess = GetCurrentProcess();</span><br><span class="line">  <span class="keyword">return</span> TerminateProcess(CurrentProcess, <span class="number">0xC0000409</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接下来就是我不太理解的地方了，即便我走这个路径，程序依然不会调用<code>_except_handler4()</code>，而是做了很多别的事情之后通过别的方式结束了程序（这部分在跟的时候没有试着去理解，是一个不太好的习惯）</p>
+<p>在程序栈上面是能找到前面所述的那块结构的，而且其中的函数指针确实是这个函数，那么为什么最后还是不会调用它呢？</p>
+<img src="/2024/01/30/%E8%A5%BF%E6%B9%96%E8%AE%BA%E5%89%912024/image-20240130183521595.png" class="" title="image-20240130183521595">
+
+<p>目前猜测是在那块异常处理函数中有某块逻辑没有满足，导致没有走<code>_except_handler4()</code></p>
+<h5 id="目前进度到这里，后面的内容以后继续填坑"><a href="#目前进度到这里，后面的内容以后继续填坑" class="headerlink" title="目前进度到这里，后面的内容以后继续填坑"></a>目前进度到这里，后面的内容以后继续填坑</h5>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/winpwn/" rel="tag"># winpwn</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/11/06/2023%E9%B9%8F%E5%9F%8E%E6%9D%AF/" rel="prev" title="2023鹏城杯">
+      <i class="fa fa-chevron-left"></i> 2023鹏城杯
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#babywin"><span class="nav-number">2.</span> <span class="nav-text">babywin</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B0%83%E8%AF%95"><span class="nav-number">2.0.1.</span> <span class="nav-text">调试</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A2%98%E7%9B%AE"><span class="nav-number">2.1.</span> <span class="nav-text">题目</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Canary"><span class="nav-number">2.1.1.</span> <span class="nav-text">Canary</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SEH"><span class="nav-number">2.1.2.</span> <span class="nav-text">SEH</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E7%BB%93%E6%9E%84%E4%BD%93"><span class="nav-number">2.1.2.1.</span> <span class="nav-text">相关结构体</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#TIB"><span class="nav-number">2.1.2.1.1.</span> <span class="nav-text">TIB</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AF%94%E8%B5%9B%E6%97%B6%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">2.1.3.</span> <span class="nav-text">比赛时遇到的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%9B%AE%E5%89%8D%E8%BF%9B%E5%BA%A6%E5%88%B0%E8%BF%99%E9%87%8C%EF%BC%8C%E5%90%8E%E9%9D%A2%E7%9A%84%E5%86%85%E5%AE%B9%E4%BB%A5%E5%90%8E%E7%BB%A7%E7%BB%AD%E5%A1%AB%E5%9D%91"><span class="nav-number">2.1.3.0.1.</span> <span class="nav-text">目前进度到这里，后面的内容以后继续填坑</span></a></li></ol></li></ol></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">74</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

